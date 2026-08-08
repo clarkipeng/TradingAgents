@@ -1,5 +1,7 @@
 import os
 
+from tradingagents.research_protocol import GLOBAL_EVENT_V2_BROAD_NEWS_QUERIES
+
 _TRADINGAGENTS_HOME = os.path.join(os.path.expanduser("~"), ".tradingagents")
 
 # Single source of truth for env-var → config-key overrides. To expose
@@ -18,6 +20,7 @@ _ENV_OVERRIDES = {
     "TRADINGAGENTS_CHECKPOINT_ENABLED":   "checkpoint_enabled",
     "TRADINGAGENTS_BENCHMARK_TICKER":     "benchmark_ticker",
     "TRADINGAGENTS_TEMPERATURE":          "temperature",
+    "TRADINGAGENTS_COLLECTED_MEDIA_ENABLED": "collected_media_enabled",
     "TRADINGAGENTS_LLM_MAX_RETRIES":      "llm_max_retries",
     # Provider-specific reasoning/thinking knobs (None = each provider's own
     # default). Settable here for non-interactive runs; the CLI also offers an
@@ -46,7 +49,7 @@ def _coerce(value: str, reference):
         if normalized in _BOOL_FALSE:
             return False
         raise ValueError(
-            f"expected a boolean ({'/'.join(_BOOL_TRUE + _BOOL_FALSE)}), got {value!r}"
+            f"expected a boolean ({'/'.join(_BOOL_TRUE + _BOOL_FALSE)})"
         )
     if isinstance(reference, int) and not isinstance(reference, bool):
         return int(value)
@@ -63,8 +66,18 @@ def _apply_env_overrides(config: dict) -> dict:
             continue
         try:
             config[key] = _coerce(raw, config.get(key))
-        except ValueError as exc:
-            raise ValueError(f"Invalid value for {env_var}: {exc}") from exc
+        except ValueError:
+            if isinstance(config.get(key), bool):
+                expected = f"a boolean ({'/'.join(_BOOL_TRUE + _BOOL_FALSE)})"
+            elif isinstance(config.get(key), int):
+                expected = "an integer"
+            elif isinstance(config.get(key), float):
+                expected = "a number"
+            else:
+                expected = "a valid value"
+            raise ValueError(
+                f"Invalid value for {env_var}; expected {expected}"
+            ) from None
     return config
 
 
@@ -103,6 +116,13 @@ DEFAULT_CONFIG = _apply_env_overrides({
     # Checkpoint/resume: when True, LangGraph saves state after each node
     # so a crashed run can resume from the last successful step.
     "checkpoint_enabled": False,
+    # Backtest mode disables the adaptive memory/reflection loop. Resolving a
+    # historical decision with returns visible today would leak its future into
+    # the next simulated decision.
+    "backtest_mode": False,
+    # Optional LLM-visible alias -> real vendor symbol mapping for ticker-mask
+    # negative controls. Empty in all ordinary live and historical runs.
+    "research_symbol_aliases": {},
     # Output language for analyst reports and final decision
     # Internal agent debate stays in English for reasoning quality
     "output_language": "English",
@@ -116,6 +136,17 @@ DEFAULT_CONFIG = _apply_env_overrides({
     "news_article_limit": 20,             # max articles per ticker (ticker-news)
     "global_news_article_limit": 10,      # max articles for global/macro news
     "global_news_lookback_days": 7,       # macro news lookback window
+    "global_news_novelty_lookback_days": 30,  # older context used only for novelty scoring
+    # Research mode that permits broad global narratives but no ticker-specific
+    # news or social-media inputs. Market-price tools remain available.
+    "global_topics_only": False,
+    # When enabled, historical analyst runs read the poller's captured database
+    # instead of today's live social/news feeds. This is required for a
+    # reproducible, look-ahead-safe sentiment backtest.
+    "collected_media_enabled": bool(
+        os.getenv("MEDIA_DB_URL") or os.getenv("DATABASE_URL")
+    ),
+    "media_db_url": os.getenv("MEDIA_DB_URL") or os.getenv("DATABASE_URL"),
     # Search queries used by get_global_news for macro headlines. Extend or
     # replace to broaden geographic / sector coverage.
     "global_news_queries": [
@@ -125,6 +156,34 @@ DEFAULT_CONFIG = _apply_env_overrides({
         "ECB Bank of England BOJ central bank policy",
         "oil commodities supply chain energy",
     ],
+    # Shared macro themes captured by the cloud poller. These are intentionally
+    # broad rather than ticker-specific and can also ground historical runs.
+    "macro_themes": {
+        "rates": {
+            "queries": list(GLOBAL_EVENT_V2_BROAD_NEWS_QUERIES["rates"]),
+            "prediction_topics": ["Fed rate cut", "recession"],
+        },
+        "trade": {
+            "queries": list(GLOBAL_EVENT_V2_BROAD_NEWS_QUERIES["trade"]),
+            "prediction_topics": ["tariffs", "US China trade"],
+        },
+        "politics": {
+            "queries": list(GLOBAL_EVENT_V2_BROAD_NEWS_QUERIES["politics"]),
+            "prediction_topics": ["election", "government shutdown"],
+        },
+        "companies": {
+            "queries": list(GLOBAL_EVENT_V2_BROAD_NEWS_QUERIES["companies"]),
+            "prediction_topics": [],
+        },
+        "technology": {
+            "queries": list(GLOBAL_EVENT_V2_BROAD_NEWS_QUERIES["technology"]),
+            "prediction_topics": ["AI bubble", "chip export ban"],
+        },
+        "energy": {
+            "queries": list(GLOBAL_EVENT_V2_BROAD_NEWS_QUERIES["energy"]),
+            "prediction_topics": ["oil price", "OPEC"],
+        },
+    },
     # Data vendor configuration
     # Category-level configuration (default for all tools in category).
     # The configured value is the exact vendor chain — requests are NOT silently

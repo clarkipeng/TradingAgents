@@ -32,6 +32,7 @@ from tradingagents.dataflows.config import set_config
 from tradingagents.dataflows.utils import safe_ticker_component
 from tradingagents.default_config import DEFAULT_CONFIG
 from tradingagents.llm_clients import create_llm_client
+from tradingagents.logging_utils import safe_exception_type
 from tradingagents.reporting import write_report_tree
 
 from .checkpointer import checkpoint_step, clear_checkpoint, get_checkpointer, thread_id
@@ -288,8 +289,8 @@ class TradingAgentsGraph:
             return raw, alpha, actual_days
         except Exception as e:
             logger.warning(
-                "Could not resolve outcome for %s on %s vs %s (will retry next run): %s",
-                ticker, trade_date, benchmark, e,
+                "Could not resolve outcome for %s on %s vs %s (%s); will retry next run",
+                ticker, trade_date, benchmark, safe_exception_type(e),
             )
             return None, None, None
 
@@ -371,8 +372,10 @@ class TradingAgentsGraph:
         """
         self.ticker = company_name
 
-        # Resolve any pending memory-log entries for this ticker before the pipeline runs.
-        self._resolve_pending_entries(company_name)
+        # Historical runs must not resolve past entries using outcomes visible
+        # today; that would feed future returns into the next simulated date.
+        if not self.config.get("backtest_mode"):
+            self._resolve_pending_entries(company_name)
 
         # Recompile with a checkpointer if the user opted in.
         if self.config.get("checkpoint_enabled"):
@@ -420,8 +423,21 @@ class TradingAgentsGraph:
         """Execute the graph and write the resulting state to disk and memory log."""
         # Initialize state — inject memory log context for PM and the
         # deterministically resolved instrument identity for all agents.
-        past_context = self.memory_log.get_past_context(company_name)
-        instrument_context = self.resolve_instrument_context(company_name, asset_type)
+        past_context = (
+            "" if self.config.get("backtest_mode")
+            else self.memory_log.get_past_context(company_name)
+        )
+        if self.config.get("backtest_mode"):
+            # Current profile metadata (name, sector, description) can encode
+            # mergers/reclassifications that happened after the simulated date.
+            # Keep only the user-supplied symbol/type in historical mode.
+            instrument_context = build_instrument_context(company_name, asset_type, {})
+            instrument_context += (
+                " Historical simulation: use only evidence returned by the supplied "
+                "point-in-time tools. Do not use latent knowledge of events after the trade date."
+            )
+        else:
+            instrument_context = self.resolve_instrument_context(company_name, asset_type)
         init_agent_state = self.propagator.create_initial_state(
             company_name,
             trade_date,
@@ -466,11 +482,12 @@ class TradingAgentsGraph:
         self._log_state(trade_date, final_state)
 
         # Store decision for deferred reflection on the next same-ticker run.
-        self.memory_log.store_decision(
-            ticker=company_name,
-            trade_date=trade_date,
-            final_trade_decision=final_state["final_trade_decision"],
-        )
+        if not self.config.get("backtest_mode"):
+            self.memory_log.store_decision(
+                ticker=company_name,
+                trade_date=trade_date,
+                final_trade_decision=final_state["final_trade_decision"],
+            )
 
         # Clear checkpoint on successful completion to avoid stale state.
         if self.config.get("checkpoint_enabled"):

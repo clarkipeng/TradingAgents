@@ -1,0 +1,83 @@
+# Fly.io deployment for the global-news collector — one always-on worker with
+# no public service. It writes point-in-time evidence to managed Postgres.
+#
+# Deploy and verify: see docs/production-runbook.md.
+#   - app name must be globally unique: change `app` below or let `fly launch` pick one
+#   - secrets (DB URL, source tokens) are set with `fly secrets set`, NOT here
+#   - data lives in Fly Managed Postgres via MEDIA_DB_URL; this worker is stateless
+#     and needs no Fly volume
+
+app = "tradagent"
+primary_region = "iad"          # keep close to the Fly MPG primary region
+kill_signal = "SIGTERM"
+# Let an in-flight bounded collection cycle finalize receipts and release its lease.
+kill_timeout = "300s"
+
+[build]
+  dockerfile = "Dockerfile.poller"
+
+[deploy]
+  # The image ENTRYPOINT remains tradingagents-poller, so this replaces only
+  # its CMD. The database-read-only preflight and silent webhook receiver-contract
+  # probe must pass before Fly updates the worker.
+  release_command = "--global-only --preflight"
+  release_command_timeout = "2m"
+  # Stop the sole old worker before starting the new one. This avoids a rolling
+  # overlap issuing duplicate provider requests; the hourly cadence tolerates
+  # the brief handoff and PostgreSQL also enforces a singleton advisory lease.
+  strategy = "immediate"
+
+[processes]
+  app = "--global-only"
+
+# Non-secret config. Credentials are set with Fly secrets, never committed.
+[env]
+  # The collector identity never acquires DDL authority or migrates on boot.
+  MEDIA_AUTO_MIGRATE = "false"
+  # This is the sole persistent runtime; disabling it is the emergency pause.
+  MEDIA_COLLECTION_ENABLED = "true"
+  # Production preflight fails closed if the notification path is not configured.
+  # Fresh forks may set this false only during an explicitly reviewed setup phase.
+  MEDIA_REQUIRE_ALERT_WEBHOOK = "true"
+  # Global-only mode requires this exact source boundary. Broad editorial-news
+  # queries are built in; X topics come from ranked general news and geographic
+  # trends, never a ticker/entity watchlist or first-party company feed.
+  MEDIA_POLLER_SOURCES = "x"
+  # Explicit versioned cadence: ten broad-news slots hourly, while paid X trend
+  # discovery/search runs once per UTC day and caps post reads at 30/day.
+  MEDIA_POLLER_INTERVAL = "3600"
+  MEDIA_POLLER_TRADING_HOURS = "false"
+  MEDIA_POLLER_X_INTERVAL = "86400"
+  MEDIA_POLLER_X_TOPICS = "3"
+  MEDIA_POLLER_X_LIMIT = "10"
+  # Private Fly health listener. There is deliberately no services/http_service
+  # section, so this port is not published on the app's public hostname.
+  MEDIA_HEALTH_PORT = "5500"
+
+# The sole persistent collector must come back after any unexpected process exit.
+# Fly still owns intentional deployment replacement and scale-to-zero operations;
+# durable receipts and request budgets make a restarted collection idempotent.
+[[restart]]
+  policy = "always"
+  processes = ["app"]
+
+# A top-level check works without defining a public Fly service. Keep the
+# existing check name for rollout and rollback compatibility. /readyz proves
+# that this process completed a fresh cycle without a runtime failure; strict
+# coverage remains available separately at /healthz.
+[checks.collector_health]
+  type = "http"
+  port = 5500
+  method = "get"
+  path = "/readyz"
+  interval = "60s"
+  timeout = "10s"
+  grace_period = "5m"
+  processes = ["app"]
+
+# Smallest machine is ample: the poller's import surface is ~30 MB RSS and it is
+# network-bound, idle most of the hour. Bump memory only if you add many tickers.
+[[vm]]
+  memory = "256mb"
+  cpu_kind = "shared"
+  cpus = 1
