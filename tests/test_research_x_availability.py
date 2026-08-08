@@ -491,6 +491,33 @@ def test_operational_and_research_cycle_structure_reject_the_same_mutations(
 
 
 @pytest.mark.unit
+def test_research_never_uses_an_operational_cycle_checkpoint():
+    primary_id = _spec()["collection_cycle_id"]
+    compatible_id = _legacy_spec()["collection_cycle_id"]
+
+    class Store:
+        def collection_cycle(self, cycle_id):
+            if cycle_id == primary_id:
+                return None
+            if cycle_id == compatible_id:
+                raise media_store.CollectionCycleRawContentMismatch(
+                    "strict replay mismatch"
+                )
+            return None
+
+        def collection_cycle_checkpoint(self, _cycle_id):
+            pytest.fail("formal research must never read operational checkpoints")
+
+    with pytest.raises(
+        media_store.CollectionCycleRawContentMismatch,
+        match="strict replay mismatch",
+    ):
+        project_x_cycle_availability(
+            Store(), cutoff=_CUTOFF, candidate_rows=[_x_row("candidate")]
+        )
+
+
+@pytest.mark.unit
 def test_complete_x_cycle_content_binds_authorized_rows_into_selection():
     news = _news_row()
     current = _x_row("current")

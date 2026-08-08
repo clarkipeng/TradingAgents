@@ -263,11 +263,20 @@ a registered, authenticated terminal shape from an older collector may be
 admitted so the release that repairs its stricter validation can deploy. The
 machine-readable result therefore reports identity-inventory validity, the
 number of repair-compatible cycles, and `x_evidence_health_validated=false`.
+If strict raw-content replay differs across an upgrade, only an exact registered
+prior identity may fall back to an operational checkpoint. That checkpoint
+reads the immutable parent, slots, receipts, and persisted raw-content IDs
+without claiming that the media rows replayed. A structurally complete
+checkpoint whose current manifest replay succeeds is exposed as `checkpointed`:
+it prevents a duplicate paid request and satisfies runtime coverage, while
+remaining visibly distinct from `complete`.
 Research still performs the full provenance, slot, receipt, manifest, and cutoff
-replay before using evidence. An unregistered identity or unauthenticated
-terminal envelope is rejected. This same-day check never calls a provider or
-rescans all historical rows, and its failure output contains only a sanitized
-exception class.
+replay before using evidence and never reads operational checkpoints. An
+authenticated compatible incomplete or running repair envelope may pass release
+preflight, but only a structurally complete checkpoint satisfies runtime
+coverage. An unregistered identity, a current-identity mismatch, or an
+unauthenticated envelope is rejected. This same-day check never calls a provider
+or rescans all historical rows.
 
 Provider responses are byte-bounded and schema-validated. Malformed X error
 envelopes and non-RSS HTML cannot masquerade as valid empty observations.
@@ -321,12 +330,14 @@ the pool while keeping the advisory-lock connection direct, matching production.
 
 If release preflight rejects the database, its log projection contains only a
 fixed failure stage and exception-type vocabulary, never the DSN or database
-message. For example, `primary_connection` / `OperationalError` localizes the
-failure to opening the configured primary engine without disclosing
-credentials. Inspect the failed release logs, `fly releases`, and the sole
-started Machine together. Do not bypass preflight or add the failed candidate to
-the historical compatibility list; correct the connection/runtime contract and
-redeploy through the wrapper.
+message. The stages are `configuration`, `build_identity`, `database_contract`,
+`database_clock`, `x_identity_inventory`, `x_cycle_replay`, `alert_receiver`,
+and `render`. For example, `database_contract:OperationalError` localizes a
+connection or schema-contract failure without disclosing credentials. Inspect
+the failed release logs, `fly releases`, and the sole started Machine together.
+Do not bypass preflight or add the failed candidate to the historical
+compatibility list; correct the connection/runtime contract and redeploy through
+the wrapper.
 
 After activation, Fly's existing `collector_health` check probes `/readyz` over
 its private network. It passes only after the current process finishes a fresh,
@@ -346,8 +357,10 @@ API.
 
 A `scheduled` X state before 21:00 is neutral, not proof that an earlier X
 incident recovered. An X-caused coverage incident remains active and silent
-through that pre-window state, then recovers only after a later daily X cycle is
-actually complete.
+through that pre-window state, then resolves only after a later daily X cycle is
+complete or its exact prior-identity paid attempt is authenticated as
+`checkpointed`. The latter is operational recovery only; it does not authorize
+the cycle's rows for research.
 
 A daemon runtime failure keeps both endpoints unhealthy, closes the store and
 any singleton lease, and reacquires both before another provider call. Retries

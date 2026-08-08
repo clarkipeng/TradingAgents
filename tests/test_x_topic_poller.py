@@ -683,7 +683,7 @@ def test_x_discovery_cycle_has_independent_daily_clock(tmp_path, monkeypatch):
         (tampered_item["source"], tampered_item["external_id"]),
     )
     store.conn.commit()
-    with pytest.raises(ValueError, match="raw-content replay detected tampering"):
+    with pytest.raises(ValueError, match="raw-content replay mismatch"):
         store.collection_cycle(cycle["collection_cycle_id"])
     store.close()
 

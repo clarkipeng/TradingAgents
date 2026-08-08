@@ -828,6 +828,49 @@ def test_coverage_alerts_once_per_transition_then_reminder_and_recovery(
 
 
 @pytest.mark.unit
+def test_checkpointed_x_cycle_recovers_an_x_caused_coverage_incident(
+    tmp_path, monkeypatch,
+):
+    store = SqliteMediaStore(tmp_path / "m.db")
+    events = []
+    monkeypatch.setattr(
+        poller,
+        "emit_alert",
+        lambda _component, event, **_kwargs: events.append(event) or True,
+    )
+    invalid = {
+        "complete": False,
+        "query_slots": [],
+        "missing_query_slots": [],
+        "missing_source_groups": [],
+        "periodic_requirements": {"x_daily": "invalid"},
+        "missing_periodic_requirements": ["x_daily"],
+    }
+    checkpointed = {
+        **invalid,
+        "complete": True,
+        "periodic_requirements": {"x_daily": "checkpointed"},
+        "missing_periodic_requirements": [],
+    }
+
+    poller._update_coverage_alert_state(
+        store, coverage=invalid, observed_utc=100.0
+    )
+    assert store.get_meta(poller._COVERAGE_ALERT_X_CAUSE_KEY) == 1.0
+    poller._update_coverage_alert_state(
+        store, coverage=checkpointed, observed_utc=200.0
+    )
+
+    assert events == [
+        "query_slot_coverage_incomplete",
+        "query_slot_coverage_recovered",
+    ]
+    assert store.get_meta(poller._COVERAGE_ALERT_STATE_KEY) == 0.0
+    assert store.get_meta(poller._COVERAGE_ALERT_X_CAUSE_KEY) == 0.0
+    store.close()
+
+
+@pytest.mark.unit
 def test_coverage_alert_retries_after_webhook_delivery_failure(tmp_path, monkeypatch):
     store = SqliteMediaStore(tmp_path / "m.db")
     delivered = iter([False, True])
@@ -1974,6 +2017,56 @@ def test_complete_compatible_x_cycle_handoffs_without_duplicate_paid_work(
 
 
 @pytest.mark.unit
+def test_checkpointed_compatible_cycle_is_operational_but_not_replay_validated(
+    tmp_path, monkeypatch,
+):
+    instant = 1_786_080_000.0
+    monkeypatch.setattr(poller.time, "time", lambda: instant)
+    store = SqliteMediaStore(tmp_path / "checkpointed-compatible-x.db")
+    monkeypatch.setattr(store, "server_observed_utc", lambda: instant)
+    compatible_spec = _finish_compatible_x_cycle(
+        store, instant, with_receipts=True
+    )
+    current_spec = poller._x_collection_cycle_spec(instant, 3)
+    receipt = store.fetch_runs(provider="xtrend")[0]
+    item = store.fetch_items(receipt["fetch_run_id"])[0]
+    store.conn.execute(
+        "UPDATE media_posts SET body='changed after collection' "
+        "WHERE source=? AND external_id=?",
+        (item["source"], item["external_id"]),
+    )
+    store.conn.commit()
+    initial_receipts = store.fetch_runs(limit=100)
+    _forbid_x_provider_calls(monkeypatch)
+
+    resolution = poller._x_daily_cycle_resolution(store, instant, 3)
+
+    assert resolution["origin"] == "compatible"
+    assert resolution["state"] == "checkpointed"
+    assert resolution["checkpoint_only"] is True
+    assert resolution["cycle"]["raw_content_replay_validated"] is False
+    assert set(poller.poll_x_topics_once(store, instant, 10, 3)) == {
+        (slot["provider"], slot["query_key"])
+        for slot in compatible_spec["identity"]["expected_static_slots"]
+    }
+    coverage = poller.run_cycle(
+        store,
+        tickers=[],
+        sources=[],
+        macro_themes={},
+        x_enabled=True,
+        force_x=True,
+    )
+
+    assert coverage["complete"] is True
+    assert coverage["periodic_requirements"] == {"x_daily": "checkpointed"}
+    assert coverage["missing_periodic_requirements"] == []
+    assert store.collection_cycle(current_spec["collection_cycle_id"]) is None
+    assert store.fetch_runs(limit=100) == initial_receipts
+    store.close()
+
+
+@pytest.mark.unit
 def test_first_present_compatible_x_cycle_wins_with_multiple_prior_cycles(
     tmp_path, monkeypatch,
 ):
@@ -2140,6 +2233,38 @@ def test_incomplete_compatible_x_cycle_blocks_force_but_stays_unhealthy(
 
 
 @pytest.mark.unit
+def test_replay_checkpoint_preserves_an_incomplete_compatible_attempt(
+    tmp_path, monkeypatch,
+):
+    instant = 1_786_080_000.0
+    monkeypatch.setattr(poller.time, "time", lambda: instant)
+    store = SqliteMediaStore(tmp_path / "incomplete-checkpoint-x.db")
+    monkeypatch.setattr(store, "server_observed_utc", lambda: instant)
+    spec = _finish_compatible_x_cycle(store, instant, with_receipts=False)
+    strict_read = store.collection_cycle
+
+    def fail_strict_replay(cycle_id):
+        if cycle_id == spec["collection_cycle_id"]:
+            raise poller.media_store.CollectionCycleRawContentMismatch(
+                "private diagnostic text"
+            )
+        return strict_read(cycle_id)
+
+    monkeypatch.setattr(store, "collection_cycle", fail_strict_replay)
+    _forbid_x_provider_calls(monkeypatch)
+
+    resolution = poller._x_daily_cycle_resolution(store, instant, 3)
+
+    assert resolution["origin"] == "compatible"
+    assert resolution["state"] == "incomplete"
+    assert resolution["checkpoint_only"] is True
+    assert resolution["cycle"]["raw_content_replay_validated"] is False
+    with pytest.raises(ValueError, match="not uniquely complete"):
+        poller.poll_x_topics_once(store, instant, 10, 3)
+    store.close()
+
+
+@pytest.mark.unit
 def test_invalid_compatible_x_cycle_is_blocked_and_never_accepted(monkeypatch):
     instant = 1_786_080_000.0
     compatible_spec = _compatible_x_cycle_spec(instant)
@@ -2171,6 +2296,36 @@ def test_invalid_compatible_x_cycle_is_blocked_and_never_accepted(monkeypatch):
     assert poller._x_daily_requirement_state(store, instant, 3) == "invalid"
     with pytest.raises(ValueError, match="not uniquely complete"):
         poller.poll_x_topics_once(store, instant, 10, 3)
+
+
+@pytest.mark.unit
+def test_current_cycle_replay_mismatch_never_uses_compatibility_checkpoint(
+    monkeypatch,
+):
+    instant = 1_786_080_000.0
+    current_spec = poller._x_collection_cycle_spec(instant, 3)
+
+    class Store:
+        def collection_cycle(self, cycle_id):
+            assert cycle_id == current_spec["collection_cycle_id"]
+            raise poller.media_store.CollectionCycleRawContentMismatch(
+                "private diagnostic text"
+            )
+
+        def collection_cycle_checkpoint(self, _cycle_id):
+            pytest.fail("current identities must never use compatibility checkpoints")
+
+    monkeypatch.setattr(
+        poller,
+        "fetch_top_news_headlines",
+        lambda **_kwargs: pytest.fail("an invalid current cycle must block paid work"),
+    )
+
+    resolution = poller._x_daily_cycle_resolution(Store(), instant, 3)
+
+    assert resolution["origin"] == "current"
+    assert resolution["state"] == "invalid"
+    assert resolution["checkpoint_only"] is False
 
 
 @pytest.mark.unit
@@ -2382,8 +2537,9 @@ def test_alert_test_has_no_database_or_provider_access(monkeypatch, capsys):
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize("replay_mismatch", [False, True])
 def test_preflight_is_read_only_sanitized_and_checks_production_contract(
-    monkeypatch, capsys,
+    monkeypatch, capsys, replay_mismatch,
 ):
     secret_db = "postgresql+psycopg://collector:secret@db.internal/evidence"
     secret_direct_db = (
@@ -2405,6 +2561,8 @@ def test_preflight_is_read_only_sanitized_and_checks_production_contract(
         "server_terminal_utc": server_now - 5,
         "manifest": old_manifest,
         "manifest_id": poller.content_id(old_manifest, prefix="cycle_manifest_"),
+        "manifest_valid": False,
+        "raw_content_replay_validated": False,
     }
     assert poller._x_collection_cycle_state(observed_spec, observed_cycle) == "invalid"
 
@@ -2438,6 +2596,15 @@ def test_preflight_is_read_only_sanitized_and_checks_production_contract(
         def collection_cycle(self, cycle_id):
             assert cycle_id == observed_spec["collection_cycle_id"]
             calls.append("cycle")
+            if replay_mismatch:
+                raise poller.media_store.CollectionCycleRawContentMismatch(
+                    "private diagnostic text"
+                )
+            return observed_cycle
+
+        def collection_cycle_checkpoint(self, cycle_id):
+            assert cycle_id == observed_spec["collection_cycle_id"]
+            calls.append("checkpoint")
             return observed_cycle
 
         def close(self):
@@ -2503,14 +2670,80 @@ def test_preflight_is_read_only_sanitized_and_checks_production_contract(
     )
     assert payload["alert_webhook_required"] is True
     assert payload["alert_probe_delivered"] is True
-    assert calls == [
-        "open", "preflight", "identities", "cycle", "probe", "close"
-    ]
+    expected_calls = ["open", "preflight", "identities", "cycle"]
+    if replay_mismatch:
+        expected_calls.append("checkpoint")
+    assert calls == [*expected_calls, "probe", "close"]
     rendered = json.dumps(payload)
     assert secret_db not in rendered
     assert secret_direct_db not in rendered
     assert secret_webhook not in rendered
     assert "x-secret-token" not in rendered
+
+
+@pytest.mark.unit
+def test_preflight_checkpoints_a_complete_compatible_replay_mismatch(
+    tmp_path, monkeypatch, capsys,
+):
+    secret_db = "postgresql+psycopg://collector:secret@db.internal/evidence"
+    server_now = 1_786_080_000.0
+    monkeypatch.setattr(poller.time, "time", lambda: server_now)
+    store = SqliteMediaStore(tmp_path / "preflight-checkpoint.db")
+    monkeypatch.setattr(store, "server_observed_utc", lambda: server_now)
+    spec = _finish_compatible_x_cycle(store, server_now, with_receipts=True)
+    receipt = store.fetch_runs(provider="xtrend")[0]
+    item = store.fetch_items(receipt["fetch_run_id"])[0]
+    store.conn.execute(
+        "UPDATE media_posts SET body='changed after collection' "
+        "WHERE source=? AND external_id=?",
+        (item["source"], item["external_id"]),
+    )
+    store.conn.commit()
+    with pytest.raises(poller.media_store.CollectionCycleRawContentMismatch):
+        store.collection_cycle(spec["collection_cycle_id"])
+    checkpoint_reads = []
+    read_checkpoint = store.collection_cycle_checkpoint
+    monkeypatch.setattr(
+        store,
+        "collection_cycle_checkpoint",
+        lambda cycle_id: checkpoint_reads.append(cycle_id)
+        or read_checkpoint(cycle_id),
+    )
+    monkeypatch.setattr(
+        store,
+        "collector_runtime_preflight",
+        lambda *, direct_url=None: {"contract_version": 3, "ready": True},
+        raising=False,
+    )
+    monkeypatch.setenv("MEDIA_COLLECTION_ENABLED", "true")
+    monkeypatch.setenv("MEDIA_AUTO_MIGRATE", "false")
+    monkeypatch.setenv("MEDIA_REQUIRE_ALERT_WEBHOOK", "false")
+    monkeypatch.setenv("X_BEARER_TOKEN", "x-secret-token")
+    monkeypatch.delenv("MEDIA_DB_DIRECT_URL", raising=False)
+    monkeypatch.setattr(poller, "open_store", lambda *_args, **_kwargs: store)
+    monkeypatch.setattr(poller, "build_identity", lambda: "build_" + "b" * 24)
+    for provider_name in (
+        "fetch_global_news", "fetch_x_topic", "fetch_x_trends",
+    ):
+        monkeypatch.setattr(
+            poller,
+            provider_name,
+            lambda *_args, **_kwargs: pytest.fail("preflight called a provider"),
+        )
+
+    poller.main([
+        "--global-only", "--preflight", "--sources", "x",
+        "--no-trading-hours", "--interval", "3600",
+        "--x-interval", "86400", "--health-port", "5500",
+        "--db", secret_db,
+    ])
+
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "ok"
+    assert payload["x_repair_compatible_cycle_count"] == 1
+    assert payload["x_evidence_health_validated"] is False
+    assert checkpoint_reads == [spec["collection_cycle_id"]]
+    assert "secret" not in json.dumps(payload)
 
 
 @pytest.mark.unit
@@ -2616,7 +2849,7 @@ def test_required_preflight_fails_when_sanitized_alert_probe_is_not_delivered(
     captured = capsys.readouterr()
     assert calls == ["open", "preflight", "identities", "probe", "close"]
     assert captured.out == ""
-    assert "collector preflight failed (RuntimeError)" in captured.err
+    assert "collector preflight failed (alert_receiver:RuntimeError)" in captured.err
     assert secret_db not in captured.err
     assert "secret" not in captured.err
 
@@ -2695,7 +2928,7 @@ def test_preflight_rejects_accepted_pair_with_wrong_frozen_shape_before_probe(
     captured = capsys.readouterr()
     assert calls == ["open", "preflight", "identities", "close"]
     assert captured.out == ""
-    assert "collector preflight failed (RuntimeError)" in captured.err
+    assert "collector preflight failed (x_cycle_replay:RuntimeError)" in captured.err
     assert "protocol_" not in captured.err
     assert "collector_" not in captured.err.replace("collector preflight", "")
 
@@ -2730,9 +2963,69 @@ def test_preflight_failure_never_renders_database_exception_text(monkeypatch, ca
         ])
 
     error = capsys.readouterr().err
-    assert "collector preflight failed (RuntimeError)" in error
+    assert "collector preflight failed (database_contract:RuntimeError)" in error
     assert secret_db not in error
     assert "secret" not in error
+
+
+@pytest.mark.unit
+def test_preflight_never_checkpoints_a_current_cycle_replay_mismatch(
+    monkeypatch, capsys,
+):
+    secret_db = "postgresql+psycopg://collector:secret@db.internal/evidence"
+    server_now = 1_786_080_000.0
+    spec = poller._x_collection_cycle_spec(server_now, 3)
+    calls = []
+
+    class Store:
+        def collector_runtime_preflight(self, *, direct_url=None):
+            return {"contract_version": 3, "ready": True}
+
+        def server_observed_utc(self):
+            return server_now
+
+        def collection_cycle_identities(self, cycle_kind, *, period_key):
+            return [{
+                "collection_cycle_id": spec["collection_cycle_id"],
+                "protocol_id": spec["identity"]["protocol_id"],
+                "collector_semantics_id": spec["identity"][
+                    "collector_semantics_id"
+                ],
+            }]
+
+        def collection_cycle(self, cycle_id):
+            assert cycle_id == spec["collection_cycle_id"]
+            raise poller.media_store.CollectionCycleRawContentMismatch(
+                "private diagnostic text"
+            )
+
+        def collection_cycle_checkpoint(self, _cycle_id):
+            pytest.fail("current identities must never use compatibility checkpoints")
+
+        def close(self):
+            calls.append("close")
+
+    monkeypatch.setenv("MEDIA_COLLECTION_ENABLED", "true")
+    monkeypatch.setenv("MEDIA_AUTO_MIGRATE", "false")
+    monkeypatch.setenv("MEDIA_REQUIRE_ALERT_WEBHOOK", "false")
+    monkeypatch.setenv("X_BEARER_TOKEN", "x-secret-token")
+    monkeypatch.setattr(poller, "open_store", lambda *_args, **_kwargs: Store())
+    monkeypatch.setattr(poller, "build_identity", lambda: "build_" + "b" * 24)
+
+    with pytest.raises(SystemExit):
+        poller.main([
+            "--global-only", "--preflight", "--sources", "x",
+            "--no-trading-hours", "--interval", "3600",
+            "--x-interval", "86400", "--health-port", "5500",
+            "--db", secret_db,
+        ])
+
+    error = capsys.readouterr().err
+    assert calls == ["close"]
+    assert "collector preflight failed " in error
+    assert "(x_cycle_replay:CollectionCycleRawContentMismatch)" in error
+    assert "private diagnostic text" not in error
+    assert secret_db not in error
 
 
 @pytest.mark.unit

@@ -681,6 +681,40 @@ def test_cycle_item_replay_preserves_exact_username_and_receipt_times(
         assert new["fetched_utc"] == 120.0
         assert old["latest_observed_utc"] == terminals["old-query"]
         assert new["latest_observed_utc"] == terminals["new-query"]
+
+        strict_cycle = store.collection_cycle(cycle_id)
+        assert strict_cycle["raw_content_replay_validated"] is True
+        strict_state = x_cycle_structural_state(spec, strict_cycle)
+        if backend == "sqlite":
+            store.conn.execute(
+                "UPDATE media_posts SET body='changed after collection' "
+                "WHERE source='x' AND external_id='same-post'"
+            )
+            store.conn.commit()
+        else:
+            from sqlalchemy import update
+
+            with store.engine.begin() as conn:
+                conn.execute(
+                    update(store.table).where(
+                        store.table.c.source == "x",
+                        store.table.c.external_id == "same-post",
+                    ).values(body="changed after collection")
+                )
+
+        with pytest.raises(
+            media_store_module.CollectionCycleRawContentMismatch,
+            match="raw-content replay mismatch",
+        ):
+            store.collection_cycle(cycle_id)
+        checkpoint = store.collection_cycle_checkpoint(cycle_id)
+        assert checkpoint["collection_cycle_id"] == cycle_id
+        assert checkpoint["identity_valid"] is True
+        assert checkpoint["manifest_valid"] is True
+        assert checkpoint["raw_content_replay_validated"] is False
+        assert x_cycle_structural_state(spec, checkpoint) == strict_state
+        with pytest.raises(media_store_module.CollectionCycleRawContentMismatch):
+            store.collection_cycle(cycle_id)
     finally:
         store.close()
 
