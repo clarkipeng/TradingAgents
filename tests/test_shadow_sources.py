@@ -20,7 +20,7 @@ def test_shadow_policy_is_separate_bounded_and_non_formal() -> None:
     assert policy["formal_projection_allowed"] is False
     assert policy["cycle_kind"] == "source-shadow-daily"
     assert policy["maximum_dynamic_slots"] == 0
-    assert policy["maximum_sequential_runtime_seconds"] <= 90
+    assert policy["maximum_sequential_runtime_seconds"] <= 150
     assert policy["recovery_stale_seconds"] > policy["maximum_sequential_runtime_seconds"]
     assert len(shadow_sources.SOURCE_SHADOW_STATIC_SLOTS) == 5
     assert (

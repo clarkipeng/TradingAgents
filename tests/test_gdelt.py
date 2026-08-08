@@ -87,9 +87,9 @@ def test_request_uses_exact_whole_second_utc_boundaries_not_relative_timespan() 
     assert "timespan" not in url.lower()
     assert request.call_args.kwargs == {
         "timeout": 3.0,
-        "attempts": 2,
+        "attempts": 1,
         "max_bytes": 1_000_000,
-        "deadline": 110.0,
+        "deadline": 125.0,
     }
     assert rows[0]["metadata"]["request_window"] == {
         "start_utc": _CAPTURED - 12 * 3600,

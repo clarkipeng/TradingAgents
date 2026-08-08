@@ -43,7 +43,7 @@ SOURCE_SHADOW_V1_POLICY: dict[str, Any] = {
         for provider, query_key in SOURCE_SHADOW_STATIC_SLOTS
     ],
     "maximum_dynamic_slots": 0,
-    "maximum_sequential_runtime_seconds": 90.0,
+    "maximum_sequential_runtime_seconds": 150.0,
     "recovery_stale_seconds": 300.0,
     "gdelt_company_authorship_filter": "media_sources.looks_company_authored",
     "hacker_news_first_party_handling": (
