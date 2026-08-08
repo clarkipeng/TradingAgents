@@ -10,9 +10,47 @@ from tradingagents import poller
 from tradingagents.dataflows import media_sources
 from tradingagents.dataflows.media_sources import _row
 from tradingagents.dataflows.media_store import SqliteMediaStore
+from tradingagents.dataflows.x_shadow import (
+    X_SHADOW_COLLECTOR_SEMANTICS_ID,
+    X_SHADOW_POLICY,
+    X_SHADOW_PROTOCOL_ID,
+    x_shadow_receipt_usd,
+)
 
 _X_WINDOW_OPEN_UTC = datetime(2026, 8, 5, 21, tzinfo=timezone.utc).timestamp()
 _X_WINDOW_CLOSED_UTC = datetime(2026, 8, 5, 23, 46, tzinfo=timezone.utc).timestamp()
+
+
+def _complete_formal_x_cycle(store, monkeypatch, now, *, topic_count=1):
+    categories = ("world", "business", "technology")
+    topics = [
+        {
+            "topic": f"trend_{categories[index]}",
+            "category": categories[index],
+            "query": f'"Global event {index}" reaction',
+            "external_id": f"headline-{index}",
+            "title": f"Global event {index} develops - Reuters",
+            "body": "summary",
+            "created_utc": now - 10 - index,
+            "publisher": "Reuters",
+            "metadata": {"publisher_domain": "reuters.com"},
+        }
+        for index in range(topic_count)
+    ]
+    monkeypatch.setattr(poller.time, "time", lambda: now)
+    monkeypatch.setattr(
+        poller, "fetch_x_trends", lambda *_args, **_kwargs: [{"name": "Global event"}]
+    )
+    monkeypatch.setattr(
+        poller, "fetch_top_news_headlines", lambda **_kwargs: list(topics)
+    )
+    monkeypatch.setattr(
+        poller, "discover_x_topics", lambda max_topics, **_kwargs: list(topics)[:max_topics]
+    )
+    monkeypatch.setattr(poller, "fetch_x_topic", lambda *_args, **_kwargs: [])
+    poller.poll_x_topics_once(store, now=now, limit=10, max_topics=3)
+    cycle_id = poller._x_collection_cycle_spec(now, 3)["collection_cycle_id"]
+    return topics, poller._stored_x_discovery_decision(store, cycle_id)
 
 
 @pytest.mark.unit
@@ -1581,3 +1619,324 @@ def test_discovery_queries_are_derived_only_from_ranked_headlines():
     assert "zephyrquill" in first["query"].lower()
     assert "quasarloom" in second["query"].lower()
     assert "xtrend" not in poller.GLOBAL_EVENT_V2_PROTOCOL["evidence"]["allowed_sources"]
+
+
+@pytest.mark.unit
+def test_x_recent_counts_preserves_exact_window_and_decision_lineage(
+    tmp_path, monkeypatch,
+):
+    end = datetime(2026, 8, 8, 12, tzinfo=timezone.utc).timestamp()
+    start = end - 166 * 3600
+    decision_id = "xdiscovery_" + "a" * 24
+    decision_captured = end - 3600
+    captured = {}
+
+    def iso(value):
+        return datetime.fromtimestamp(value, timezone.utc).isoformat().replace(
+            "+00:00", "Z"
+        )
+
+    bins = [
+        {"start": iso(value), "end": iso(value + 3600), "tweet_count": 1}
+        for value in range(int(start), int(end), 3600)
+    ]
+
+    def get_json(url, headers, timeout):
+        captured.update(url=url, headers=headers, timeout=timeout)
+        return {"data": bins, "meta": {"total_tweet_count": len(bins)}}
+
+    monkeypatch.setenv("X_BEARER_TOKEN", "configured")
+    monkeypatch.setattr(media_sources, "_get_json", get_json)
+    rows = media_sources.fetch_x_recent_counts(
+        "trend_world",
+        '"Global event" reaction',
+        end + 3599,
+        discovery_decision_id=decision_id,
+        discovery_decision_captured_utc=decision_captured,
+        start_utc=start,
+        end_utc=end,
+    )
+
+    params = parse_qs(urlparse(captured["url"]).query)
+    assert params["query"] == [
+        '("Global event" reaction) lang:en -is:retweet -is:reply'
+    ]
+    assert params["granularity"] == ["hour"]
+    assert params["start_time"] == [iso(start)]
+    assert params["end_time"] == [iso(end)]
+    snapshot = json.loads(rows[0]["body"])
+    assert snapshot["discovery_decision_id"] == decision_id
+    assert snapshot["discovery_decision_captured_utc"] == decision_captured
+    assert snapshot["snapshot_availability"] == "terminal-fetch-receipt-only"
+    assert snapshot["bin_availability"] == (
+        "descriptive-components-never-independent-observations"
+    )
+    assert rows[0]["created_utc"] == snapshot["captured_utc"]
+    assert rows[0]["metadata"]["discovery_decision_id"] == decision_id
+    assert len(snapshot["bins"]) == 166
+
+    store = SqliteMediaStore(tmp_path / "x-count-point-in-time.db")
+    store.store(rows)
+    assert store.history_asof(
+        "2026-08-01", "2026-08-02", sources=["xcount"]
+    ) == []
+    assert len(store.history_asof(
+        "2026-08-01", "2026-08-08", sources=["xcount"]
+    )) == 1
+    store.close()
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("query", "capture_delay", "decision_delay"),
+    [
+        ("q" * 512, 1, -1),
+        ("valid query", 3600, -1),
+        ("valid query", 1, 2),
+    ],
+)
+def test_x_recent_counts_rejects_invalid_requests_before_provider(
+    monkeypatch, query, capture_delay, decision_delay,
+):
+    end = datetime(2026, 8, 8, 12, tzinfo=timezone.utc).timestamp()
+    start = end - 166 * 3600
+    captured = end + capture_delay
+    monkeypatch.setenv("X_BEARER_TOKEN", "configured")
+    monkeypatch.setattr(
+        media_sources,
+        "_get_json",
+        lambda *_args, **_kwargs: pytest.fail("invalid request reached X"),
+    )
+    with pytest.raises(ValueError):
+        media_sources.fetch_x_recent_counts(
+            "trend_world",
+            query,
+            captured,
+            discovery_decision_id="xdiscovery_" + "b" * 24,
+            discovery_decision_captured_utc=end + decision_delay,
+            start_utc=start,
+            end_utc=end,
+        )
+
+
+@pytest.mark.unit
+def test_x_shadow_is_bounded_idempotent_and_accounted_from_terminal_facts(
+    tmp_path, monkeypatch,
+):
+    now = _X_WINDOW_OPEN_UTC
+    store = SqliteMediaStore(tmp_path / "x-shadow.db")
+    topics, decision = _complete_formal_x_cycle(
+        store, monkeypatch, now, topic_count=3
+    )
+    delayed = now + 5 * 3600
+    clock = {"now": delayed}
+    trend_calls = []
+    count_calls = []
+    monkeypatch.setattr(poller.time, "time", lambda: clock["now"])
+
+    def shadow_trends(woeid, *, limit):
+        trend_calls.append((woeid, limit))
+        return [{"name": f"trend-{woeid}-{rank}"} for rank in range(limit)]
+
+    def shadow_counts(topic, query, captured, **kwargs):
+        count_calls.append((topic, query, captured, kwargs))
+        assert kwargs["discovery_decision_id"] == decision["discovery_decision_id"]
+        assert kwargs["discovery_decision_captured_utc"] == decision["captured_utc"]
+        assert captured - kwargs["start_utc"] < 167 * 3600
+        return [_row(
+            "xcount", f"count-{len(count_calls)}", f"@{topic}", captured,
+            created_utc=kwargs["end_utc"], body=query,
+            metadata={"discovery_decision_id": kwargs["discovery_decision_id"]},
+        )]
+
+    monkeypatch.setattr(poller, "fetch_x_trends", shadow_trends)
+    monkeypatch.setattr(poller, "fetch_x_recent_counts", shadow_counts)
+    slots = poller.poll_x_shadow_once(store, now, max_topics=3)
+
+    spec = poller._x_shadow_collection_cycle_spec(now)
+    cycle = store.collection_cycle(spec["collection_cycle_id"])
+    receipts = [
+        row for row in store.fetch_runs(limit=100)
+        if row["collection_cycle_id"] == spec["collection_cycle_id"]
+    ]
+    assert cycle["status"] == "complete"
+    assert trend_calls == [(23424975, 5), (23424848, 5)]
+    assert len(count_calls) == len(topics) == 3
+    assert len(slots) == 5
+    assert {row["provider"] for row in receipts} == {"xtrend", "xcount"}
+    assert all(row["cost_units"] == 1.0 for row in receipts)
+    assert sum(x_shadow_receipt_usd(row) for row in receipts) == pytest.approx(0.115)
+    assert sum(row["cost_units"] for row in receipts) == 5.0
+    for receipt in receipts:
+        metadata = json.loads(receipt["metadata_json"])
+        assert metadata["protocol_id"] == X_SHADOW_PROTOCOL_ID
+        assert metadata["collector_semantics_id"] == X_SHADOW_COLLECTOR_SEMANTICS_ID
+        assert metadata["discovery_decision_id"] == decision["discovery_decision_id"]
+        assert metadata["cost_units_semantics"] == X_SHADOW_POLICY[
+            "receipt_accounting"
+        ]["cost_units_semantics"]
+    assert poller._x_daily_requirement_state(store, now, 3) == "complete"
+
+    receipt_ids = {row["fetch_run_id"] for row in receipts}
+    monkeypatch.setattr(
+        poller, "fetch_x_trends", lambda *_args, **_kwargs: pytest.fail("retried X")
+    )
+    monkeypatch.setattr(
+        poller,
+        "fetch_x_recent_counts",
+        lambda *_args, **_kwargs: pytest.fail("retried count"),
+    )
+    poller.poll_x_shadow_once(store, now, max_topics=3)
+    assert receipt_ids == {
+        row["fetch_run_id"] for row in store.fetch_runs(limit=100)
+        if row["collection_cycle_id"] == spec["collection_cycle_id"]
+    }
+    store.close()
+
+
+@pytest.mark.unit
+def test_unknown_same_day_x_shadow_identity_skips_without_touching_formal_health(
+    tmp_path, monkeypatch,
+):
+    now = _X_WINDOW_OPEN_UTC
+    store = SqliteMediaStore(tmp_path / "x-shadow-old-identity.db")
+    _complete_formal_x_cycle(store, monkeypatch, now)
+    old = poller.media_store.collection_cycle_spec(
+        cycle_kind="x-shadow-daily",
+        period_key="2026-08-05",
+        protocol_id="protocol_" + "1" * 24,
+        collector_semantics_id="collector_" + "2" * 24,
+        expected_static_slots=[("xtrend", "woeid:999")],
+        max_dynamic_slots=0,
+    )
+    store.start_collection_cycle(old, started_utc=now)
+    store.finish_collection_cycle(old["collection_cycle_id"], completed_utc=now + 1)
+    before = len(store.fetch_runs(limit=100))
+    monkeypatch.setattr(
+        poller, "fetch_x_trends", lambda *_args, **_kwargs: pytest.fail("called X")
+    )
+    monkeypatch.setattr(
+        poller, "fetch_x_recent_counts", lambda *_args, **_kwargs: pytest.fail("called X")
+    )
+
+    assert poller.poll_x_shadow_once(store, now, max_topics=3) == []
+    assert len(store.fetch_runs(limit=100)) == before
+    assert poller._x_daily_requirement_state(store, now, 3) == "complete"
+    assert store.collection_cycle(
+        poller._x_shadow_collection_cycle_spec(now)["collection_cycle_id"]
+    ) is None
+    store.close()
+
+
+@pytest.mark.unit
+def test_daemon_runs_x_shadow_only_after_core_health_is_terminal(monkeypatch):
+    events = []
+    stop = {"flag": False}
+
+    class Store:
+        def server_observed_utc(self):
+            return _X_WINDOW_OPEN_UTC
+
+    class Health:
+        def mark_cycle(self, _coverage, *, completed_utc):
+            assert completed_utc > 0
+            events.append("health")
+
+    def core(*_args, **_kwargs):
+        events.append("core")
+        return {"periodic_requirements": {"x_daily": "complete"}}
+
+    monkeypatch.setattr(poller, "run_cycle", core)
+    monkeypatch.setattr(
+        poller,
+        "poll_x_shadow_once",
+        lambda *_args, **_kwargs: events.append("shadow"),
+    )
+    monkeypatch.setattr(
+        poller,
+        "_sleep",
+        lambda _seconds, state, **_kwargs: state.__setitem__("flag", True),
+    )
+    poller.poll_forever(
+        Store(), [], [], 3600, {}, x_enabled=True,
+        health_state=Health(), stop=stop,
+        on_cycle_terminal=lambda: events.append("terminal"),
+    )
+    assert events == ["core", "health", "terminal", "shadow"]
+
+
+@pytest.mark.unit
+def test_x_shadow_provider_failures_do_not_change_formal_readiness(
+    tmp_path, monkeypatch,
+):
+    now = _X_WINDOW_OPEN_UTC
+    store = SqliteMediaStore(tmp_path / "x-shadow-provider-failure.db")
+    _complete_formal_x_cycle(store, monkeypatch, now)
+    monkeypatch.setattr(
+        poller,
+        "fetch_x_trends",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            poller.ProviderTransientError("unavailable")
+        ),
+    )
+    monkeypatch.setattr(
+        poller,
+        "fetch_x_recent_counts",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            poller.ProviderResponseError("bad response")
+        ),
+    )
+
+    poller.poll_x_shadow_once(store, now, max_topics=3)
+
+    spec = poller._x_shadow_collection_cycle_spec(now)
+    assert store.collection_cycle(spec["collection_cycle_id"])["status"] == "incomplete"
+    assert poller._x_daily_requirement_state(store, now, 3) == "complete"
+    receipts = [
+        row for row in store.fetch_runs(limit=100)
+        if row["collection_cycle_id"] == spec["collection_cycle_id"]
+    ]
+    assert len(receipts) == 3
+    assert {row["status"] for row in receipts} == {"failed"}
+    assert sum(x_shadow_receipt_usd(row) for row in receipts) == 0.0
+    store.close()
+
+
+@pytest.mark.unit
+def test_one_shot_runs_x_shadow_after_formal_cycle_returns(monkeypatch):
+    events = []
+
+    class Store:
+        dialect = "sqlite"
+
+        def server_observed_utc(self):
+            return _X_WINDOW_OPEN_UTC
+
+        def close(self):
+            events.append("close")
+
+    monkeypatch.setenv("X_BEARER_TOKEN", "configured")
+    monkeypatch.setattr(poller, "open_store", lambda _url: Store())
+    monkeypatch.setattr(
+        poller,
+        "run_cycle",
+        lambda *_args, **_kwargs: (
+            events.append("core")
+            or {"periodic_requirements": {"x_daily": "complete"}}
+        ),
+    )
+    monkeypatch.setattr(
+        poller,
+        "poll_x_shadow_once",
+        lambda *_args, **_kwargs: events.append("shadow"),
+    )
+    monkeypatch.setattr(
+        poller,
+        "poll_source_shadow_once",
+        lambda *_args, **_kwargs: events.append("source_shadow"),
+    )
+    poller.main([
+        "--global-only", "--once", "--sources", "x", "--no-trading-hours",
+        "--interval", "3600", "--x-interval", "86400",
+    ])
+    assert events == ["core", "shadow", "source_shadow", "close"]

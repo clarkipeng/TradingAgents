@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import logging
 import math
 import os
@@ -58,6 +59,7 @@ from tradingagents.dataflows import media_store
 from tradingagents.dataflows.media_sources import (
     FETCHERS,
     GLOBAL_X_ADAPTER_POLICY,
+    GLOBAL_X_SHADOW_ADAPTER_POLICY,
     KEYLESS_SOURCES,
     SELECTABLE_SOURCES,
     ProviderResponseError,
@@ -65,12 +67,28 @@ from tradingagents.dataflows.media_sources import (
     fetch_global_news,
     fetch_polymarket_odds,
     fetch_top_news_headlines,
+    fetch_x_recent_counts,
     fetch_x_topic,
     fetch_x_trends,
     looks_company_authored,
 )
 from tradingagents.dataflows.media_store import open_store
+from tradingagents.dataflows.shadow_sources import (
+    SOURCE_SHADOW_STATIC_SLOTS,
+    SOURCE_SHADOW_V1_COLLECTOR_SEMANTICS_ID,
+    SOURCE_SHADOW_V1_POLICY,
+    SOURCE_SHADOW_V1_PROTOCOL_ID,
+    fetch_source_shadow_slot,
+    source_shadow_cycle_resolution,
+    source_shadow_cycle_spec,
+)
 from tradingagents.dataflows.trading_clock import TradingClock
+from tradingagents.dataflows.x_shadow import (
+    X_SHADOW_COLLECTOR_SEMANTICS_ID,
+    X_SHADOW_POLICY,
+    X_SHADOW_PROTOCOL_ID,
+    X_SHADOW_STATIC_SLOTS,
+)
 from tradingagents.default_config import DEFAULT_CONFIG
 from tradingagents.global_research import (
     _evidence_id,
@@ -110,10 +128,16 @@ _GLOBAL_X_SEARCH_LIMIT = int(
 _GLOBAL_X_TOPIC_LIMIT = int(
     GLOBAL_EVENT_V2_PROTOCOL["evidence"]["max_x_search_requests_per_utc_day"]
 )
+_X_SHADOW_COUNT_LIMIT = int(
+    X_SHADOW_POLICY["max_count_requests_per_utc_day"]
+)
+_X_SHADOW_TREND_LIMIT = int(X_SHADOW_POLICY["max_trends_per_request"])
 if int(
     GLOBAL_EVENT_V2_PROTOCOL["evidence"]["max_x_results_per_query"]
 ) != _GLOBAL_X_SEARCH_LIMIT:
     raise RuntimeError("formal X result limit differs from the adapter contract")
+if _X_SHADOW_COUNT_LIMIT != _GLOBAL_X_TOPIC_LIMIT:
+    raise RuntimeError("X shadow count budget differs from formal topic capacity")
 # Coverage alerts are operational state, separate from the immutable evidence
 # ledger. Repeated identical incidents get one notification plus a daily reminder;
 # a transition back to complete coverage emits one recovery notification.
@@ -917,6 +941,8 @@ def _run_fetch(
     budget_limits: dict[str, float] | None = None,
     budget_metadata: dict | None = None,
     collection_cycle_id: str | None = None,
+    protocol_id: str = GLOBAL_EVENT_V2_COLLECTION_PROTOCOL_ID,
+    collector_semantics_id: str = GLOBAL_EVENT_V2_COLLECTOR_SEMANTICS_ID,
 ) -> tuple[int, int, str]:
     """Fetch, receipt-stamp, store, and audit one independent query."""
     _assert_store_collector_lease(store)
@@ -932,8 +958,8 @@ def _run_fetch(
     metadata = {
         "labels": labels or [],
         "kind": "odds" if odds else "media" if store_result else "request_receipt",
-        "protocol_id": GLOBAL_EVENT_V2_COLLECTION_PROTOCOL_ID,
-        "collector_semantics_id": GLOBAL_EVENT_V2_COLLECTOR_SEMANTICS_ID,
+        "protocol_id": protocol_id,
+        "collector_semantics_id": collector_semantics_id,
         **(budget_metadata or {}),
     }
     if cost_units > 0 and not budget_limits:
@@ -1825,6 +1851,10 @@ def _x_request_budget_limits(category: str, now: float, request_key: str) -> dic
         limit = int(GLOBAL_EVENT_V2_PROTOCOL["evidence"]["max_x_trend_requests_per_utc_day"])
     elif category == "search":
         limit = int(GLOBAL_EVENT_V2_PROTOCOL["evidence"]["max_x_search_requests_per_utc_day"])
+    elif category == "shadow_trend":
+        limit = int(X_SHADOW_POLICY["max_trend_requests_per_utc_day"])
+    elif category == "count":
+        limit = int(X_SHADOW_POLICY["max_count_requests_per_utc_day"])
     else:
         raise ValueError("unknown X budget category")
     day = datetime.fromtimestamp(now, timezone.utc).strftime("%Y-%m-%d")
@@ -1891,6 +1921,21 @@ def _x_trend_media_rows(
     return rows
 
 
+def _x_shadow_trend_media_rows(woeid: int, captured_utc: float) -> list[dict]:
+    """Fetch one capped regional response and preserve its billable item count."""
+    trends = fetch_x_trends(woeid, limit=_X_SHADOW_TREND_LIMIT)
+    if len(trends) > _X_SHADOW_TREND_LIMIT:
+        raise ProviderResponseError("X shadow trend response exceeded its resource cap")
+    try:
+        return _x_trend_media_rows(
+            trends,
+            woeid=woeid,
+            captured_utc=captured_utc,
+        )
+    except (TypeError, ValueError) as exc:
+        raise ProviderResponseError("X shadow trend response is invalid") from exc
+
+
 def _x_collection_cycle_spec_for_identity(
     now: float,
     identity: Mapping,
@@ -1907,6 +1952,99 @@ def _x_collection_cycle_spec_for_identity(
         expected_static_slots=identity["x_daily_static_slots"],
         max_dynamic_slots=identity["x_daily_max_dynamic_slots"],
     )
+
+
+def _x_shadow_collection_cycle_spec(now: float) -> dict:
+    """Return the independent non-formal X-shadow identity for one UTC day."""
+    if isinstance(now, bool) or not isinstance(now, (int, float)) \
+            or not math.isfinite(float(now)):
+        raise ValueError("X shadow cycle time must be finite")
+    period_key = datetime.fromtimestamp(float(now), timezone.utc).strftime("%Y-%m-%d")
+    return media_store.collection_cycle_spec(
+        cycle_kind=X_SHADOW_POLICY["cycle_kind"],
+        period_key=period_key,
+        protocol_id=X_SHADOW_PROTOCOL_ID,
+        collector_semantics_id=X_SHADOW_COLLECTOR_SEMANTICS_ID,
+        expected_static_slots=X_SHADOW_STATIC_SLOTS,
+        max_dynamic_slots=_X_SHADOW_COUNT_LIMIT,
+    )
+
+
+def _shadow_cycle_state(spec: Mapping, cycle: Mapping | None) -> str:
+    """Classify an isolated cycle without widening a formal validator."""
+    if cycle is None:
+        return "missing"
+    if (
+        cycle.get("identity_valid") is not True
+        or cycle.get("identity") != spec.get("identity")
+        or cycle.get("collection_cycle_id") != spec.get("collection_cycle_id")
+    ):
+        return "invalid"
+    if cycle.get("status") == "running":
+        return "running"
+    if cycle.get("manifest_valid") is not True:
+        return "invalid"
+    return "complete" if cycle.get("complete") is True else "incomplete"
+
+
+def _x_shadow_identity_inventory_allows_current(store, spec: Mapping) -> bool:
+    """Fail closed when another shadow identity already owns this UTC period."""
+    identity = spec.get("identity")
+    if not isinstance(identity, Mapping):
+        return False
+    try:
+        observed = store.collection_cycle_identities(
+            str(identity["cycle_kind"]),
+            period_key=str(identity["period_key"]),
+        )
+    except (AttributeError, KeyError, TypeError, ValueError) as exc:
+        raise ValueError("X shadow identity inventory is unreadable") from exc
+    required = {
+        "collection_cycle_id",
+        "protocol_id",
+        "collector_semantics_id",
+    }
+    if (
+        not isinstance(observed, list)
+        or not all(
+            isinstance(item, dict)
+            and set(item) == required
+            and isinstance(item["collection_cycle_id"], str)
+            and re.fullmatch(r"cycle_[0-9a-f]{24}", item["collection_cycle_id"])
+            is not None
+            and isinstance(item["protocol_id"], str)
+            and re.fullmatch(r"protocol_[0-9a-f]{24}", item["protocol_id"])
+            is not None
+            and isinstance(item["collector_semantics_id"], str)
+            and re.fullmatch(
+                r"collector_[0-9a-f]{24}", item["collector_semantics_id"]
+            ) is not None
+            for item in observed
+        )
+        or len(observed)
+        != len({item["collection_cycle_id"] for item in observed})
+    ):
+        raise ValueError("X shadow identity inventory is malformed")
+    current = {
+        "collection_cycle_id": spec["collection_cycle_id"],
+        "protocol_id": identity["protocol_id"],
+        "collector_semantics_id": identity["collector_semantics_id"],
+    }
+    if any(item != current for item in observed):
+        logger.info("X shadow identity inventory is not current; skipping")
+        return False
+    return True
+
+
+def _x_count_window(captured_utc: float) -> tuple[float, float]:
+    """Anchor 166 complete count bins to the last UTC hour boundary."""
+    if isinstance(captured_utc, bool) or not isinstance(captured_utc, (int, float)) \
+            or not math.isfinite(float(captured_utc)):
+        raise ValueError("X count anchor must be finite")
+    policy = GLOBAL_X_SHADOW_ADAPTER_POLICY["recent_counts"]
+    bucket = int(policy["bucket_seconds"])
+    end = float(math.floor(float(captured_utc) / bucket) * bucket)
+    return end - int(policy["lookback_seconds"]), end
 
 
 def _x_start_window_open(now: float) -> bool:
@@ -2126,7 +2264,7 @@ def _x_daily_cycle_resolution(store, now: float, max_topics: int) -> dict:
     }
 
 
-def _x_manifest_slots(cycle: Mapping) -> list[tuple[str, str]]:
+def _cycle_manifest_slots(cycle: Mapping) -> list[tuple[str, str]]:
     manifest = cycle.get("manifest")
     if not isinstance(manifest, Mapping):
         return []
@@ -2137,6 +2275,323 @@ def _x_manifest_slots(cycle: Mapping) -> list[tuple[str, str]]:
             + list(manifest.get("expected_dynamic_slots") or [])
         )
     ]
+
+
+def _stored_x_discovery_decision(store, collection_cycle_id: str) -> dict:
+    """Load and replay the exact formal decision that seeds shadow count queries."""
+    items = store.collection_cycle_item_rows(
+        collection_cycle_id,
+        provider="trendnews",
+        query_key="ranked-global-discovery",
+    )
+    decisions = []
+    for item in items:
+        row = item.get("row") if isinstance(item, Mapping) else None
+        metadata = row.get("metadata") if isinstance(row, Mapping) else None
+        if isinstance(metadata, Mapping) and metadata.get("evidence_role") \
+                == "query_free_discovery_decision":
+            try:
+                decision = json.loads(row.get("body"))
+            except (TypeError, json.JSONDecodeError) as exc:
+                raise ValueError("stored X discovery decision is malformed") from exc
+            decisions.append(decision)
+    if len(decisions) != 1:
+        raise ValueError("formal X cycle must contain one discovery decision")
+    decision = decisions[0]
+    validate_x_discovery_decision(decision)
+    if decision.get("collection_cycle_id") != collection_cycle_id:
+        raise ValueError("stored X discovery decision belongs to another cycle")
+    return decision
+
+
+def poll_x_shadow_once(store, now: float, max_topics: int = _GLOBAL_X_TOPIC_LIMIT) \
+        -> list[tuple[str, str]]:
+    """Collect isolated regional trends and attention counts once per UTC day."""
+    resolution = _x_daily_cycle_resolution(store, now, max_topics)
+    formal_cycle = resolution.get("cycle")
+    if (
+        resolution.get("origin") != "current"
+        or resolution.get("state") != "complete"
+        or not isinstance(formal_cycle, Mapping)
+    ):
+        return []
+    spec = _x_shadow_collection_cycle_spec(now)
+    if not _x_shadow_identity_inventory_allows_current(store, spec):
+        return []
+    decision = _stored_x_discovery_decision(
+        store, formal_cycle["collection_cycle_id"]
+    )
+    requests = decision.get("search_requests")
+    if (
+        not isinstance(requests, list)
+        or len(requests) > _X_SHADOW_COUNT_LIMIT
+        or any(not isinstance(request, Mapping) for request in requests)
+    ):
+        raise ValueError("stored X discovery requests exceed the shadow contract")
+
+    cycle_id = spec["collection_cycle_id"]
+    cycle = store.collection_cycle(cycle_id)
+    state = _shadow_cycle_state(spec, cycle)
+    if state == "running":
+        observed_utc = store.server_observed_utc()
+        started = cycle.get("server_started_utc")
+        stale = float(
+            GLOBAL_EVENT_V2_PROTOCOL["evidence"]["x_cycle_recovery_stale_seconds"]
+        )
+        if (
+            isinstance(started, bool)
+            or not isinstance(started, (int, float))
+            or not math.isfinite(float(started))
+        ):
+            raise ValueError("running X shadow cycle lacks a server start observation")
+        if observed_utc - float(started) < stale:
+            return [
+                (slot["provider"], slot["query_key"])
+                for slot in store.collection_cycle_slots(cycle_id)
+            ]
+        cycle = store.recover_collection_cycle(
+            cycle_id,
+            recovered_utc=observed_utc,
+            minimum_age_seconds=stale,
+        )
+        state = _shadow_cycle_state(spec, cycle)
+    if state in {"complete", "incomplete"}:
+        return _cycle_manifest_slots(cycle)
+    if state != "missing":
+        raise ValueError("existing X shadow collection cycle is invalid")
+
+    try:
+        store.start_collection_cycle(spec, started_utc=time.time())
+    except ValueError:
+        existing = store.collection_cycle(cycle_id)
+        if existing is None:
+            raise
+        return poll_x_shadow_once(store, now, max_topics)
+
+    # Recheck after creation so even a same-period policy race cannot reach a
+    # paid endpoint. Production's singleton collector lease closes the wider
+    # race; this check also protects manual/local invocations.
+    if not _x_shadow_identity_inventory_allows_current(store, spec):
+        store.finish_collection_cycle(cycle_id, completed_utc=time.time())
+        return []
+
+    expected_slots = list(X_SHADOW_STATIC_SLOTS)
+    dynamic_slots = [
+        ("xcount", str(request["query_key"])) for request in requests
+    ]
+    if dynamic_slots:
+        store.declare_collection_cycle_slots(
+            cycle_id, dynamic_slots, declared_utc=time.time()
+        )
+        expected_slots.extend(dynamic_slots)
+    accounting = X_SHADOW_POLICY["receipt_accounting"]
+    shadow_metadata = {
+        "formal_effect": "none",
+        "shadow_protocol_id": X_SHADOW_PROTOCOL_ID,
+        "discovery_decision_id": decision["discovery_decision_id"],
+        "cost_units_semantics": accounting["cost_units_semantics"],
+    }
+    try:
+        for provider, query_key in X_SHADOW_STATIC_SLOTS:
+            woeid = int(query_key.split(":", 1)[1])
+            try:
+                _run_fetch(
+                    store,
+                    provider=provider,
+                    query_key=query_key,
+                    fetch_fn=lambda captured, location=woeid: (
+                        _x_shadow_trend_media_rows(location, captured)
+                    ),
+                    labels=[f"@X_SHADOW_TREND_{woeid}"],
+                    cost_units=1.0,
+                    budget_limits=_x_request_budget_limits(
+                        "shadow_trend", now, query_key
+                    ),
+                    budget_metadata={
+                        **shadow_metadata,
+                        "budget_category": "shadow_trend",
+                        "billable_quantity": accounting["regional_trend"][
+                            "billable_quantity"
+                        ],
+                        "usd_per_billable_item": accounting["regional_trend"][
+                            "usd_per_item"
+                        ],
+                        "billable_quantity_cap": _X_SHADOW_TREND_LIMIT,
+                    },
+                    collection_cycle_id=cycle_id,
+                    protocol_id=X_SHADOW_PROTOCOL_ID,
+                    collector_semantics_id=(
+                        X_SHADOW_COLLECTOR_SEMANTICS_ID
+                    ),
+                )
+            except _FetchBudgetExceeded:
+                logger.info("X shadow trend budget already reserved; skipping %s", query_key)
+            except (ProviderTransientError, ProviderResponseError) as exc:
+                logger.info(
+                    "X shadow trend %s unavailable (%s)",
+                    _query_slot_id(provider, query_key),
+                    _exception_kind(exc),
+                )
+
+        for request in requests:
+            query_key = str(request["query_key"])
+            topic = str(request["topic"])
+            # Re-anchor immediately before each reservation. This leaves a full
+            # hour of margin inside X's rolling seven-day recent-count window,
+            # even when shadow collection runs long after the formal decision.
+            count_request_utc = time.time()
+            window_start, window_end = _x_count_window(count_request_utc)
+            try:
+                _run_fetch(
+                    store,
+                    provider="xcount",
+                    query_key=query_key,
+                    fetch_fn=lambda captured, selected_topic=topic,
+                            selected_query=query_key,
+                            selected_start=window_start,
+                            selected_end=window_end: fetch_x_recent_counts(
+                        selected_topic,
+                        selected_query,
+                        captured,
+                        discovery_decision_id=decision["discovery_decision_id"],
+                        discovery_decision_captured_utc=decision["captured_utc"],
+                        start_utc=selected_start,
+                        end_utc=selected_end,
+                    ),
+                    labels=list(request["labels"]),
+                    cost_units=1.0,
+                    budget_limits=_x_request_budget_limits(
+                        "count", now, query_key
+                    ),
+                    budget_metadata={
+                        **shadow_metadata,
+                        "budget_category": "count",
+                        "billable_quantity": accounting["recent_count"][
+                            "billable_quantity"
+                        ],
+                        "usd_per_billable_request": accounting["recent_count"][
+                            "usd_per_request"
+                        ],
+                        "window_start_utc": window_start,
+                        "window_end_utc": window_end,
+                    },
+                    collection_cycle_id=cycle_id,
+                    protocol_id=X_SHADOW_PROTOCOL_ID,
+                    collector_semantics_id=(
+                        X_SHADOW_COLLECTOR_SEMANTICS_ID
+                    ),
+                )
+            except _FetchBudgetExceeded:
+                logger.info("X shadow count budget already reserved; skipping topic")
+            except (ProviderTransientError, ProviderResponseError) as exc:
+                logger.info(
+                    "X shadow count %s unavailable (%s)",
+                    _query_slot_id("xcount", query_key),
+                    _exception_kind(exc),
+                )
+    finally:
+        cycle = store.finish_collection_cycle(cycle_id, completed_utc=time.time())
+        logger.info(
+            "x-shadow-cycle %s: %s · manifest=%s",
+            cycle_id,
+            cycle["status"],
+            cycle["manifest_id"],
+        )
+    return expected_slots
+
+
+def poll_source_shadow_once(store, now: float) -> list[tuple[str, str]]:
+    """Collect one non-gating daily sample from each public shadow source."""
+    resolution = source_shadow_cycle_resolution(store, now)
+    if resolution["state"] == "other_identity_already_attempted":
+        logger.info("Source shadow identity changed mid-day; waiting for UTC rollover")
+        return []
+    spec = resolution["spec"]
+    cycle_id = spec["collection_cycle_id"]
+    cycle = store.collection_cycle(cycle_id)
+    state = _shadow_cycle_state(spec, cycle)
+    if state == "running":
+        observed_utc = store.server_observed_utc()
+        started = cycle.get("server_started_utc")
+        stale_seconds = float(SOURCE_SHADOW_V1_POLICY["recovery_stale_seconds"])
+        if (
+            isinstance(started, bool)
+            or not isinstance(started, (int, float))
+            or not math.isfinite(float(started))
+        ):
+            raise ValueError("running source shadow cycle lacks a server start observation")
+        if observed_utc - float(started) < stale_seconds:
+            return [
+                (slot["provider"], slot["query_key"])
+                for slot in store.collection_cycle_slots(cycle_id)
+            ]
+        cycle = store.recover_collection_cycle(
+            cycle_id,
+            recovered_utc=observed_utc,
+            minimum_age_seconds=stale_seconds,
+        )
+        state = _shadow_cycle_state(spec, cycle)
+    if state in {"complete", "incomplete"}:
+        return _cycle_manifest_slots(cycle)
+    if state != "missing":
+        raise ValueError("existing source shadow collection cycle is invalid")
+
+    try:
+        store.start_collection_cycle(spec, started_utc=time.time())
+    except ValueError:
+        existing = store.collection_cycle(cycle_id)
+        if existing is None:
+            raise
+        return poll_source_shadow_once(store, now)
+
+    # A singleton lease prevents this in production; the second inventory read
+    # also protects manual/local races between two policy versions.
+    post_create = source_shadow_cycle_resolution(store, now)
+    if post_create["state"] != "ready":
+        store.finish_collection_cycle(cycle_id, completed_utc=time.time())
+        return []
+
+    receipt_metadata = {
+        "formal_effect": "none",
+        "evidence_role": SOURCE_SHADOW_V1_POLICY["evidence_role"],
+        "shadow_protocol_id": SOURCE_SHADOW_V1_PROTOCOL_ID,
+    }
+    try:
+        for provider, query_key in SOURCE_SHADOW_STATIC_SLOTS:
+            try:
+                _run_fetch(
+                    store,
+                    provider=provider,
+                    query_key=query_key,
+                    fetch_fn=lambda captured, selected_provider=provider,
+                            selected_query=query_key: fetch_source_shadow_slot(
+                        selected_provider,
+                        selected_query,
+                        captured,
+                    ),
+                    budget_metadata=receipt_metadata,
+                    collection_cycle_id=cycle_id,
+                    protocol_id=SOURCE_SHADOW_V1_PROTOCOL_ID,
+                    collector_semantics_id=(
+                        SOURCE_SHADOW_V1_COLLECTOR_SEMANTICS_ID
+                    ),
+                )
+            except (ProviderTransientError, ProviderResponseError) as exc:
+                logger.info(
+                    "%s shadow slot %s unavailable (%s)",
+                    _safe_alert_provider(provider),
+                    _query_slot_id(provider, query_key),
+                    _exception_kind(exc),
+                )
+    finally:
+        cycle = store.finish_collection_cycle(cycle_id, completed_utc=time.time())
+        logger.info(
+            "source-shadow-cycle %s: %s · manifest=%s",
+            cycle_id,
+            cycle["status"],
+            cycle["manifest_id"],
+        )
+    return list(SOURCE_SHADOW_STATIC_SLOTS)
 
 
 def _poll_x_cycle_children(
@@ -2312,7 +2767,7 @@ def poll_x_topics_once(
                 or resolution["cycle"] is None:
             raise ValueError("same-day compatible X collection cycle is not uniquely complete")
         store.set_meta("last_x_poll_utc", now)
-        return _x_manifest_slots(resolution["cycle"])
+        return _cycle_manifest_slots(resolution["cycle"])
     if resolution["origin"] == "current" and resolution["cycle"] is None:
         raise ValueError("existing X collection cycle is invalid")
     spec = resolution["spec"]
@@ -2351,7 +2806,7 @@ def poll_x_topics_once(
         elif resolution["state"] not in {"complete", "incomplete"}:
             raise ValueError("existing X collection cycle manifest is invalid")
         store.set_meta("last_x_poll_utc", now)
-        return _x_manifest_slots(existing)
+        return _cycle_manifest_slots(existing)
 
     if not _x_start_window_open(now):
         return [
@@ -2527,6 +2982,7 @@ def poll_forever(
     x_interval: int = _GLOBAL_ONLY_X_INTERVAL_SECONDS,
     x_limit: int = _GLOBAL_X_SEARCH_LIMIT,
     x_topic_limit: int = _GLOBAL_X_TOPIC_LIMIT,
+    source_shadow_enabled: bool = False,
     *,
     health_state: CollectorHealthState | None = None,
     lease_guard=None,
@@ -2581,6 +3037,34 @@ def poll_forever(
                 health_state.mark_cycle(coverage, completed_utc=time.time())
             if on_cycle_terminal is not None:
                 on_cycle_terminal()
+            if stop["flag"]:
+                break
+            server_clock = getattr(store, "server_observed_utc", None)
+            shadow_period_utc = (
+                server_clock() if callable(server_clock) else time.time()
+            )
+            x_requirement = (
+                coverage.get("periodic_requirements", {}).get("x_daily")
+                if isinstance(coverage, Mapping) else None
+            )
+            if x_enabled and x_requirement == "complete":
+                if lease_guard is not None:
+                    lease_guard.assert_held()
+                # Shadow telemetry runs only after formal coverage and health
+                # are terminal. It cannot change either result.
+                poll_x_shadow_once(
+                    store,
+                    shadow_period_utc,
+                    max_topics=x_topic_limit,
+                )
+                if lease_guard is not None:
+                    lease_guard.assert_held()
+            if source_shadow_enabled:
+                if lease_guard is not None:
+                    lease_guard.assert_held()
+                poll_source_shadow_once(store, shadow_period_utc)
+                if lease_guard is not None:
+                    lease_guard.assert_held()
             _sleep(interval, stop, lease_guard=lease_guard)
         except Exception as exc:  # noqa: BLE001 - sanitize before terminating
             error_kind = _exception_kind(exc)
@@ -2700,6 +3184,86 @@ def _x_cycle_audit_projection(store, period_date) -> dict:
     }
 
 
+def _shadow_cycle_audit_projection(store, spec: Mapping) -> dict:
+    """Return a safe, non-gating projection of one shadow cycle."""
+    identity = spec.get("identity") if isinstance(spec, Mapping) else None
+    if not isinstance(identity, Mapping):
+        raise ValueError("shadow cycle audit requires a canonical spec")
+    result = {
+        "period": str(identity["period_key"]),
+        "state": "invalid",
+        "terminal_utc": None,
+        "requests": 0,
+        "items": 0,
+        "trend_resources": 0,
+        "count_requests": 0,
+        "estimated_usd": 0.0,
+    }
+    try:
+        observed = store.collection_cycle_identities(
+            str(identity["cycle_kind"]),
+            period_key=str(identity["period_key"]),
+        )
+    except (AttributeError, TypeError, ValueError):
+        return result
+    current = {
+        "collection_cycle_id": spec["collection_cycle_id"],
+        "protocol_id": identity["protocol_id"],
+        "collector_semantics_id": identity["collector_semantics_id"],
+    }
+    if not isinstance(observed, list) or any(
+        not isinstance(item, dict) or item != current for item in observed
+    ):
+        result["state"] = "other_identity" if isinstance(observed, list) else "invalid"
+        return result
+    try:
+        cycle = store.collection_cycle(spec["collection_cycle_id"])
+    except (media_store.CollectionCycleRawContentMismatch, TypeError, ValueError):
+        return result
+    state = _shadow_cycle_state(spec, cycle)
+    result["state"] = state
+    if cycle is None:
+        return result
+    terminal = cycle.get("server_terminal_utc")
+    if isinstance(terminal, (int, float)) and not isinstance(terminal, bool):
+        result["terminal_utc"] = datetime.fromtimestamp(
+            float(terminal), timezone.utc
+        ).isoformat()
+    manifest = cycle.get("manifest")
+    receipts = manifest.get("slot_receipts") if isinstance(manifest, Mapping) else []
+    if state in {"complete", "incomplete"} and not isinstance(receipts, list):
+        result["state"] = "invalid"
+        return result
+    valid_receipts = [receipt for receipt in receipts if isinstance(receipt, Mapping)]
+    result["requests"] = sum(
+        receipt.get("fetch_run_id") is not None for receipt in valid_receipts
+    )
+    result["items"] = sum(
+        int(receipt.get("item_count") or 0) for receipt in valid_receipts
+    )
+    result["trend_resources"] = sum(
+        int(receipt.get("item_count") or 0)
+        for receipt in valid_receipts
+        if receipt.get("provider") == "xtrend"
+        and receipt.get("status") in {"success", "empty"}
+    )
+    result["count_requests"] = sum(
+        receipt.get("provider") == "xcount" and receipt.get("status") == "success"
+        for receipt in valid_receipts
+    )
+    result["estimated_usd"] = (
+        result["trend_resources"]
+        * float(X_SHADOW_POLICY["billing_rate_snapshot"]["usd_per_trend_read"])
+        + result["count_requests"]
+        * float(
+            X_SHADOW_POLICY["billing_rate_snapshot"][
+                "usd_per_recent_count_request"
+            ]
+        )
+    )
+    return result
+
+
 def print_audit(store, *, include_history: bool = False) -> None:
     """Print current collector health and, when requested, immutable history."""
     now = store.server_observed_utc()
@@ -2733,6 +3297,20 @@ def print_audit(store, *, include_history: bool = False) -> None:
         print(f"collector_x_{label}_trend_requests={x_cycle['trend_requests']}")
         print(f"collector_x_{label}_search_requests={x_cycle['search_requests']}")
         print(f"collector_x_{label}_posts_returned={x_cycle['posts_returned']}")
+    for label, spec in (
+        ("source_shadow", source_shadow_cycle_spec(now)),
+        ("x_shadow", _x_shadow_collection_cycle_spec(now)),
+    ):
+        shadow = _shadow_cycle_audit_projection(store, spec)
+        print(f"collector_{label}_period={shadow['period']}")
+        print(f"collector_{label}_state={shadow['state']}")
+        print(f"collector_{label}_terminal_utc={shadow['terminal_utc'] or 'none'}")
+        print(f"collector_{label}_requests={shadow['requests']}")
+        print(f"collector_{label}_items={shadow['items']}")
+        if label == "x_shadow":
+            print(f"collector_x_shadow_trend_resources={shadow['trend_resources']}")
+            print(f"collector_x_shadow_count_requests={shadow['count_requests']}")
+            print(f"collector_x_shadow_estimated_usd={shadow['estimated_usd']:.3f}")
     if include_history:
         print("collector_immutable_receipt_history_begin")
         print(
@@ -3253,6 +3831,7 @@ def _run_supervised_daemon(
                     x_interval=x_interval,
                     x_limit=x_limit,
                     x_topic_limit=x_topic_limit,
+                    source_shadow_enabled=global_only,
                     health_state=health_state,
                     lease_guard=collector_lease,
                     stop=stop,
@@ -3397,7 +3976,7 @@ def main(argv: list[str] | None = None) -> None:
                 args.interval,
                 args.x_interval,
             )
-            run_cycle(
+            coverage = run_cycle(
                 store,
                 tickers,
                 ticker_sources,
@@ -3408,6 +3987,22 @@ def main(argv: list[str] | None = None) -> None:
                 x_topic_limit=args.x_topics,
                 force_x=True,
             )
+            server_clock = getattr(store, "server_observed_utc", None)
+            shadow_period_utc = (
+                server_clock() if callable(server_clock) else time.time()
+            )
+            x_requirement = (
+                coverage.get("periodic_requirements", {}).get("x_daily")
+                if isinstance(coverage, Mapping) else None
+            )
+            if x_enabled and x_requirement == "complete":
+                poll_x_shadow_once(
+                    store,
+                    shadow_period_utc,
+                    max_topics=args.x_topics,
+                )
+            if args.global_only:
+                poll_source_shadow_once(store, shadow_period_utc)
         finally:
             _close_collector_attempt(store, collector_lease)
         return

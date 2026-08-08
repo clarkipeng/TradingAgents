@@ -29,7 +29,7 @@ import re
 import time
 import xml.etree.ElementTree as ET
 from collections.abc import Iterable, Mapping
-from datetime import datetime
+from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from types import MappingProxyType
 from urllib.error import HTTPError
@@ -161,6 +161,28 @@ GLOBAL_X_ADAPTER_POLICY = MappingProxyType({
     }),
 })
 
+# Non-formal adapters are intentionally outside ``GLOBAL_X_ADAPTER_POLICY`` so
+# adding shadow telemetry cannot mutate the registered evidence identity.
+GLOBAL_X_SHADOW_ADAPTER_POLICY = MappingProxyType({
+    "version": "global-x-shadow-request-v1",
+    "recent_counts": MappingProxyType({
+        "endpoint": "https://api.x.com/2/tweets/counts/recent?{qs}",
+        "query_contract": "same-language-and-exclusions-as-recent-search-v1",
+        "granularity": "hour",
+        "bucket_seconds": 60 * 60,
+        # Recent counts require start_time to remain inside the rolling
+        # seven-day window. 166 complete bins preserve more than an hour of
+        # latency room even when the request starts just before an hour turns.
+        "lookback_seconds": 166 * 60 * 60,
+        "maximum_capture_age_seconds": 167 * 60 * 60,
+        "maximum_query_chars": 512,
+        "snapshot_availability": "terminal-fetch-receipt-only",
+        "bin_availability": "descriptive-components-never-independent-observations",
+        "fields_parameter": "search_count.fields",
+        "fields": ("start", "end", "tweet_count"),
+    }),
+})
+
 
 def global_x_adapter_policy_manifest() -> dict[str, object]:
     """Return a JSON-ready projection of the end-to-end global X adapter."""
@@ -172,6 +194,18 @@ def global_x_adapter_policy_manifest() -> dict[str, object]:
         return value
 
     return plain(GLOBAL_X_ADAPTER_POLICY)
+
+
+def global_x_shadow_adapter_policy_manifest() -> dict[str, object]:
+    """Return a detached manifest for non-formal X discovery requests."""
+    def plain(value):
+        if isinstance(value, Mapping):
+            return {key: plain(item) for key, item in value.items()}
+        if isinstance(value, tuple):
+            return [plain(item) for item in value]
+        return value
+
+    return plain(GLOBAL_X_SHADOW_ADAPTER_POLICY)
 
 
 _YAHOO_NEWS_RSS = (
@@ -1043,6 +1077,20 @@ def fetch_x(ticker: str, now: float, limit: int = 50,
     )
 
 
+def _x_filtered_query(query: str) -> str:
+    """Apply the one frozen public-reaction filter shared by X endpoints."""
+    if not isinstance(query, str) or not query.strip():
+        raise ValueError("X query must be non-empty")
+    policy = GLOBAL_X_ADAPTER_POLICY["recent_search"]
+    return " ".join((
+        # Preserve the formal recent-search wire query exactly. The shadow
+        # count endpoint consumes that stored query; it does not normalize it.
+        f"({query})",
+        f"lang:{policy['query_language']}",
+        *(f"-is:{value}" for value in policy["query_exclusions"]),
+    ))
+
+
 def _fetch_x_search(query: str, label: str, now: float, limit: int,
                     timeout: float, sort_order: str) -> list[dict]:
     """Run one bounded X recent-search query and return media-store rows."""
@@ -1051,12 +1099,8 @@ def _fetch_x_search(query: str, label: str, now: float, limit: int,
         raise RuntimeError("X bearer token is not configured")
     policy = GLOBAL_X_ADAPTER_POLICY["recent_search"]
     result_limit = policy["result_limit"]
-    query_filters = " ".join((
-        f"lang:{policy['query_language']}",
-        *(f"-is:{value}" for value in policy["query_exclusions"]),
-    ))
     qs = urlencode({
-        "query": f"({query}) {query_filters}",
+        "query": _x_filtered_query(query),
         "max_results": min(
             max(limit, int(result_limit["minimum"])),
             int(result_limit["maximum"]),
@@ -1191,6 +1235,170 @@ def _fetch_x_search(query: str, label: str, now: float, limit: int,
             },
         ))
     return rows
+
+
+def fetch_x_recent_counts(
+    topic: str,
+    query: str,
+    now: float,
+    *,
+    discovery_decision_id: str,
+    discovery_decision_captured_utc: float,
+    start_utc: float,
+    end_utc: float,
+    timeout: float = 10.0,
+) -> list[dict]:
+    """Fetch one exact hourly attention window as discovery-only X metadata."""
+    token = (os.environ.get("X_BEARER_TOKEN") or "").strip()
+    if not token:
+        raise RuntimeError("X bearer token is not configured")
+    if not isinstance(topic, str) or not topic.strip():
+        raise ValueError("X count topic must be non-empty")
+    if (
+        not isinstance(discovery_decision_id, str)
+        or re.fullmatch(r"xdiscovery_[0-9a-f]{24}", discovery_decision_id) is None
+    ):
+        raise ValueError("X count discovery decision ID is invalid")
+    if any(
+        isinstance(value, bool)
+        or not isinstance(value, (int, float))
+        or not math.isfinite(float(value))
+        for value in (
+            now,
+            discovery_decision_captured_utc,
+            start_utc,
+            end_utc,
+        )
+    ):
+        raise ValueError("X count times must be finite")
+
+    policy = GLOBAL_X_SHADOW_ADAPTER_POLICY["recent_counts"]
+    bucket_seconds = int(policy["bucket_seconds"])
+    start = float(start_utc)
+    end = float(end_utc)
+    captured = float(now)
+    decision_captured = float(discovery_decision_captured_utc)
+    if (
+        start % bucket_seconds != 0
+        or end % bucket_seconds != 0
+        or end - start != int(policy["lookback_seconds"])
+        or end > captured
+        or captured - start >= int(policy["maximum_capture_age_seconds"])
+        or decision_captured < 0
+        or decision_captured > captured
+    ):
+        raise ValueError("X count window must be one exact completed hourly lookback")
+
+    def utc_text(value: float) -> str:
+        return datetime.fromtimestamp(value, timezone.utc).isoformat().replace(
+            "+00:00", "Z"
+        )
+
+    filtered_query = _x_filtered_query(query)
+    if len(filtered_query) > int(policy["maximum_query_chars"]):
+        raise ValueError("X recent-count query exceeds the endpoint limit")
+    qs = urlencode({
+        "query": filtered_query,
+        "start_time": utc_text(start),
+        "end_time": utc_text(end),
+        "granularity": policy["granularity"],
+        policy["fields_parameter"]: ",".join(policy["fields"]),
+    })
+    response = _get_json(
+        policy["endpoint"].format(qs=qs),
+        {"Authorization": f"Bearer {token}", "Accept": "application/json"},
+        timeout,
+    )
+    if not isinstance(response, dict):
+        raise ProviderResponseError("X recent-count response schema is invalid")
+    errors = response.get("errors")
+    if errors is not None and (not isinstance(errors, list) or errors):
+        raise ProviderResponseError("X recent-count response reported errors")
+    bins = response.get("data")
+    meta = response.get("meta")
+    if (
+        not isinstance(bins, list)
+        or any(not isinstance(item, dict) for item in bins)
+        or not isinstance(meta, dict)
+    ):
+        raise ProviderResponseError("X recent-count response schema is invalid")
+    total = meta.get("total_tweet_count")
+    if isinstance(total, bool) or not isinstance(total, int) or total < 0:
+        raise ProviderResponseError("X recent-count response total is invalid")
+
+    normalized = []
+    for item in bins:
+        item_start = _iso_to_epoch(item.get("start"))
+        item_end = _iso_to_epoch(item.get("end"))
+        count = item.get("tweet_count")
+        if (
+            item_start is None
+            or item_end is None
+            or item_end - item_start != bucket_seconds
+            or isinstance(count, bool)
+            or not isinstance(count, int)
+            or count < 0
+        ):
+            raise ProviderResponseError("X recent-count response bin is invalid")
+        normalized.append({
+            "start_utc": float(item_start),
+            "end_utc": float(item_end),
+            "post_count": count,
+        })
+    normalized.sort(key=lambda item: item["start_utc"])
+    expected_starts = [
+        float(value) for value in range(int(start), int(end), bucket_seconds)
+    ]
+    if (
+        [item["start_utc"] for item in normalized] != expected_starts
+        or any(
+            item["end_utc"] != item["start_utc"] + bucket_seconds
+            for item in normalized
+        )
+        or sum(item["post_count"] for item in normalized) != total
+    ):
+        raise ProviderResponseError("X recent-count response window is inconsistent")
+
+    snapshot = {
+        "schema_version": 1,
+        "evidence_role": "public_attention_shadow",
+        "discovery_decision_id": discovery_decision_id,
+        "discovery_decision_captured_utc": decision_captured,
+        "topic": topic.strip(),
+        "query": query,
+        "query_filter": filtered_query,
+        "granularity": policy["granularity"],
+        "start_utc": start,
+        "end_utc": end,
+        "captured_utc": captured,
+        "snapshot_availability": policy["snapshot_availability"],
+        "bin_availability": policy["bin_availability"],
+        "total_post_count": total,
+        "bins": normalized,
+    }
+    body = json.dumps(
+        snapshot, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    )
+    external_id = "xcount_" + hashlib.sha256(body.encode("utf-8")).hexdigest()[:24]
+    return [_row(
+        "xcount",
+        external_id,
+        f"@X_COUNT_{topic.strip()}",
+        captured,
+        created_utc=captured,
+        body=body,
+        metadata={
+            "evidence_role": "public_attention_shadow",
+            "discovery_decision_id": discovery_decision_id,
+            "discovery_decision_captured_utc": decision_captured,
+            "snapshot_availability": policy["snapshot_availability"],
+            "bin_availability": policy["bin_availability"],
+            "granularity": policy["granularity"],
+            "start_utc": start,
+            "end_utc": end,
+            "total_post_count": total,
+        },
+    )]
 
 
 def fetch_x_topic(

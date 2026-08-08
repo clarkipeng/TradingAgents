@@ -44,6 +44,15 @@ because `tradagent` is the already-approved collector. In a fresh fork or new
 app, set it to `false` through setup and focused verification so a first deploy
 cannot collect accidentally.
 
+The same singleton worker also runs non-gating discovery shadow cycles; there is
+no second Fly worker, database, model process, broker process, or additional
+secret. The public-source cycle makes four daily GDELT requests and one bounded
+Hacker News top-feed sample. After formal X completes, the X shadow cycle makes
+two five-result regional trend requests and up to three recent-count requests;
+it retrieves no additional posts or users. Shadow failures and staleness remain
+visible in receipts and audit output but do not affect formal coverage or
+readiness. No schema migration is required.
+
 Do not put secrets in `fly.toml`, command history, tickets, or logs. Pipe them to
 `fly secrets import --stage -a tradagent`, then clear the shell variables. Confirm
 only secret names with:
@@ -415,6 +424,16 @@ once per UTC day from 21:00 through 23:45 UTC, with at most two trend requests,
 three searches, and ten returned posts per search. `scheduled` before 21:00 is
 expected; `missing`, `incomplete`, or `invalid` after the window warrants
 investigation.
+
+The audit also reports the independent `source-shadow-daily` and
+`x-shadow-daily` states. `missing` or `incomplete` there means exploratory
+discovery data was unavailable; it is not a formal collector outage. A terminal
+same-day shadow identity is never retried, and a deployment that encounters an
+older same-day shadow policy waits until the next UTC day instead of issuing a
+second provider attempt. Current X billing is per returned trend resource and
+per recent-count request; `fetch_runs.cost_units` remains a durable request
+budget unit, not dollars. With five trends per added region and three counts,
+the new X shadow ceiling is $3.45 per 30 days before deduplication.
 
 Also check:
 

@@ -1598,8 +1598,7 @@ def test_collector_audit_requires_all_ten_globalnews_slots(capsys):
         def collection_cycle(self, _cycle_id):
             return None
 
-        def collection_cycle_identities(self, cycle_kind, *, period_key):
-            assert cycle_kind == "x-daily"
+        def collection_cycle_identities(self, _cycle_kind, *, period_key):
             assert period_key
             return []
 
@@ -3563,6 +3562,7 @@ def test_one_shot_singleton_lease_uses_exit_status_instead_of_alerting(monkeypat
     monkeypatch.delenv("MEDIA_DB_DIRECT_URL", raising=False)
     monkeypatch.setattr(poller, "open_store", lambda _url: Store())
     monkeypatch.setattr(poller, "run_cycle", run_cycle)
+    monkeypatch.setattr(poller, "poll_source_shadow_once", lambda *_args: [])
     monkeypatch.setattr(
         poller,
         "emit_alert",

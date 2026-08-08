@@ -119,6 +119,38 @@ may contain zero forecast-eligible stories and must retain exact `0`/`[]`
 lineage; a raw empty or failed provider response is unhealthy. Either case must
 not silently relax the source policy.
 
+Two versioned shadow streams collect broader discovery telemetry without
+changing that frozen experiment. Once per UTC day, the public-source stream
+captures four broad GDELT category samples and one bounded Hacker News top-feed
+sample. GDELT uses explicit UTC windows, ignores provider tone, filters likely
+company-authored articles with the same shared predicate as the core collector,
+and stores a content-bound response manifest. Hacker News stores the complete
+ordered feed manifest plus the rank, score, and comment count of its sampled
+community stories. A first-party outbound link is retained because the measured
+signal is the community ranking, but it is labeled and never treated as
+independent editorial evidence.
+
+After a complete formal X cycle, a separate X shadow cycle captures only the top
+five UK and India trends and at most three 166-hour recent-count series for the
+already-stored discovery queries. It never requests extra posts or profiles.
+The count window ends at a completed UTC hour and stays one hour inside X's
+rolling seven-day boundary. Every count snapshot is linked to the exact formal
+discovery-decision ID and its capture time. The entire retrospective series is
+available only with its terminal fetch receipt; hourly bins are descriptive
+components, never observations available at their individual bin times. At the
+pricing snapshot dated 2026-08-08, this expansion adds at most $0.115 per day
+($3.45 per 30 days) before deduplication; the formal collector plus shadow
+ceiling is $1.165 per day ($34.95 per 30 days). X's Developer Console is
+authoritative if rates change.
+
+These sources use independent content-addressed protocol, semantics, and daily
+cycle IDs. Their rows are excluded from formal source allowlists, query
+coverage, X availability, snapshots, forecasts, and release health. A provider
+failure produces an immutable incomplete shadow receipt but cannot relax or
+invalidate formal evidence. Shadow data can inform a future preregistered
+protocol only after corroboration and an explicit version change; it cannot be
+retroactively added to this experiment.
+
 ### 2. Freeze an immutable snapshot
 
 Every provider attempt gets a receipt. Every retained item records both its
