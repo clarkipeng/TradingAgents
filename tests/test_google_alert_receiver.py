@@ -14,6 +14,7 @@ from tradingagents import operations
 
 ROOT = Path(__file__).resolve().parents[1]
 RECEIVER = ROOT / "integrations" / "google_alert_webhook" / "Code.gs"
+MANIFEST = ROOT / "integrations" / "google_alert_webhook" / "appsscript.json"
 NODE = shutil.which("node")
 
 HARNESS = textwrap.dedent(
@@ -223,6 +224,20 @@ HARNESS = textwrap.dedent(
     }));
     """
 )
+
+
+@pytest.mark.unit
+def test_google_alert_receiver_manifest() -> None:
+    assert json.loads(MANIFEST.read_text(encoding="utf-8")) == {
+        "timeZone": "Etc/UTC",
+        "dependencies": {},
+        "exceptionLogging": "STACKDRIVER",
+        "runtimeVersion": "V8",
+        "webapp": {
+            "executeAs": "USER_DEPLOYING",
+            "access": "ANYONE_ANONYMOUS",
+        },
+    }
 
 
 @pytest.mark.unit
