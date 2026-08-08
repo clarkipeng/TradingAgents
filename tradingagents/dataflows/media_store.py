@@ -38,6 +38,11 @@ from tradingagents.logging_utils import safe_exception_type
 
 logger = logging.getLogger(__name__)
 
+
+class CollectionCycleRawContentMismatch(ValueError):
+    """A persisted cycle item no longer replays to its recorded content ID."""
+
+
 # Core post columns shared by both backends. Fetchers may also emit ``labels``
 # and ``metadata``; those are normalized into append-only association tables.
 COLUMNS = (
@@ -933,7 +938,9 @@ def _verified_cycle_item_rows(rows: list[dict]) -> list[dict]:
     for item in rows:
         stored = _cycle_item_snapshot(item)
         if raw_content_id(stored) != item.get("raw_content_id"):
-            raise ValueError("collection cycle raw-content replay detected tampering")
+            raise CollectionCycleRawContentMismatch(
+                "collection cycle raw-content replay mismatch"
+            )
         verified.append({
             "fetch_run_id": item.get("fetch_run_id"),
             "raw_content_id": item.get("raw_content_id"),
@@ -2945,13 +2952,55 @@ class SqliteMediaStore:
             "WHERE run.collection_cycle_id=?", (cycle_id,),
         ).fetchall() if row else []
         self.conn.row_factory = None
-        return _verify_collection_cycle_relations(
+        cycle = _verify_collection_cycle_relations(
             dict(row), [dict(item) for item in slots],
             _cycle_receipts_with_lineage(
                 [dict(item) for item in receipts],
                 _verified_cycle_item_rows([dict(item) for item in item_rows]),
             ),
         ) if row else None
+        if cycle is not None:
+            cycle["raw_content_replay_validated"] = True
+        return cycle
+
+    def collection_cycle_checkpoint(self, collection_cycle_id: str) -> dict | None:
+        """Reconstruct stored cycle relations without replaying media rows.
+
+        The false replay marker records that this reader skipped content replay;
+        it does not independently diagnose why a strict read failed.
+        """
+        cycle_id = _validated_collection_cycle_id(collection_cycle_id)
+        self.conn.row_factory = sqlite3.Row
+        row = self.conn.execute(
+            f"SELECT {','.join(COLLECTION_CYCLE_COLUMNS)} FROM collection_cycles "
+            "WHERE collection_cycle_id=?", (cycle_id,),
+        ).fetchone()
+        slots = self.conn.execute(
+            f"SELECT {','.join(COLLECTION_CYCLE_SLOT_COLUMNS)} "
+            "FROM collection_cycle_slots WHERE collection_cycle_id=?",
+            (cycle_id,),
+        ).fetchall() if row else []
+        receipts = self.conn.execute(
+            "SELECT fetch_run_id,provider,query_key,status,item_count FROM fetch_runs "
+            "WHERE collection_cycle_id=?", (cycle_id,),
+        ).fetchall() if row else []
+        item_rows = self.conn.execute(
+            "SELECT item.fetch_run_id,item.raw_content_id "
+            "FROM fetch_run_items AS item JOIN fetch_runs AS run "
+            "ON run.fetch_run_id=item.fetch_run_id "
+            "WHERE run.collection_cycle_id=?", (cycle_id,),
+        ).fetchall() if row else []
+        self.conn.row_factory = None
+        cycle = _verify_collection_cycle_relations(
+            dict(row), [dict(item) for item in slots],
+            _cycle_receipts_with_lineage(
+                [dict(item) for item in receipts],
+                [dict(item) for item in item_rows],
+            ),
+        ) if row else None
+        if cycle is not None:
+            cycle["raw_content_replay_validated"] = False
+        return cycle
 
     def collection_cycle_identities(
         self, cycle_kind: str, *, period_key: str,
@@ -5053,13 +5102,64 @@ class SqlAlchemyMediaStore:
             ).where(
                 self.fetches.c.collection_cycle_id == cycle_id
             )).mappings()) if row else []
-        return _verify_collection_cycle_relations(
+        cycle = _verify_collection_cycle_relations(
             dict(row), [dict(item) for item in slots],
             _cycle_receipts_with_lineage(
                 [dict(item) for item in receipts],
                 _verified_cycle_item_rows([dict(item) for item in item_rows]),
             ),
         ) if row else None
+        if cycle is not None:
+            cycle["raw_content_replay_validated"] = True
+        return cycle
+
+    def collection_cycle_checkpoint(self, collection_cycle_id: str) -> dict | None:
+        """Reconstruct stored cycle relations without replaying media rows.
+
+        The false replay marker records that this reader skipped content replay;
+        it does not independently diagnose why a strict read failed.
+        """
+        from sqlalchemy import select
+
+        cycle_id = _validated_collection_cycle_id(collection_cycle_id)
+        with self.engine.connect() as conn:
+            row = conn.execute(select(self.cycles).where(
+                self.cycles.c.collection_cycle_id == cycle_id
+            )).mappings().first()
+            slots = list(conn.execute(select(self.cycle_slots).where(
+                self.cycle_slots.c.collection_cycle_id == cycle_id
+            )).mappings()) if row else []
+            receipts = list(conn.execute(select(
+                self.fetches.c.fetch_run_id,
+                self.fetches.c.provider,
+                self.fetches.c.query_key,
+                self.fetches.c.status,
+                self.fetches.c.item_count,
+            ).where(
+                self.fetches.c.collection_cycle_id == cycle_id
+            )).mappings()) if row else []
+            item_rows = list(conn.execute(select(
+                self.fetch_items_table.c.fetch_run_id,
+                self.fetch_items_table.c.raw_content_id,
+            ).select_from(
+                self.fetch_items_table.join(
+                    self.fetches,
+                    self.fetches.c.fetch_run_id
+                    == self.fetch_items_table.c.fetch_run_id,
+                )
+            ).where(
+                self.fetches.c.collection_cycle_id == cycle_id
+            )).mappings()) if row else []
+        cycle = _verify_collection_cycle_relations(
+            dict(row), [dict(item) for item in slots],
+            _cycle_receipts_with_lineage(
+                [dict(item) for item in receipts],
+                [dict(item) for item in item_rows],
+            ),
+        ) if row else None
+        if cycle is not None:
+            cycle["raw_content_replay_validated"] = False
+        return cycle
 
     def collection_cycle_identities(
         self, cycle_kind: str, *, period_key: str,

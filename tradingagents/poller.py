@@ -469,7 +469,8 @@ def _sanitized_coverage_alert_details(coverage: dict) -> dict:
     periodic = coverage.get("periodic_requirements") or {}
     x_daily_state = periodic.get("x_daily") if isinstance(periodic, dict) else None
     if x_daily_state not in {
-        "complete", "incomplete", "invalid", "missing", "running", "scheduled"
+        "checkpointed", "complete", "incomplete", "invalid", "missing",
+        "running", "scheduled",
     }:
         x_daily_state = None
     x_daily_missing = "x_daily" in missing_periodic
@@ -605,10 +606,11 @@ def _update_coverage_alert_state(
     if previously_unhealthy and x_failed and not x_caused_incident:
         store.set_meta(_COVERAGE_ALERT_X_CAUSE_KEY, 1.0)
         x_caused_incident = True
-    elif previously_unhealthy and x_daily_state == "complete" and x_caused_incident:
-        # Clear the gate as soon as durable coverage proves a later X cycle
-        # complete. If recovery delivery is interrupted, a scheduled cycle can
-        # safely retry that already-earned recovery occurrence.
+    elif previously_unhealthy \
+            and x_daily_state in {"checkpointed", "complete"} \
+            and x_caused_incident:
+        # A complete cycle or authenticated paid-attempt checkpoint resolves
+        # the operational incident. Formal evidence replay remains separate.
         store.set_meta(_COVERAGE_ALERT_X_CAUSE_KEY, 0.0)
         x_caused_incident = False
     if coverage.get("complete") is True:
@@ -811,14 +813,15 @@ def _check_cycle_query_coverage(
         not isinstance(name, str)
         or name not in {"x_daily"}
         or state not in {
-            "complete", "incomplete", "invalid", "missing", "running", "scheduled"
+            "checkpointed", "complete", "incomplete", "invalid", "missing",
+            "running", "scheduled",
         }
         for name, state in periodic.items()
     ):
         raise ValueError("collector periodic requirement state is invalid")
     missing_periodic = sorted(
         name for name, state in periodic.items()
-        if state not in {"complete", "scheduled"}
+        if state not in {"checkpointed", "complete", "scheduled"}
     )
     coverage["periodic_requirements"] = periodic
     coverage["missing_periodic_requirements"] = missing_periodic
@@ -1968,6 +1971,82 @@ def _x_collection_cycle_state(spec: dict, cycle: Mapping | None) -> str:
     return x_cycle_structural_state(spec, cycle)
 
 
+def _is_registered_compatible_x_spec(spec: Mapping) -> bool:
+    """Recognize an exact prior collector shape for the spec's UTC period."""
+    identity = spec.get("identity")
+    if not isinstance(identity, Mapping):
+        return False
+    for registered in GLOBAL_EVENT_V2_COMPATIBLE_COLLECTOR_IDENTITIES:
+        if (
+            identity.get("protocol_id"),
+            identity.get("collector_semantics_id"),
+        ) != (
+            registered["protocol_id"],
+            registered["collector_semantics_id"],
+        ):
+            continue
+        try:
+            expected = media_store.collection_cycle_spec(
+                cycle_kind="x-daily",
+                period_key=identity.get("period_key"),
+                protocol_id=registered["protocol_id"],
+                collector_semantics_id=registered["collector_semantics_id"],
+                expected_static_slots=registered["x_daily_static_slots"],
+                max_dynamic_slots=registered["x_daily_max_dynamic_slots"],
+            )
+        except (TypeError, ValueError):
+            return False
+        return spec == expected
+    return False
+
+
+def _compatible_x_cycle_for_operations(store, spec: dict) -> dict:
+    """Resolve a prior paid attempt without relaxing formal evidence replay."""
+    if not _is_registered_compatible_x_spec(spec):
+        raise ValueError("X cycle is not an exact registered compatible identity")
+    cycle_id = spec["collection_cycle_id"]
+    try:
+        cycle = store.collection_cycle(cycle_id)
+    except media_store.CollectionCycleRawContentMismatch:
+        checkpoint = _compatible_x_cycle_checkpoint(store, spec)
+        if checkpoint is None:
+            return {
+                "cycle": None,
+                "state": "invalid",
+                "checkpoint_only": False,
+            }
+        state = _x_collection_cycle_state(spec, checkpoint)
+        return {
+            "cycle": checkpoint,
+            "state": "checkpointed" if state == "complete" else state,
+            "checkpoint_only": True,
+        }
+    return {
+        "cycle": cycle,
+        "state": _x_collection_cycle_state(spec, cycle),
+        "checkpoint_only": False,
+    }
+
+
+def _compatible_x_cycle_checkpoint(store, spec: dict) -> Mapping | None:
+    """Read a registered prior-cycle checkpoint after strict replay fails."""
+    if not _is_registered_compatible_x_spec(spec):
+        raise ValueError("X cycle is not an exact registered compatible identity")
+    try:
+        checkpoint = store.collection_cycle_checkpoint(
+            spec["collection_cycle_id"]
+        )
+    except (AttributeError, TypeError, ValueError):
+        return None
+    if (
+        not isinstance(checkpoint, Mapping)
+        or checkpoint.get("identity_valid") is not True
+        or checkpoint.get("raw_content_replay_validated") is not False
+    ):
+        return None
+    return checkpoint
+
+
 def _x_daily_cycle_resolution(store, now: float, max_topics: int) -> dict:
     """Resolve one same-day attempt, preferring current over prior identities.
 
@@ -1988,6 +2067,7 @@ def _x_daily_cycle_resolution(store, now: float, max_topics: int) -> dict:
             "cycle": None,
             "state": "invalid",
             "blocks_new_paid_cycle": True,
+            "checkpoint_only": False,
         }
     if current_cycle is not None:
         return {
@@ -1996,11 +2076,12 @@ def _x_daily_cycle_resolution(store, now: float, max_topics: int) -> dict:
             "cycle": current_cycle,
             "state": _x_collection_cycle_state(current_spec, current_cycle),
             "blocks_new_paid_cycle": True,
+            "checkpoint_only": False,
         }
 
     for spec in compatible_specs:
         try:
-            cycle = store.collection_cycle(spec["collection_cycle_id"])
+            candidate = _compatible_x_cycle_for_operations(store, spec)
         except ValueError:
             return {
                 "origin": "compatible",
@@ -2008,14 +2089,16 @@ def _x_daily_cycle_resolution(store, now: float, max_topics: int) -> dict:
                 "cycle": None,
                 "state": "invalid",
                 "blocks_new_paid_cycle": True,
+                "checkpoint_only": False,
             }
-        if cycle is not None:
+        if candidate["cycle"] is not None or candidate["state"] == "invalid":
             return {
                 "origin": "compatible",
                 "spec": spec,
-                "cycle": cycle,
-                "state": _x_collection_cycle_state(spec, cycle),
+                "cycle": candidate["cycle"],
+                "state": candidate["state"],
                 "blocks_new_paid_cycle": True,
+                "checkpoint_only": candidate["checkpoint_only"],
             }
     period_key = current_spec["identity"]["period_key"]
     try:
@@ -2031,6 +2114,7 @@ def _x_daily_cycle_resolution(store, now: float, max_topics: int) -> dict:
             "cycle": None,
             "state": "invalid",
             "blocks_new_paid_cycle": True,
+            "checkpoint_only": False,
         }
     return {
         "origin": None,
@@ -2038,6 +2122,7 @@ def _x_daily_cycle_resolution(store, now: float, max_topics: int) -> dict:
         "cycle": None,
         "state": "missing",
         "blocks_new_paid_cycle": False,
+        "checkpoint_only": False,
     }
 
 
@@ -2223,7 +2308,8 @@ def poll_x_topics_once(
     if resolution["origin"] == "unknown":
         raise ValueError("same-day X collection identity is not recognized")
     if resolution["origin"] == "compatible":
-        if resolution["state"] != "complete" or resolution["cycle"] is None:
+        if resolution["state"] not in {"checkpointed", "complete"} \
+                or resolution["cycle"] is None:
             raise ValueError("same-day compatible X collection cycle is not uniquely complete")
         store.set_meta("last_x_poll_utc", now)
         return _x_manifest_slots(resolution["cycle"])
@@ -2581,7 +2667,8 @@ def _x_cycle_audit_projection(store, period_date) -> dict:
     manifest = cycle.get("manifest") if isinstance(cycle, Mapping) else None
     receipts = []
     terminal = None
-    if state in {"complete", "incomplete"} and isinstance(manifest, Mapping):
+    if state in {"checkpointed", "complete", "incomplete"} \
+            and isinstance(manifest, Mapping):
         receipts = manifest.get("slot_receipts")
         if not isinstance(receipts, list):
             state = "invalid"
@@ -2629,7 +2716,8 @@ def print_audit(store, *, include_history: bool = False) -> None:
         store, now, _GLOBAL_X_TOPIC_LIMIT
     )
     overall_complete = bool(
-        coverage["complete"] and current_x_state in {"complete", "scheduled"}
+        coverage["complete"]
+        and current_x_state in {"checkpointed", "complete", "scheduled"}
     )
     print(f"collector_coverage_complete={str(overall_complete).lower()}")
     print(f"collector_expected_query_slots={len(coverage['query_slots'])}")
@@ -2902,6 +2990,7 @@ def _run_preflight(
 ) -> None:
     """Run the database-read-only release gate and silent webhook probe."""
     store = None
+    failure_stage = "configuration"
     try:
         if (env.get("MEDIA_AUTO_MIGRATE") or "").strip().lower() not in {
             "0",
@@ -2932,9 +3021,13 @@ def _run_preflight(
         if not (configured_db or "").strip():
             raise ValueError("PostgreSQL database is not configured")
 
+        failure_stage = "build_identity"
         semantics_id = collector_semantics_manifest()["collector_semantics_id"]
         if semantics_id != GLOBAL_EVENT_V2_COLLECTOR_SEMANTICS_ID:
             raise RuntimeError("collector semantics do not match the protocol")
+        collector_build_id = build_identity()
+
+        failure_stage = "database_contract"
         store = open_store(configured_db, auto_migrate=False)
         database_contract = store.collector_runtime_preflight(
             direct_url=(env.get("MEDIA_DB_DIRECT_URL") or "").strip() or None
@@ -2942,6 +3035,7 @@ def _run_preflight(
         if database_contract.get("ready") is not True:
             raise RuntimeError("collector database contract is not ready")
 
+        failure_stage = "database_clock"
         server_now = store.server_observed_utc()
         if (
             isinstance(server_now, bool)
@@ -2950,6 +3044,7 @@ def _run_preflight(
         ):
             raise RuntimeError("collector database clock is invalid")
         period_key = datetime.fromtimestamp(float(server_now), timezone.utc).date().isoformat()
+        failure_stage = "x_identity_inventory"
         expected_specs = [
             _x_collection_cycle_spec(
                 float(server_now),
@@ -2978,7 +3073,11 @@ def _run_preflight(
             != len({item["collection_cycle_id"] for item in observed_cycles})
         ):
             raise RuntimeError("today's X collection identity inventory is invalid")
+        compatible_cycle_ids = {
+            spec["collection_cycle_id"] for spec in expected_specs[1:]
+        }
         repair_compatible_cycle_count = 0
+        failure_stage = "x_cycle_replay"
         for observed in observed_cycles:
             spec = expected_by_id.get(observed["collection_cycle_id"])
             if spec is None or (observed["protocol_id"], observed["collector_semantics_id"]) != (
@@ -2986,17 +3085,33 @@ def _run_preflight(
                 spec["identity"]["collector_semantics_id"],
             ):
                 raise RuntimeError("today's X collection identity is not compatible")
-            cycle = store.collection_cycle(observed["collection_cycle_id"])
-            if not _preflight_x_cycle_is_known(spec, cycle):
+            compatible = observed["collection_cycle_id"] in compatible_cycle_ids
+            if compatible:
+                try:
+                    cycle = store.collection_cycle(observed["collection_cycle_id"])
+                    checkpoint_only = False
+                except media_store.CollectionCycleRawContentMismatch:
+                    cycle = _compatible_x_cycle_checkpoint(store, spec)
+                    checkpoint_only = cycle is not None
+            else:
+                cycle = store.collection_cycle(observed["collection_cycle_id"])
+                checkpoint_only = False
+            structural_state = x_cycle_structural_state(spec, cycle)
+            if (
+                not _preflight_x_cycle_is_known(spec, cycle)
+                or (not compatible and structural_state == "invalid")
+            ):
                 raise RuntimeError("today's X collection cycle is structurally invalid")
-            if x_cycle_structural_state(spec, cycle) == "invalid":
+            if compatible and (checkpoint_only or structural_state == "invalid"):
                 repair_compatible_cycle_count += 1
 
         alert_probe_delivered = False
         if webhook_required:
+            failure_stage = "alert_receiver"
             alert_probe_delivered = bool(probe_alert_webhook())
             if not alert_probe_delivered:
                 raise RuntimeError("collector alert receiver contract is not ready")
+        failure_stage = "render"
         print(
             canonical_json(
                 {
@@ -3004,7 +3119,7 @@ def _run_preflight(
                     "status": "ok",
                     "collection_protocol_id": GLOBAL_EVENT_V2_COLLECTION_PROTOCOL_ID,
                     "collector_semantics_id": semantics_id,
-                    "collector_build_id": build_identity(),
+                    "collector_build_id": collector_build_id,
                     "database_contract": database_contract,
                     "x_identity_period": period_key,
                     "x_identity_inventory_valid": True,
@@ -3018,7 +3133,11 @@ def _run_preflight(
             )
         )
     except Exception as exc:  # noqa: BLE001 - never render configuration or DB text
-        parser.exit(2, f"collector preflight failed ({_exception_kind(exc)})\n")
+        parser.exit(
+            2,
+            "collector preflight failed "
+            f"({failure_stage}:{_exception_kind(exc)})\n",
+        )
     finally:
         if store is not None:
             try:
