@@ -1,6 +1,10 @@
 """Dynamic X discovery stays broad, diverse, and tightly bounded."""
 
 import json
+import os
+import re
+import subprocess
+import sys
 from datetime import datetime, timezone
 from urllib.parse import parse_qs, urlparse
 
@@ -111,6 +115,7 @@ def test_x_topic_query_is_public_relevant_and_minimum_sized(monkeypatch):
     assert "affiliation" not in params["user.fields"][0].split(",")
     assert captured["headers"]["Authorization"] == "Bearer secret-test-token"
     assert rows[0]["ticker"] == "@TREND_WORLD"
+    assert rows[0]["title"] == '"Bordeaux" wildfires'
     assert rows[0]["metadata"]["evidence_role"] == "unverified_public_reaction"
     assert rows[0]["metadata"]["author_id"] == "101"
     assert rows[0]["metadata"]["automation_signals_complete"] is True
@@ -485,19 +490,60 @@ def test_x_author_profile_rejects_malformed_present_urls(profile_fields):
 
 
 @pytest.mark.unit
-def test_discovery_selects_current_news_across_three_categories(monkeypatch):
+def test_discovery_prioritizes_two_strategic_technology_stories_and_global_news(
+    monkeypatch,
+):
     headlines = [
-        {"external_id": "w1", "title": "Wildfires force Bordeaux evacuations - Reuters",
-         "body": "", "created_utc": 10.0, "publisher": "Reuters", "category": "world", "rank": 0},
-        {"external_id": "b1", "title": "Central banks surprise global markets - Bloomberg",
-         "body": "", "created_utc": 11.0, "publisher": "Bloomberg", "category": "business", "rank": 0},
-        {"external_id": "t1", "title": "Helios Labs releases Nova model - The Verge",
-         "body": "", "created_utc": 12.0, "publisher": "The Verge", "category": "technology", "rank": 2},
-        {"external_id": "t0", "title": "Helios Labs product review - Helios Labs",
-         "body": "", "created_utc": 13.0, "publisher": "Helios Labs", "category": "technology", "rank": 0},
-        # Cross-feed presence raises this story's information score.
-        {"external_id": "t1", "title": "Helios Labs releases Nova model - The Verge",
-         "body": "", "created_utc": 12.0, "publisher": "The Verge", "category": "general", "rank": 1},
+        {
+            "external_id": "global",
+            "title": "US administration announces global tariff policy - Reuters",
+            "body": "",
+            "created_utc": 10.0,
+            "publisher": "Reuters",
+            "category": "world",
+            "region": "US",
+            "rank": 0,
+        },
+        {
+            "external_id": "chips",
+            "title": "China chip export controls disrupt semiconductor supply - BBC",
+            "body": "",
+            "created_utc": 11.0,
+            "publisher": "BBC",
+            "category": "world",
+            "region": "GB",
+            "rank": 2,
+        },
+        {
+            "external_id": "memory",
+            "title": "South Korea expands HBM production capacity - Reuters",
+            "body": "",
+            "created_utc": 12.0,
+            "publisher": "Reuters",
+            "category": "business",
+            "region": "US",
+            "rank": 3,
+        },
+        {
+            "external_id": "phone",
+            "title": "New foldable phone launches with AI features - TechCrunch",
+            "body": "",
+            "created_utc": 13.0,
+            "publisher": "TechCrunch",
+            "category": "technology",
+            "region": "US",
+            "rank": 0,
+        },
+        {
+            "external_id": "company",
+            "title": "Company launches frontier AI model - Company Newsroom",
+            "body": "",
+            "created_utc": 14.0,
+            "publisher": "Company Newsroom",
+            "category": "technology",
+            "region": "US",
+            "rank": 0,
+        },
     ]
     feed_limits = []
 
@@ -509,17 +555,101 @@ def test_discovery_selects_current_news_across_three_categories(monkeypatch):
     monkeypatch.setattr(
         poller, "fetch_x_trends",
         lambda woeid, **_kwargs: (
-            [{"name": "Helios Labs", "tweet_count": 1000}] if woeid == 1 else []
+            [{"name": "China chip export", "tweet_count": 1000}]
+            if woeid == 1 else []
         ),
     )
 
     topics = poller.discover_x_topics(max_topics=3)
 
-    assert [topic["category"] for topic in topics] == ["world", "business", "technology"]
+    assert [topic["topic"] for topic in topics] == [
+        "trend_slot_1", "trend_slot_2", "trend_slot_3",
+    ]
+    assert [topic["selection_role"] for topic in topics] == [
+        "strategic_technology", "strategic_technology", "major_global",
+    ]
     assert all(topic["query"] for topic in topics)
-    assert topics[2]["query"].startswith('"Helios Labs"')
-    assert {topic["external_id"] for topic in topics} == {"w1", "b1", "t1"}
-    assert feed_limits == [12]
+    assert {topic["external_id"] for topic in topics} == {
+        "global", "chips", "memory",
+    }
+    assert all(topic["strategic_technology"] for topic in topics[:2])
+    assert topics[2]["strategic_technology"] is False
+    assert feed_limits == [20]
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("title", "category", "strategic", "subdomain"),
+    [
+        ("China imposes semiconductor export controls", "world", True, "semiconductors"),
+        ("US restricts AI chip exports to China", "world", True, "semiconductors"),
+        ("China bans exports of rare earths used in chips", "world", True, "semiconductors"),
+        ("Japan chipmaker expands processor production", "business", True, "semiconductors"),
+        ("South Korean memory chip exports surge", "business", True, "semiconductors"),
+        ("South Korea expands HBM production capacity", "business", True, "semiconductors"),
+        ("Taiwan begins construction of advanced chip fab", "world", True, "semiconductors"),
+        ("Researchers release a new foundation model", "technology", True, "artificial_intelligence"),
+        (
+            "OpenAI unveils GPT-5 AI model",
+            "technology",
+            True,
+            "artificial_intelligence",
+        ),
+        ("Anthropic releases Claude 5 reasoning model", "technology", True, "artificial_intelligence"),
+        ("DeepSeek releases R2 reasoning model", "technology", True, "artificial_intelligence"),
+        ("Meta launches Llama 5 AI model", "technology", True, "artificial_intelligence"),
+        ("Cyberattack disrupts national network infrastructure", "world", True, "cybersecurity"),
+        ("Telecom operators announce network investment", "business", True, "telecommunications"),
+        ("Telecom group begins 6G infrastructure research", "technology", True, "telecommunications"),
+        ("Factory launches industrial robotics production line", "business", True, "robotics"),
+        ("Japan funds a quantum computing breakthrough", "technology", True, "quantum"),
+        ("Satellite launch expands orbital infrastructure", "technology", True, "space_infrastructure"),
+        ("China election policy enters debate", "world", False, None),
+        ("Presidential power faces a court challenge", "world", False, None),
+        ("Fashion models launch summer collection", "technology", False, None),
+        ("Researchers develop a new ocean model", "technology", False, None),
+        ("Economists release a labor market model", "technology", False, None),
+        ("Office space launches leasing campaign", "technology", False, None),
+        ("New SUV model launches", "technology", False, None),
+        ("Foldable phone launches with AI features", "technology", False, None),
+        ("New generative AI phone launches as demand grows", "technology", False, None),
+        ("Iran launches rockets at Israel", "world", False, None),
+        ("Satellite images show attacks on military base", "world", False, None),
+        ("Potato chip factory expands production", "business", False, None),
+    ],
+)
+def test_strategic_technology_taxonomy_requires_technology_and_material_event(
+    title, category, strategic, subdomain,
+):
+    result = poller._strategic_technology_classification(
+        {"lineage": [{"title": title, "category": category}]}
+    )
+
+    assert result["strategic_technology"] is strategic
+    if subdomain is not None:
+        assert subdomain in result["strategic_subdomains"]
+
+
+@pytest.mark.unit
+def test_consumer_story_needs_a_systemic_technology_consequence():
+    ordinary = poller._strategic_technology_classification({
+        "lineage": [{"title": "New phone launches with AI camera features"}],
+    })
+    systemic = poller._strategic_technology_classification({
+        "lineage": [{
+            "title": "Phone production falls as semiconductor supply shortage expands"
+        }],
+    })
+
+    assert ordinary == {
+        "strategic_technology": False,
+        "strategic_subdomains": [],
+        "strategic_context": False,
+        "major_global_impact": False,
+        "consumer_only": True,
+    }
+    assert systemic["strategic_technology"] is True
+    assert systemic["consumer_only"] is False
 
 
 @pytest.mark.unit
@@ -539,7 +669,324 @@ def test_discovery_normalization_matching_and_query_contract():
     ) is False
     assert poller._headline_query(
         "Breaking OpenAI GPT-6 Model Launches Worldwide - Reuters"
-    ) == '"OpenAI GPT-6" Model'
+    ) == '"OpenAI GPT-6" Launches Model'
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("title", "expected_query"),
+    [
+        ("Google launches Gemini 3", '"Gemini 3" Google launches'),
+        ("OpenAI releases o3", "OpenAI o3 releases"),
+        (
+            "Anthropic unveils Claude 4",
+            '"Claude 4" Anthropic unveils',
+        ),
+        (
+            "Nvidia unveils Blackwell Ultra",
+            '"Blackwell Ultra" Nvidia unveils',
+        ),
+    ],
+)
+def test_query_builder_preserves_opaque_named_subjects_and_events(
+    title, expected_query,
+):
+    query = poller._headline_query(title)
+
+    assert query == expected_query
+    headline_words = set(re.findall(r"[a-z0-9]+", title.casefold()))
+    query_words = set(re.findall(r"[a-z0-9]+", query.casefold()))
+    assert query_words <= headline_words
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("title", "category", "expected_query"),
+    [
+        (
+            "US restricts AI chip exports to China",
+            "world",
+            'China "AI chip" exports',
+        ),
+        (
+            "Israel and Iran agree ceasefire after US strikes",
+            "world",
+            "Israel Iran ceasefire",
+        ),
+        (
+            "Trump announces tariffs on China",
+            "world",
+            "Trump China tariffs",
+        ),
+    ],
+)
+def test_discovery_queries_preserve_named_subjects_and_material_events(
+    title, category, expected_query,
+):
+    topics = poller.discover_x_topics(
+        max_topics=1,
+        headlines=[{
+            "external_id": "headline",
+            "title": f"{title} - Reuters",
+            "body": "",
+            "created_utc": 10.0,
+            "publisher": "Reuters",
+            "category": category,
+            "region": "US",
+            "rank": 0,
+        }],
+        trends=[],
+    )
+
+    assert len(topics) == 1
+    assert topics[0]["query"] == expected_query
+    headline_words = set(re.findall(r"[a-z0-9]+", title.casefold()))
+    query_words = set(re.findall(r"[a-z0-9]+", expected_query.casefold()))
+    assert query_words <= headline_words
+
+
+@pytest.mark.unit
+def test_opaque_model_name_requires_an_explicit_strategic_domain():
+    def topics(title):
+        return poller.discover_x_topics(
+            max_topics=1,
+            headlines=[{
+                "external_id": "headline",
+                "title": f"{title} - Reuters",
+                "body": "",
+                "created_utc": 10.0,
+                "publisher": "Reuters",
+                "category": "technology",
+                "region": "US",
+                "rank": 0,
+            }],
+            trends=[],
+        )
+
+    assert topics("Google launches Gemini 3") == []
+    selected = topics("Google launches AI model Gemini 3")
+    assert len(selected) == 1
+    assert selected[0]["strategic_subdomains"] == ["artificial_intelligence"]
+    assert "gemini 3" in selected[0]["query"].casefold()
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "title",
+    [
+        "Phone maker launches Nova 4 smartphone",
+        "Fashion house launches Aurora 4 collection",
+        "Automaker unveils Falcon 4 vehicle",
+        "ZephyrQuill launches Aurora 4 software platform",
+        "Tesla unveils Model Y",
+        "Boeing launches MAX-10",
+        "Samsung unveils Galaxy S26",
+        "Microsoft launches Windows 12",
+        "Ford unveils Mustang Mach E",
+        "Netflix releases Stranger Things 6",
+    ],
+)
+def test_named_release_discovery_rejects_non_strategic_products(title):
+    topics = poller.discover_x_topics(
+        max_topics=1,
+        headlines=[{
+            "external_id": "headline",
+            "title": f"{title} - Reuters",
+            "body": "",
+            "created_utc": 10.0,
+            "publisher": "Reuters",
+            "category": "technology",
+            "region": "US",
+            "rank": 0,
+        }],
+        trends=[],
+    )
+
+    assert topics == []
+
+
+@pytest.mark.unit
+def test_discovery_query_order_is_stable_across_python_hash_seeds():
+    script = (
+        "from tradingagents.poller import _headline_query; "
+        "print(_headline_query("
+        "'US and AI model launches worldwide - Reuters', "
+        "domain_signals=('AI model',)))"
+    )
+    outputs = {
+        subprocess.run(
+            [sys.executable, "-c", script],
+            check=True,
+            capture_output=True,
+            text=True,
+            env={**os.environ, "PYTHONHASHSEED": seed},
+        ).stdout.strip()
+        for seed in ("1", "7", "113")
+    }
+
+    assert outputs == {'US "AI model" launches'}
+
+
+@pytest.mark.unit
+def test_grouped_story_uses_the_role_qualifying_headline_for_its_query():
+    headlines = [
+        {
+            "external_id": "generic",
+            "title": "US China trade restrictions expand - Reuters",
+            "body": "",
+            "created_utc": 10.0,
+            "publisher": "Reuters",
+            "category": "world",
+            "region": "US",
+            "rank": 0,
+        },
+        {
+            "external_id": "semiconductor",
+            "title": "US China semiconductor trade restrictions expand - BBC",
+            "body": "",
+            "created_utc": 11.0,
+            "publisher": "BBC",
+            "category": "technology",
+            "region": "GB",
+            "rank": 1,
+        },
+    ]
+
+    selected = poller.discover_x_topics(
+        max_topics=1, headlines=headlines, trends=[]
+    )[0]
+
+    assert selected["external_id"] == "semiconductor"
+    assert selected["title"] == headlines[1]["title"]
+    assert "semiconductor" in selected["query"].casefold()
+    assert selected["strategic_technology"] is True
+
+
+@pytest.mark.unit
+def test_strategic_query_keeps_technology_and_east_asia_context():
+    headline = {
+        "external_id": "hbm",
+        "title": "South Korea expands HBM production capacity - Reuters",
+        "body": "",
+        "created_utc": 10.0,
+        "publisher": "Reuters",
+        "category": "business",
+        "region": "US",
+        "rank": 0,
+    }
+
+    query = poller.discover_x_topics(
+        max_topics=1, headlines=[headline], trends=[]
+    )[0]["query"].casefold()
+
+    assert "hbm" in query
+    assert "south korea" in query
+
+
+@pytest.mark.unit
+def test_general_feed_requires_global_impact_and_technology_noise_cannot_backfill():
+    general_policy = {
+        "external_id": "policy",
+        "title": "National administration announces new tariff policy - Reuters",
+        "body": "",
+        "created_utc": 10.0,
+        "publisher": "Reuters",
+        "category": "general",
+        "region": "US",
+        "rank": 0,
+    }
+    generic_public_story = {
+        **general_policy,
+        "external_id": "generic",
+        "title": "Major public story develops - Reuters",
+    }
+    product_noise = {
+        **general_policy,
+        "external_id": "product",
+        "title": "ZephyrQuill launches a software platform - Reuters",
+        "category": "technology",
+    }
+
+    selected = poller.discover_x_topics(
+        max_topics=3,
+        headlines=[generic_public_story, product_noise, general_policy],
+        trends=[],
+    )
+
+    assert [item["external_id"] for item in selected] == ["policy"]
+    assert selected[0]["selection_role"] == "major_global"
+
+
+@pytest.mark.unit
+def test_discovery_query_identity_is_casefolded_and_whitespace_stable():
+    assert poller._discovery_query_identity('  "NovaX"   AI model ') == (
+        poller._discovery_query_identity('"NOVAX" AI model')
+    )
+
+
+@pytest.mark.unit
+def test_subdomain_diversity_never_displaces_materially_stronger_reporting():
+    def headline(external_id, title, publisher, domain, rank):
+        return {
+            "external_id": external_id,
+            "title": f"{title} - {publisher}",
+            "body": "",
+            "created_utc": 10.0 + rank,
+            "publisher": publisher,
+            "category": "technology",
+            "region": "US",
+            "rank": rank,
+            "metadata": {"publisher_domain": domain},
+        }
+
+    headlines = [
+        *[
+            headline(
+                f"biology-{index}",
+                "Atlas releases frontier AI model for genomic medicine",
+                publisher,
+                domain,
+                index,
+            )
+            for index, (publisher, domain) in enumerate((
+                ("Reuters", "reuters.com"),
+                ("BBC", "bbc.co.uk"),
+                ("NPR", "npr.org"),
+            ))
+        ],
+        *[
+            headline(
+                f"weather-{index}",
+                "Nova deploys reasoning model for weather prediction",
+                publisher,
+                domain,
+                index + 1,
+            )
+            for index, (publisher, domain) in enumerate((
+                ("Reuters", "reuters.com"),
+                ("BBC", "bbc.co.uk"),
+            ))
+        ],
+        headline(
+            "quantum",
+            "Researchers announce quantum computing breakthrough",
+            "NPR",
+            "npr.org",
+            0,
+        ),
+    ]
+
+    selected = poller.discover_x_topics(
+        max_topics=2, headlines=headlines, trends=[]
+    )
+
+    assert [item["external_id"].split("-")[0] for item in selected] == [
+        "biology", "weather",
+    ]
+    assert all(
+        item["strategic_subdomains"] == ["artificial_intelligence"]
+        for item in selected
+    )
 
 
 @pytest.mark.unit
@@ -629,6 +1076,74 @@ def test_paid_topic_search_requires_formally_independent_editorial_lineage():
 def test_paid_topic_search_requires_a_finite_capture_time():
     with pytest.raises(ValueError, match="capture time must be finite"):
         poller._formally_grounded_discovery_topics([], float("nan"))
+
+
+@pytest.mark.unit
+def test_discovery_filters_ineligible_publishers_before_allocating_slots():
+    captured = 1_800_000_000.0
+
+    def headline(
+        external_id, title, publisher, domain, category, rank,
+    ):
+        return {
+            "external_id": external_id,
+            "title": title,
+            "body": "independent report",
+            "created_utc": captured - 60,
+            "publisher": publisher,
+            "category": category,
+            "region": "US",
+            "rank": rank,
+            "metadata": {"publisher_domain": domain},
+        }
+
+    topics = poller.discover_x_topics(
+        max_topics=3,
+        captured_utc=captured,
+        trends=[],
+        headlines=[
+            headline(
+                "ineligible",
+                "Researchers release a frontier AI model",
+                "The Verge",
+                "theverge.com",
+                "technology",
+                0,
+            ),
+            headline(
+                "ai",
+                "Researchers release a foundation AI model",
+                "Reuters",
+                "reuters.com",
+                "technology",
+                1,
+            ),
+            headline(
+                "chips",
+                "South Korea expands HBM production capacity",
+                "Associated Press",
+                "apnews.com",
+                "business",
+                2,
+            ),
+            headline(
+                "global",
+                "Governments announce a new global trade agreement",
+                "BBC",
+                "bbc.co.uk",
+                "world",
+                0,
+            ),
+        ],
+    )
+
+    assert [topic["external_id"] for topic in topics] == [
+        "chips", "ai", "global",
+    ]
+    assert all(
+        headline["publisher"] in {"Reuters", "Associated Press", "BBC"}
+        for topic in topics for headline in topic["lineage"]
+    )
 
 
 @pytest.mark.unit
@@ -1599,7 +2114,7 @@ def test_discovery_queries_are_derived_only_from_ranked_headlines():
             max_topics=1,
             headlines=[{
                 "external_id": external_id,
-                "title": f"{entity} launches a new platform - Reuters",
+                "title": f"{entity} releases a frontier AI model - Reuters",
                 "body": "",
                 "created_utc": 10.0,
                 "publisher": "Reuters",

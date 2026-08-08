@@ -85,6 +85,7 @@ _COLLECTION_CYCLE_KIND = re.compile(r"[a-z0-9][a-z0-9-]{0,63}")
 _COLLECTOR_BUILD_ID = re.compile(r"build_[0-9a-f]{24}")
 _FORMAL_MEDIA_SOURCES = frozenset({"globalnews", "trendnews", "x"})
 _IMMUTABLE_MEDIA_FIELDS = ("created_utc", "title", "body")
+_IMMUTABLE_X_MEDIA_FIELDS = ("created_utc", "body")
 _IMMUTABLE_NEWS_PROVENANCE_FIELDS = (
     "publisher_domain",
     "article_url",
@@ -954,6 +955,28 @@ def _materialized_cycle_item_rows(rows: list[dict]) -> list[dict]:
     materialized = []
     for item in rows:
         row = _cycle_item_snapshot(item)
+        if row.get("source") == "x":
+            query_context = item.get("receipt_query_key")
+            if not isinstance(query_context, str) or not query_context.strip():
+                raise ValueError("X cycle item lacks its receipt query context")
+            try:
+                receipt_metadata = json.loads(item.get("receipt_metadata_json") or "{}")
+            except (TypeError, json.JSONDecodeError) as exc:
+                raise ValueError("X cycle item receipt metadata is malformed") from exc
+            if not isinstance(receipt_metadata, dict):
+                raise ValueError("X cycle item receipt metadata is malformed")
+            receipt_labels = receipt_metadata.get("labels")
+            if not isinstance(receipt_labels, list) or any(
+                not isinstance(label, str) or not label
+                for label in receipt_labels
+            ):
+                raise ValueError("X cycle item lacks its receipt labels")
+            row["title"] = query_context
+            metadata = row.get("metadata")
+            row["metadata"] = {
+                **(metadata if isinstance(metadata, dict) else {}),
+                "receipt_labels": list(receipt_labels),
+            }
         row["fetched_utc"] = item.get("observed_utc")
         row["latest_observed_utc"] = item.get("server_terminal_utc")
         row["latest_observed_utc_source"] = "server_terminal_utc"
@@ -1203,12 +1226,46 @@ def _build_fetch_item_lineage(
     return items, formal_lineage
 
 
+def _media_rows_for_receipt(
+    provider: str, query_key: str, rows: list[dict]
+) -> list[dict]:
+    """Separate X search context from globally deduplicated provider content.
+
+    X has no provider title. Topic fetchers expose their unfiltered search in
+    ``title`` long enough for collector admission, while the receipt already
+    stores that exact query. Persisting the query on ``media_posts`` would make
+    the same post conflict when another search discovers it. Exact receipt
+    labels likewise belong to the receipt, not its shared observation row.
+    """
+    if provider != "x":
+        return rows
+    normalized = []
+    for row in rows:
+        item = dict(row)
+        context = item.get("title")
+        if context is not None:
+            if not isinstance(context, str) or context != query_key:
+                raise ValueError("X topic context does not match its receipt query")
+            item["title"] = None
+        metadata = item.get("metadata")
+        if isinstance(metadata, dict) and "receipt_labels" in metadata:
+            item["metadata"] = {
+                key: value for key, value in metadata.items()
+                if key != "receipt_labels"
+            }
+        normalized.append(item)
+    return normalized
+
+
 def _media_rows_conflict(existing: dict, observed: dict) -> bool:
     """Detect revisions that would otherwise synthesize a hybrid formal row."""
     source = observed.get("source")
     if source not in _FORMAL_MEDIA_SOURCES or existing.get("source") != source:
         return False
-    if any(existing.get(field) != observed.get(field) for field in _IMMUTABLE_MEDIA_FIELDS):
+    immutable_fields = (
+        _IMMUTABLE_X_MEDIA_FIELDS if source == "x" else _IMMUTABLE_MEDIA_FIELDS
+    )
+    if any(existing.get(field) != observed.get(field) for field in immutable_fields):
         return True
     existing_metadata = (
         existing.get("metadata") if isinstance(existing.get("metadata"), dict) else {}
@@ -3074,7 +3131,8 @@ class SqliteMediaStore:
         self.conn.row_factory = sqlite3.Row
         rows = self.conn.execute(
             "SELECT item.fetch_run_id,item.raw_content_id,item.observed_utc,"
-            "run.server_terminal_utc,"
+            "run.server_terminal_utc,run.query_key AS receipt_query_key,"
+            "run.metadata_json AS receipt_metadata_json,"
             + ",".join(
                 f"post.{column} AS stored_{column}" for column in COLUMNS
             )
@@ -3303,18 +3361,21 @@ class SqliteMediaStore:
         try:
             self.conn.execute("BEGIN IMMEDIATE")
             current = self.conn.execute(
-                "SELECT provider,status FROM fetch_runs WHERE fetch_run_id=?",
+                "SELECT provider,query_key,status FROM fetch_runs WHERE fetch_run_id=?",
                 (fetch_run_id,),
             ).fetchone()
-            if current is None or current[1] != "running":
+            if current is None or current[2] != "running":
                 raise ValueError(f"unknown or completed fetch run {fetch_run_id}")
             formal_lineage = None
             if kind == "media":
+                persisted_rows = _media_rows_for_receipt(
+                    current[0], current[1], rows
+                )
                 items, formal_lineage = _build_fetch_item_lineage(
-                    fetch_run_id, current[0], rows, received_utc,
+                    fetch_run_id, current[0], persisted_rows, received_utc,
                     formal_eligible_evidence_ids,
                 )
-                inserted = self._store_in_transaction(rows)
+                inserted = self._store_in_transaction(persisted_rows)
                 self.conn.executemany(
                     "INSERT INTO fetch_run_items "
                     "(fetch_run_id,source,external_id,raw_content_id,evidence_id,"
@@ -5254,6 +5315,8 @@ class SqlAlchemyMediaStore:
             self.fetch_items_table.c.raw_content_id,
             self.fetch_items_table.c.observed_utc,
             self.fetches.c.server_terminal_utc,
+            self.fetches.c.query_key.label("receipt_query_key"),
+            self.fetches.c.metadata_json.label("receipt_metadata_json"),
             *[
                 self.table.c[column].label(f"stored_{column}")
                 for column in COLUMNS
@@ -5513,7 +5576,9 @@ class SqlAlchemyMediaStore:
             raise TypeError("fetch response rows must be a list")
         with self.engine.begin() as conn:
             current = conn.execute(select(
-                self.fetches.c.provider, self.fetches.c.status,
+                self.fetches.c.provider,
+                self.fetches.c.query_key,
+                self.fetches.c.status,
             ).where(
                 self.fetches.c.fetch_run_id == fetch_run_id
             ).with_for_update()).first()
@@ -5521,11 +5586,14 @@ class SqlAlchemyMediaStore:
                 raise ValueError(f"unknown or completed fetch run {fetch_run_id}")
             formal_lineage = None
             if kind == "media":
+                persisted_rows = _media_rows_for_receipt(
+                    current.provider, current.query_key, rows
+                )
                 items, formal_lineage = _build_fetch_item_lineage(
-                    fetch_run_id, current.provider, rows, received_utc,
+                    fetch_run_id, current.provider, persisted_rows, received_utc,
                     formal_eligible_evidence_ids,
                 )
-                inserted = self._store_in_transaction(conn, rows)
+                inserted = self._store_in_transaction(conn, persisted_rows)
                 if items:
                     conn.execute(self.fetch_items_table.insert(), items)
             elif kind == "odds":

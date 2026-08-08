@@ -593,9 +593,9 @@ def test_fetch_receipt_collapses_exact_duplicate_and_merges_topic_labels(tmp_pat
             },
         }
         return [
-            _row("trendnews", "same-vintage", "@TREND_WORLD", captured, **common),
+            _row("trendnews", "same-vintage", "@TREND_SLOT_1", captured, **common),
             _row(
-                "trendnews", "same-vintage", "@TREND_TECHNOLOGY", captured, **common
+                "trendnews", "same-vintage", "@TREND_SLOT_2", captured, **common
             ),
         ]
 
@@ -612,7 +612,7 @@ def test_fetch_receipt_collapses_exact_duplicate_and_merges_topic_labels(tmp_pat
     assert len(store.fetch_items(receipt["fetch_run_id"])) == 1
     assert store.conn.execute(
         "SELECT label FROM media_labels ORDER BY label"
-    ).fetchall() == [("@TREND_TECHNOLOGY",), ("@TREND_WORLD",)]
+    ).fetchall() == [("@TREND_SLOT_1",), ("@TREND_SLOT_2",)]
     store.close()
 
 
@@ -1745,7 +1745,7 @@ def test_collector_audit_cli_selects_history_explicitly(
 
 
 def _compatible_x_cycle_spec(instant, index=0):
-    identity = poller.GLOBAL_EVENT_V2_COMPATIBLE_COLLECTOR_IDENTITIES[index]
+    identity = poller.GLOBAL_EVENT_V2_OPERATIONAL_PRIOR_COLLECTOR_IDENTITIES[index]
     return poller._x_collection_cycle_spec_for_identity(instant, identity)
 
 
@@ -2012,6 +2012,158 @@ def test_complete_compatible_x_cycle_handoffs_without_duplicate_paid_work(
     assert coverage["periodic_requirements"] == {"x_daily": "complete"}
     assert store.collection_cycle(current_spec["collection_cycle_id"]) is None
     assert store.fetch_runs(limit=100) == initial_receipts
+    store.close()
+
+
+@pytest.mark.unit
+def test_fresh_running_prior_x_cycle_handoff_is_scheduled_without_provider_calls(
+    tmp_path, monkeypatch,
+):
+    store = SqliteMediaStore(tmp_path / "fresh-running-prior-x.db")
+    instant = datetime(2026, 8, 8, 20, tzinfo=timezone.utc).timestamp()
+    monkeypatch.setattr(poller.time, "time", lambda: instant)
+    monkeypatch.setattr(store, "server_observed_utc", lambda: instant)
+    prior_spec = _compatible_x_cycle_spec(instant)
+    prior_cycle_id = store.start_collection_cycle(
+        prior_spec, started_utc=instant
+    )
+    current_spec = poller._x_collection_cycle_spec(instant, 3)
+    calls = []
+    poll_x = poller.poll_x_topics_once
+    monkeypatch.setattr(
+        poller,
+        "poll_x_topics_once",
+        lambda *args, **kwargs: calls.append("handoff")
+        or poll_x(*args, **kwargs),
+    )
+    monkeypatch.setattr(
+        store,
+        "recover_collection_cycle",
+        lambda *_args, **_kwargs: pytest.fail(
+            "a fresh prior cycle must not be recovered"
+        ),
+    )
+    monkeypatch.setattr(poller, "emit_alert", lambda *_args, **_kwargs: False)
+    _forbid_x_provider_calls(monkeypatch)
+
+    assert poller._x_start_window_open(instant) is False
+    coverage = poller.run_cycle(
+        store,
+        tickers=[],
+        sources=[],
+        macro_themes={},
+        x_enabled=True,
+        force_x=True,
+    )
+
+    assert calls == ["handoff"]
+    assert coverage["complete"] is False
+    assert coverage["periodic_requirements"] == {"x_daily": "running"}
+    assert store.collection_cycle(prior_cycle_id)["status"] == "running"
+    assert store.collection_cycle(current_spec["collection_cycle_id"]) is None
+    assert store.fetch_runs(limit=100) == []
+    store.close()
+
+
+@pytest.mark.unit
+def test_stale_running_prior_x_cycle_handoff_recovers_without_provider_calls(
+    tmp_path, monkeypatch,
+):
+    store = SqliteMediaStore(tmp_path / "stale-running-prior-x.db")
+    instant = datetime(2026, 8, 8, 21, tzinfo=timezone.utc).timestamp()
+    stale_seconds = float(
+        poller.GLOBAL_EVENT_V2_PROTOCOL["evidence"][
+            "x_cycle_recovery_stale_seconds"
+        ]
+    )
+    started = instant - stale_seconds - 1.0
+    prior_spec = _compatible_x_cycle_spec(instant)
+    monkeypatch.setattr(poller.time, "time", lambda: started)
+    prior_cycle_id = store.start_collection_cycle(
+        prior_spec, started_utc=started
+    )
+    monkeypatch.setattr(poller.time, "time", lambda: instant)
+    monkeypatch.setattr(store, "server_observed_utc", lambda: instant)
+    current_spec = poller._x_collection_cycle_spec(instant, 3)
+    recover = store.recover_collection_cycle
+    recoveries = []
+
+    def recover_prior(cycle_id, **kwargs):
+        recoveries.append((cycle_id, kwargs))
+        return recover(cycle_id, **kwargs)
+
+    monkeypatch.setattr(store, "recover_collection_cycle", recover_prior)
+    monkeypatch.setattr(poller, "emit_alert", lambda *_args, **_kwargs: False)
+    _forbid_x_provider_calls(monkeypatch)
+
+    coverage = poller.run_cycle(
+        store,
+        tickers=[],
+        sources=[],
+        macro_themes={},
+        x_enabled=True,
+        force_x=True,
+    )
+
+    assert recoveries == [(
+        prior_cycle_id,
+        {
+            "recovered_utc": instant,
+            "minimum_age_seconds": stale_seconds,
+        },
+    )]
+    assert coverage["complete"] is False
+    assert coverage["periodic_requirements"] == {"x_daily": "incomplete"}
+    recovered = store.collection_cycle(prior_cycle_id)
+    assert recovered["status"] == "incomplete"
+    assert recovered["manifest_valid"] is True
+    assert store.collection_cycle(current_spec["collection_cycle_id"]) is None
+    assert store.fetch_runs(limit=100) == []
+    store.close()
+
+
+@pytest.mark.unit
+def test_prior_x_recovery_seals_incomplete_across_utc_period_boundary(
+    tmp_path, monkeypatch,
+):
+    store = SqliteMediaStore(tmp_path / "rollover-running-prior-x.db")
+    before_rollover = datetime(
+        2026, 8, 8, 23, 59, 59, tzinfo=timezone.utc
+    ).timestamp()
+    after_rollover = datetime(
+        2026, 8, 9, 0, 0, 1, tzinfo=timezone.utc
+    ).timestamp()
+    stale_seconds = float(
+        poller.GLOBAL_EVENT_V2_PROTOCOL["evidence"][
+            "x_cycle_recovery_stale_seconds"
+        ]
+    )
+    started = before_rollover - stale_seconds - 1.0
+    prior_spec = _compatible_x_cycle_spec(before_rollover)
+    monkeypatch.setattr(poller.time, "time", lambda: started)
+    prior_cycle_id = store.start_collection_cycle(
+        prior_spec, started_utc=started
+    )
+    monkeypatch.setattr(poller.time, "time", lambda: after_rollover)
+    observations = iter([before_rollover, after_rollover, after_rollover])
+    monkeypatch.setattr(store, "server_observed_utc", lambda: next(observations))
+    _forbid_x_provider_calls(monkeypatch)
+
+    coverage = poller.run_cycle(
+        store,
+        tickers=[],
+        sources=[],
+        macro_themes={},
+        x_enabled=True,
+        force_x=True,
+    )
+
+    assert coverage["periodic_requirements"] == {"x_daily": "scheduled"}
+    recovered = store.collection_cycle(prior_cycle_id)
+    assert recovered["status"] == "incomplete"
+    assert recovered["manifest_valid"] is True
+    assert poller._x_collection_cycle_state(prior_spec, recovered) == "incomplete"
+    assert store.fetch_runs(limit=100) == []
     store.close()
 
 
@@ -2470,6 +2622,7 @@ def test_collector_x_audit_reports_exact_cycle_request_counts():
     assert projection == {
         "period": "2026-08-05",
         "state": "complete",
+        "identity_origin": "current",
         "terminal_utc": datetime.fromtimestamp(terminal, timezone.utc).isoformat(),
         "trend_requests": 2,
         "search_requests": 2,
@@ -2859,7 +3012,7 @@ def test_preflight_rejects_accepted_pair_with_wrong_frozen_shape_before_probe(
 ):
     calls = []
     server_now = 1_786_080_000.0
-    accepted = poller.GLOBAL_EVENT_V2_COMPATIBLE_COLLECTOR_IDENTITIES[0]
+    accepted = poller.GLOBAL_EVENT_V2_OPERATIONAL_PRIOR_COLLECTOR_IDENTITIES[0]
     wrong_shape = poller.media_store.collection_cycle_spec(
         cycle_kind="x-daily",
         period_key=poller._x_collection_cycle_spec(server_now, 3)["identity"][

@@ -24,6 +24,7 @@ from tradingagents.research_protocol import (
     GLOBAL_EVENT_V2_COMPATIBLE_COLLECTOR_IDENTITIES,
     GLOBAL_EVENT_V2_CURRENT_COLLECTOR_IDENTITY,
     GLOBAL_EVENT_V2_LEGACY_COLLECTOR_IDENTITIES,
+    GLOBAL_EVENT_V2_OPERATIONAL_PRIOR_COLLECTOR_IDENTITIES,
     GLOBAL_EVENT_V2_PROTOCOL,
     GLOBAL_EVENT_V2_PROTOCOL_ID,
     GLOBAL_EVENT_V2_PROTOCOL_MANIFEST,
@@ -196,9 +197,13 @@ def test_discovery_policy_is_immutable_complete_and_identity_bound(monkeypatch):
         "trend_matching",
         "query",
         "ranking",
+        "prioritization",
         "allocation",
         "audit_record",
     }
+    assert policy["version"] == (
+        "ranked-strategic-technology-topic-discovery-v7-explicit-domain"
+    )
     assert set(policy["normalization"]) == {
         "publisher_suffix_pattern",
         "word_pattern",
@@ -218,6 +223,7 @@ def test_discovery_policy_is_immutable_complete_and_identity_bound(monkeypatch):
         "resolution",
     }
     assert set(policy["trend_matching"]) == {
+        "headline_scope",
         "leading_chars_to_strip",
         "meaningful_min_chars",
         "single_term_required_overlap",
@@ -225,6 +231,7 @@ def test_discovery_policy_is_immutable_complete_and_identity_bound(monkeypatch):
     }
     assert set(policy["query"]) == {
         "token_pattern",
+        "version_token_pattern",
         "generic_capitalized_terms",
         "capitalization",
         "distinctive_token",
@@ -234,37 +241,81 @@ def test_discovery_policy_is_immutable_complete_and_identity_bound(monkeypatch):
         "qualified_phrase_min_words",
         "anchor_order",
         "anchor_cap",
+        "deferred_short_uppercase_max_chars",
         "signal_min_chars",
         "query_part_cap",
         "fallback_signal_cap",
         "phrase_quote",
         "max_query_chars",
+        "preferred_signal_order",
+        "preferred_signal_anchor_deduplication",
+        "event_signal_pattern",
+        "query_identity",
     }
     assert set(policy["ranking"]) == {
         "default_category",
         "default_region",
         "missing_created_utc",
         "missing_rank",
-        "score_base",
-        "score_rank_cap",
-        "score_rank_weight",
-        "cross_feed_weight",
-        "cross_region_weight",
-        "cross_source_baseline_count",
-        "trend_match_weight",
-        "category_missing_rank",
-        "category_rank_weight",
         "lineage_fields",
+        "canonical_role_order",
+        "canonical_headline_order",
     }
+    assert set(policy["prioritization"]) == {
+        "version",
+        "classification_text",
+        "strategic_domain_patterns",
+        "ambiguous_semiconductor_pattern",
+        "ambiguous_semiconductor_context_pattern",
+        "model_identifier_pattern",
+        "material_event_pattern",
+        "strategic_context_pattern",
+        "major_global_impact_pattern",
+        "consumer_gadget_pattern",
+        "consumer_strategic_override_pattern",
+        "pattern_flags",
+    }
+    assert policy["prioritization"]["version"] == (
+        "strategic-technology-two-plus-global-v3-explicit-domain"
+    )
+    assert [name for name, _pattern in policy["prioritization"][
+        "strategic_domain_patterns"
+    ]] == [
+        "artificial_intelligence",
+        "compute_infrastructure",
+        "semiconductors",
+        "cybersecurity",
+        "telecommunications",
+        "robotics",
+        "quantum",
+        "space_infrastructure",
+        "critical_power",
+    ]
     assert set(policy["allocation"]) == {
-        "topic_prefix",
-        "representation_order",
-        "category_candidate_order",
-        "remaining_candidate_order",
-        "fallback_category_order",
+        "target_roles",
+        "fallback_role",
+        "major_global_categories",
+        "general_category_requires_major_global_impact",
+        "major_global_excludes_strategic_technology",
+        "exclude_consumer_only_from_fallback",
+        "fallback_categories",
+        "fallback_allows_strategic_technology",
+        "fallback_allows_major_global_general",
+        "require_distinct_queries",
+        "slot_topic_prefix",
+        "strategic_candidate_order",
+        "major_global_candidate_order",
+        "fallback_candidate_order",
         "search_request_grouping",
         "search_request_order",
     }
+    assert policy["allocation"]["target_roles"] == [
+        "strategic_technology",
+        "strategic_technology",
+        "major_global",
+    ]
+    assert policy["allocation"]["major_global_categories"] == ["world", "general"]
+    assert policy["allocation"]["require_distinct_queries"] is True
     assert set(policy["audit_record"]) == {
         "version",
         "headline_fields",
@@ -272,12 +323,20 @@ def test_discovery_policy_is_immutable_complete_and_identity_bound(monkeypatch):
         "trend_fields",
         "selected_topic_fields",
     }
+    assert policy["audit_record"]["selected_topic_fields"][-6:] == [
+        "selection_role",
+        "strategic_technology",
+        "strategic_subdomains",
+        "strategic_context",
+        "major_global_impact",
+        "consumer_only",
+    ]
     with pytest.raises(TypeError):
-        DISCOVERY_POLICY["ranking"]["trend_match_weight"] = 31
+        DISCOVERY_POLICY["ranking"]["missing_rank"] = 31
 
     baseline = collection_protocol_manifest(GLOBAL_EVENT_V2_PROTOCOL["evidence"])
     changed_policy = deepcopy(policy)
-    changed_policy["ranking"]["trend_match_weight"] = 31
+    changed_policy["ranking"]["missing_rank"] = 31
     monkeypatch.setattr(collector_contract, "DISCOVERY_POLICY", changed_policy)
     changed = collection_protocol_manifest(GLOBAL_EVENT_V2_PROTOCOL["evidence"])
     changed_collection_id = content_id(changed, prefix="protocol_")
@@ -321,9 +380,17 @@ def test_identity_history_is_append_only_current_pinned_and_immutable():
         GLOBAL_EVENT_V2_COLLECTOR_IDENTITY_HISTORY[-1]
         == GLOBAL_EVENT_V2_CURRENT_COLLECTOR_IDENTITY
     )
-    assert tuple(
-        reversed(GLOBAL_EVENT_V2_LEGACY_COLLECTOR_IDENTITIES)
-    ) == GLOBAL_EVENT_V2_COMPATIBLE_COLLECTOR_IDENTITIES
+    assert tuple(reversed(GLOBAL_EVENT_V2_LEGACY_COLLECTOR_IDENTITIES)) == (
+        GLOBAL_EVENT_V2_OPERATIONAL_PRIOR_COLLECTOR_IDENTITIES
+    )
+    assert GLOBAL_EVENT_V2_COMPATIBLE_COLLECTOR_IDENTITIES == ()
+    assert not {
+        (entry["protocol_id"], entry["collector_semantics_id"])
+        for entry in GLOBAL_EVENT_V2_OPERATIONAL_PRIOR_COLLECTOR_IDENTITIES
+    } & {
+        (entry["protocol_id"], entry["collector_semantics_id"])
+        for entry in GLOBAL_EVENT_V2_COMPATIBLE_COLLECTOR_IDENTITIES
+    }
     with pytest.raises(TypeError):
         GLOBAL_EVENT_V2_COLLECTOR_IDENTITY_HISTORY[0]["reason"] = "changed"
     with pytest.raises(TypeError):
@@ -381,6 +448,7 @@ def test_identity_history_has_frozen_golden_pairs_and_x_cycle_shapes():
         ("protocol_09b9f5ad4b015b24a553e7f4", "collector_5d8f7d2a7c92e52be419ad17"),
         ("protocol_79b64af05d79c66399d66385", "collector_c985ba5adc18bbcbc5f329f3"),
         ("protocol_b19d2d7e9a3bdc6bd398d66c", "collector_f4ed952ec4c96058c0e7d5a8"),
+        ("protocol_438764472436ad07e26a2ade", "collector_077b2fea4605a8cdb260dd4b"),
     ]
     assert {
         (
@@ -399,16 +467,16 @@ def test_identity_history_has_frozen_golden_pairs_and_x_cycle_shapes():
         )
     }
     assert GLOBAL_EVENT_V2_COLLECTION_PROTOCOL_ID == (
-        "protocol_b19d2d7e9a3bdc6bd398d66c"
+        "protocol_438764472436ad07e26a2ade"
     )
     assert GLOBAL_EVENT_V2_COLLECTOR_SEMANTICS_ID == (
-        "collector_f4ed952ec4c96058c0e7d5a8"
+        "collector_077b2fea4605a8cdb260dd4b"
     )
-    assert GLOBAL_EVENT_V2_PROTOCOL_ID == "protocol_099de6da8205322797ef1828"
+    assert GLOBAL_EVENT_V2_PROTOCOL_ID == "protocol_b348fa8c6bac9226e8ac3042"
 
 
 @pytest.mark.unit
-def test_full_protocol_hash_tracks_semantics_and_machine_compatibility_history():
+def test_full_protocol_hash_tracks_semantics_and_machine_identity_boundaries():
     def identity(protocol, *, collection_id=GLOBAL_EVENT_V2_COLLECTION_PROTOCOL_ID,
                  semantics_id=GLOBAL_EVENT_V2_COLLECTOR_SEMANTICS_ID,
                  history=GLOBAL_EVENT_V2_COLLECTOR_IDENTITY_HISTORY):
@@ -426,7 +494,7 @@ def test_full_protocol_hash_tracks_semantics_and_machine_compatibility_history()
     assert GLOBAL_EVENT_V2_PROTOCOL_MANIFEST["collection_contract"] == {
         "collection_protocol_id": GLOBAL_EVENT_V2_COLLECTION_PROTOCOL_ID,
         "collector_semantics_id": GLOBAL_EVENT_V2_COLLECTOR_SEMANTICS_ID,
-        "compatible_identity_history": [
+        "retired_identity_history": [
             {
                 "protocol_id": entry["protocol_id"],
                 "collector_semantics_id": entry["collector_semantics_id"],
@@ -437,8 +505,53 @@ def test_full_protocol_hash_tracks_semantics_and_machine_compatibility_history()
             }
             for entry in GLOBAL_EVENT_V2_LEGACY_COLLECTOR_IDENTITIES
         ],
-        "compatibility_precedence": COLLECTOR_COMPATIBILITY_PRECEDENCE,
+        "formally_compatible_identity_history": [],
+        "same_day_paid_attempt_precedence": COLLECTOR_COMPATIBILITY_PRECEDENCE,
     }
+    retired_pairs = {
+        (entry["protocol_id"], entry["collector_semantics_id"])
+        for entry in GLOBAL_EVENT_V2_LEGACY_COLLECTOR_IDENTITIES
+    }
+    formal_pairs = {
+        (entry["protocol_id"], entry["collector_semantics_id"])
+        for entry in GLOBAL_EVENT_V2_COMPATIBLE_COLLECTOR_IDENTITIES
+    }
+    assert formal_pairs == set()
+    assert retired_pairs.isdisjoint(formal_pairs)
+    assert {
+        (entry["protocol_id"], entry["collector_semantics_id"])
+        for entry in GLOBAL_EVENT_V2_OPERATIONAL_PRIOR_COLLECTOR_IDENTITIES
+    } == retired_pairs
+
+    formally_readmitting_retired = content_id(
+        experiment_protocol_manifest(
+            GLOBAL_EVENT_V2_PROTOCOL,
+            collection_protocol_id=GLOBAL_EVENT_V2_COLLECTION_PROTOCOL_ID,
+            collector_semantics_id=GLOBAL_EVENT_V2_COLLECTOR_SEMANTICS_ID,
+            collector_identity_history=GLOBAL_EVENT_V2_COLLECTOR_IDENTITY_HISTORY,
+            formally_compatible_identities=(
+                GLOBAL_EVENT_V2_OPERATIONAL_PRIOR_COLLECTOR_IDENTITIES[0],
+            ),
+        ),
+        prefix="protocol_",
+    )
+    assert formally_readmitting_retired != GLOBAL_EVENT_V2_PROTOCOL_ID
+
+    with pytest.raises(
+        ValueError, match="formal collector compatibility must reference retired history"
+    ):
+        experiment_protocol_manifest(
+            GLOBAL_EVENT_V2_PROTOCOL,
+            collection_protocol_id=GLOBAL_EVENT_V2_COLLECTION_PROTOCOL_ID,
+            collector_semantics_id=GLOBAL_EVENT_V2_COLLECTOR_SEMANTICS_ID,
+            collector_identity_history=GLOBAL_EVENT_V2_COLLECTOR_IDENTITY_HISTORY,
+            formally_compatible_identities=(
+                {
+                    **dict(GLOBAL_EVENT_V2_CURRENT_COLLECTOR_IDENTITY),
+                    "protocol_id": "protocol_" + "e" * 24,
+                },
+            ),
+        )
 
     compatibility_only = deepcopy(GLOBAL_EVENT_V2_PROTOCOL)
     compatibility_only["evidence"]["compatible_collector_identities"] = [{
@@ -510,3 +623,41 @@ def test_full_protocol_hash_tracks_semantics_and_machine_compatibility_history()
         GLOBAL_EVENT_V2_PROTOCOL,
         semantics_id="collector_" + "0" * 24,
     ) != GLOBAL_EVENT_V2_PROTOCOL_ID
+
+
+@pytest.mark.unit
+def test_formal_compatibility_requires_exact_unique_retired_machine_shapes():
+    retired = dict(GLOBAL_EVENT_V2_OPERATIONAL_PRIOR_COLLECTOR_IDENTITIES[0])
+
+    for wrong_shape in (
+        {
+            **retired,
+            "x_daily_static_slots": retired["x_daily_static_slots"][:-1],
+        },
+        {
+            **retired,
+            "x_daily_max_dynamic_slots": retired["x_daily_max_dynamic_slots"] + 1,
+        },
+    ):
+        with pytest.raises(
+            ValueError,
+            match="formal collector compatibility must reference retired history",
+        ):
+            experiment_protocol_manifest(
+                GLOBAL_EVENT_V2_PROTOCOL,
+                collection_protocol_id=GLOBAL_EVENT_V2_COLLECTION_PROTOCOL_ID,
+                collector_semantics_id=GLOBAL_EVENT_V2_COLLECTOR_SEMANTICS_ID,
+                collector_identity_history=GLOBAL_EVENT_V2_COLLECTOR_IDENTITY_HISTORY,
+                formally_compatible_identities=(wrong_shape,),
+            )
+
+    with pytest.raises(
+        ValueError, match="formal collector compatibility must be unique"
+    ):
+        experiment_protocol_manifest(
+            GLOBAL_EVENT_V2_PROTOCOL,
+            collection_protocol_id=GLOBAL_EVENT_V2_COLLECTION_PROTOCOL_ID,
+            collector_semantics_id=GLOBAL_EVENT_V2_COLLECTOR_SEMANTICS_ID,
+            collector_identity_history=GLOBAL_EVENT_V2_COLLECTOR_IDENTITY_HISTORY,
+            formally_compatible_identities=(retired, retired),
+        )

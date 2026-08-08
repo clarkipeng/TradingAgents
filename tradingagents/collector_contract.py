@@ -20,7 +20,7 @@ from tradingagents.dataflows import media_sources
 # or operational refactor.
 COLLECTOR_POLICY = "global-only-editorial-and-trend-reaction-v2"
 COLLECTOR_COMPATIBILITY_PRECEDENCE = (
-    "current-then-newest-compatible-to-oldest-v1"
+    "current-then-newest-prior-deployment-to-oldest-v2"
 )
 
 _DISCOVERY_STOPWORDS = tuple(sorted({
@@ -33,17 +33,17 @@ _DISCOVERY_STOPWORDS = tuple(sorted({
 }))
 _DISCOVERY_GENERIC_CAPITALIZED_TERMS = tuple(sorted({
     "Analysis", "Breaking", "Exclusive", "Explainer", "Here", "How", "Live", "My",
-    "New", "Opinion", "The", "This", "Update", "What", "When", "Why",
+    "New", "Opinion", "The", "This", "Update", "What", "When", "Why", "Worldwide",
 }))
 
 # All literals that can change ranked topic discovery live here. Nested values
 # are immutable, while ``discovery_policy_manifest`` returns a plain JSON-ready
 # projection for the collection identity.
 DISCOVERY_POLICY = MappingProxyType({
-    "version": "ranked-cross-source-topic-discovery-v3",
+    "version": "ranked-strategic-technology-topic-discovery-v7-explicit-domain",
     "inputs": MappingProxyType({
-        "ranked_feed_limit": 12,
-        "categories": ("world", "business", "technology"),
+        "ranked_feed_limit": 20,
+        "categories": ("world", "business", "technology", "general"),
         "exclude_low_information": True,
         "exclude_company_authored": True,
         "low_information_pattern": (
@@ -71,69 +71,232 @@ DISCOVERY_POLICY = MappingProxyType({
         "resolution": "first-matching-input-group",
     }),
     "trend_matching": MappingProxyType({
+        "headline_scope": "all-grouped-lineage-titles-v1",
         "leading_chars_to_strip": "#",
         "meaningful_min_chars": 4,
         "single_term_required_overlap": 1,
         "multiple_term_required_overlap": 2,
     }),
     "query": MappingProxyType({
-        "token_pattern": r"[A-Za-z][A-Za-z0-9&.'’+-]*",
+        "token_pattern": (
+            r"[A-Za-z][A-Za-z0-9&.'’+-]*|\d[A-Za-z0-9.-]*"
+        ),
+        "version_token_pattern": (
+            r"(?:[A-Za-z]\d[A-Za-z0-9.-]*|\d[A-Za-z0-9.-]*)"
+        ),
         "generic_capitalized_terms": _DISCOVERY_GENERIC_CAPITALIZED_TERMS,
         "capitalization": "initial-or-internal-uppercase-v1",
         "distinctive_token": "digit-or-internal-uppercase-or-single-uppercase-v1",
         "long_run_min_words": 4,
         "long_run_word_cap": 2,
         "phrase_word_cap": 3,
-        "qualified_phrase_min_words": 2,
+        "qualified_phrase_min_words": 1,
         "anchor_order": (
-            "distinctive-desc",
             "word-count-desc",
+            "position-asc",
             "character-count-desc",
+            "phrase-asc",
         ),
-        "anchor_cap": 1,
+        "anchor_cap": 2,
+        "deferred_short_uppercase_max_chars": 2,
         "signal_min_chars": 4,
-        "query_part_cap": 2,
+        "query_part_cap": 3,
         "fallback_signal_cap": 3,
         "phrase_quote": '"',
         "max_query_chars": 400,
+        "preferred_signal_order": (
+            "domain-then-event-then-context-matches-in-headline-v2"
+        ),
+        "preferred_signal_anchor_deduplication": (
+            "casefolded-token-set-containment-v2"
+        ),
+        "event_signal_pattern": (
+            r"\b(?:exports?|tariffs?|ceasefires?|sanctions?|shortages?|"
+            r"breaches?|cyberattacks?|outages?|launch(?:es|ed|ing)?|"
+            r"releas(?:e|es|ed|ing)|debut(?:s|ed)?|unveil(?:s|ed|ing)?)\b"
+        ),
+        "query_identity": "unicode-casefold-whitespace-collapse-v1",
     }),
     "ranking": MappingProxyType({
         "default_category": "general",
         "default_region": "unknown",
         "missing_created_utc": 0,
         "missing_rank": 10_000,
-        "score_base": 100,
-        "score_rank_cap": 20,
-        "score_rank_weight": 4,
-        "cross_feed_weight": 18,
-        "cross_region_weight": 12,
-        "cross_source_baseline_count": 1,
-        "trend_match_weight": 30,
-        "category_missing_rank": 20,
-        "category_rank_weight": 2,
         "lineage_fields": (
             "external_id", "title", "body", "created_utc", "publisher",
             "metadata", "category", "region", "rank",
         ),
+        "canonical_role_order": (
+            "strategic_technology", "major_global_impact", "any",
+        ),
+        "canonical_headline_order": (
+            "strategic-context-desc", "rank-asc", "created-utc-desc",
+            "topic-key-asc", "external-id-asc",
+        ),
+    }),
+    "prioritization": MappingProxyType({
+        "version": "strategic-technology-two-plus-global-v3-explicit-domain",
+        "classification_text": "each-grouped-lineage-title",
+        "strategic_domain_patterns": (
+            (
+                "artificial_intelligence",
+                r"\b(?:artificial intelligence|machine learning|large language "
+                r"models?|foundation models?|frontier models?|multimodal models?|"
+                r"generative ai|ai models?|ai systems?|ai agents?|agentic ai|"
+                r"language models?|reasoning models?|model training|model inference|"
+                r"neural networks?|llms?)\b",
+            ),
+            (
+                "compute_infrastructure",
+                r"\b(?:compute clusters?|ai accelerators?|graphics processing units?|"
+                r"gpus?|data cent(?:er|re)s?|cloud infrastructure)\b",
+            ),
+            (
+                "semiconductors",
+                r"\b(?:ai chips?|semiconductors?|chipmakers?|chipmaking|chip fabrication|"
+                r"microchips?|microprocessors?|integrated circuits?|memory chips?|"
+                r"foundr(?:y|ies)|fabs?|wafers?|silicon dies?|lithograph(?:y|ic)|euv|"
+                r"high bandwidth memory|hbm|dram|nand|advanced packaging)\b",
+            ),
+            (
+                "cybersecurity",
+                r"\b(?:cybersecurity|cyber attacks?|cyberattacks?|ransomware|malware|"
+                r"data breaches?|network security)\b",
+            ),
+            (
+                "telecommunications",
+                r"\b(?:telecommunications?|telecoms?|5g|6g|fiber optic|"
+                r"undersea cables?|submarine cables?)\b",
+            ),
+            (
+                "robotics",
+                r"\b(?:robotics?|humanoid robots?|industrial robots?|autonomous "
+                r"systems?)\b",
+            ),
+            (
+                "quantum",
+                r"\b(?:quantum comput(?:ers?|ing)|quantum networks?|quantum chips?)\b",
+            ),
+            (
+                "space_infrastructure",
+                r"\b(?:communications? satellites?|weather satellites?|satellite "
+                r"networks?|satellite launches?|spacecraft|space rockets?|"
+                r"orbital infrastructure|launch vehicles?)\b",
+            ),
+            (
+                "critical_power",
+                r"\b(?:power grids?|electric grids?|electricity transmission|"
+                r"data cent(?:er|re) power)\b",
+            ),
+        ),
+        "ambiguous_semiconductor_pattern": r"\bchips?\b",
+        "ambiguous_semiconductor_context_pattern": (
+            r"\b(?:ai|artificial intelligence|computers?|servers?|memory|processors?|"
+            r"semiconductors?|silicon|wafers?|fabs?|foundr(?:y|ies)|electronics?|"
+            r"rare earths?|export controls?|supply chains?)\b"
+        ),
+        "model_identifier_pattern": (
+            r"\b[A-Z]{3,}(?:-[A-Z0-9]+|\d[A-Z0-9.-]*)\b"
+        ),
+        "material_event_pattern": (
+            r"\b(?:launch(?:es|ed|ing)?|releas(?:e|es|ed|ing)|debut(?:s|ed)?|"
+            r"unveil(?:s|ed|ing)?|announc(?:e|es|ed|ing)|breakthroughs?|research|"
+            r"train(?:s|ed|ing)?|inference|invest(?:s|ed|ing|ment|ments)|funding|"
+            r"develop(?:s|ed|ing|ment|ments)?|deploy(?:s|ed|ing|ment|ments)?|"
+            r"expand(?:s|ed|ing|ion)?|surge(?:s|d|ing)?|accelerat(?:e|es|ed|ing|ion)|"
+            r"ris(?:e|es|ing)|rose|fall(?:s|ing)?|fell|declin(?:e|es|ed|ing)|"
+            r"rollouts?|build(?:s|ing)?|construction|capacity|factor(?:y|ies)|plants?|"
+            r"produc(?:e|es|ed|ing|tion)|manufactur(?:e|es|ed|ing)|shortages?|"
+            r"supply chains?|shipments?|export controls?|sanctions?|regulat(?:e|es|ed|ion|ions)|"
+            r"legislation|subsid(?:y|ies)|industrial policy|bans?|"
+            r"restrict(?:s|ed|ing|ion|ions)?|"
+            r"breaches?|cyberattacks?|attacks?|outages?|"
+            r"disrupt(?:s|ed|ing|ion|ions)?|adoption|demand)\b"
+        ),
+        "strategic_context_pattern": (
+            r"\b(?:china|chinese|taiwan|taiwanese|south korea|korea|korean|japan|"
+            r"japanese|india|indian|united states|u\.s\.|europe|european union|eu|"
+            r"netherlands|dutch|export controls?|export curbs?|sanctions?|"
+            r"supply chains?|trade restrictions?|"
+            r"industrial policy|national security|power grids?|electricity)\b"
+        ),
+        "major_global_impact_pattern": (
+            r"\b(?:elections?|government|administration|congress|parliament|courts?|"
+            r"policy|presidents?|presidential|prime ministers?|heads? of state|"
+            r"political leaders?|"
+            r"executive orders?|summits?|negotiations?|tariffs?|trade|sanctions?|"
+            r"war|conflict|ceasefires?|diplomacy|treat(?:y|ies)|military|defen[cs]e|"
+            r"nuclear|missiles?|central banks?|interest rates?|inflation|recession|"
+            r"unemployment|jobs?|econom(?:y|ies|ic)|gdp|debt|currenc(?:y|ies)|"
+            r"energy|oil|gas|climate|wildfires?|earthquakes?|floods?|"
+            r"hurricanes?|public health|pandemics?|protests?)\b"
+        ),
+        "consumer_gadget_pattern": (
+            r"\b(?:smartphones?|phones?|handsets?|tablets?|wearables?|smartwatches?|"
+            r"earbuds?|headsets?|televisions?|tvs?|cameras?|consoles?|gaming|"
+            r"laptops?|foldables?|cars?|vehicles?|automobiles?|suvs?|trucks?|"
+            r"products?|devices?|appliances?)\b"
+        ),
+        "consumer_strategic_override_pattern": (
+            r"\b(?:semiconductors?|chips?|chipmakers?|chip fabrication|microchips?|"
+            r"microprocessors?|integrated circuits?|memory chips?|foundr(?:y|ies)|"
+            r"fabs?|wafers?|lithograph(?:y|ic)|euv|hbm|dram|nand|advanced packaging|export "
+            r"controls?|sanctions?|supply chains?|shortages?|large language models?|"
+            r"foundation models?|frontier models?|reasoning models?|model training|"
+            r"model inference|data cent(?:er|re)s?|ai accelerators?)\b"
+        ),
+        "pattern_flags": int(re.IGNORECASE | re.UNICODE),
     }),
     "allocation": MappingProxyType({
-        "topic_prefix": "trend_",
-        "representation_order": "configured-category-order",
-        "category_candidate_order": (
-            "category-adjusted-score-desc",
+        "target_roles": (
+            "strategic_technology",
+            "strategic_technology",
+            "major_global",
+        ),
+        "fallback_role": "general_fallback",
+        "major_global_categories": ("world", "general"),
+        "general_category_requires_major_global_impact": True,
+        "major_global_excludes_strategic_technology": True,
+        "exclude_consumer_only_from_fallback": True,
+        "fallback_categories": ("world", "business"),
+        "fallback_allows_strategic_technology": True,
+        "fallback_allows_major_global_general": True,
+        "require_distinct_queries": True,
+        "slot_topic_prefix": "trend_slot_",
+        "strategic_candidate_order": (
+            "independent-publisher-count-desc",
+            "strategic-context-desc",
+            "cross-region-count-desc",
+            "trend-match-desc",
+            "best-rank-asc",
+            "new-subdomain-count-desc",
             "created-utc-desc",
             "topic-key-asc",
             "query-asc",
         ),
-        "remaining_candidate_order": (
-            "score-desc", "created-utc-desc", "topic-key-asc", "query-asc",
+        "major_global_candidate_order": (
+            "independent-publisher-count-desc",
+            "cross-region-count-desc",
+            "trend-match-desc",
+            "best-rank-asc",
+            "created-utc-desc",
+            "topic-key-asc",
+            "query-asc",
         ),
-        "fallback_category_order": ("rank-asc", "configured-category-order"),
+        "fallback_candidate_order": (
+            "independent-publisher-count-desc",
+            "cross-region-count-desc",
+            "trend-match-desc",
+            "best-rank-asc",
+            "created-utc-desc",
+            "topic-key-asc",
+            "query-asc",
+        ),
         "search_request_grouping": "exact-query-with-sorted-label-union-v1",
         "search_request_order": "query-asc",
     }),
     "audit_record": MappingProxyType({
-        "version": "content-addressed-full-input-and-decision-v1",
+        "version": "content-addressed-full-input-and-decision-v2",
         "headline_fields": (
             "external_id", "title", "created_utc", "publisher",
             "category", "region", "rank",
@@ -141,7 +304,9 @@ DISCOVERY_POLICY = MappingProxyType({
         "headline_metadata_fields": ("publisher_domain",),
         "trend_fields": ("name", "tweet_count"),
         "selected_topic_fields": (
-            "topic", "category", "query", "external_id", "title", "score",
+            "topic", "category", "query", "external_id", "title",
+            "selection_role", "strategic_technology", "strategic_subdomains",
+            "strategic_context", "major_global_impact", "consumer_only",
         ),
     }),
 })
@@ -388,6 +553,7 @@ def collection_protocol_manifest(evidence: Mapping[str, Any]) -> dict[str, Any]:
                 for key in (
                     "version",
                     "required_evidence_role",
+                    "required_topic_context",
                     "required_immutable_author_id",
                     "required_account_created_utc",
                     "required_automation_signals_complete",
@@ -420,9 +586,12 @@ def collector_semantics_manifest(evidence: Mapping[str, Any]) -> dict[str, Any]:
     return deepcopy({
         "schema_version": 1,
         "normalization": {
-            "provider_rows": "global-media-row-v1",
+            "provider_rows": "global-media-row-v3-x-receipt-context",
             "google_news_content_vintages": "google-news-content-vintage-v3",
             "x_expanded_authors": "x-expanded-author-metrics-v3-canonical-aliases",
+            "x_topic_context": (
+                "receipt-query-key-rematerialized-as-exact-cycle-title-v2"
+            ),
             "maximum_response_bytes": media_sources._MAX_PROVIDER_RESPONSE_BYTES,
             "provider_responses": {
                 "version": "strict-provider-response-v1",
@@ -431,7 +600,9 @@ def collector_semantics_manifest(evidence: Mapping[str, Any]) -> dict[str, Any]:
                 ],
                 "globalnews": "rss2-direct-channel-items-v1",
                 "topnews": "complete-nonempty-ranked-feed-set-v1",
-                "x_recent_search": "expanded-author-strict-v2-canonical-post-aliases",
+                "x_recent_search": (
+                    "expanded-author-strict-v4-canonical-post-aliases-receipt-context"
+                ),
                 "x_trends": "nonempty-ranked-trends-v1",
             },
         },
@@ -442,7 +613,9 @@ def collector_semantics_manifest(evidence: Mapping[str, Any]) -> dict[str, Any]:
                     "formal_projection_providers"
                 ],
                 "evidence_identity": "sha256-source-external-id-v1",
-                "raw_content_identity": "sha256-normalized-provider-content-v1",
+                "raw_content_identity": (
+                    "sha256-normalized-provider-content-v2-x-query-independent"
+                ),
                 "observation_time": "server-terminal-before-cutoff-v1",
             },
             "allowed_observed_empty_providers": query_cycle[

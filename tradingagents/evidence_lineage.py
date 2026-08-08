@@ -27,6 +27,12 @@ def evidence_id(row: dict) -> str:
 def raw_content_id(row: dict) -> str:
     """Identify the exact candidate snapshot observed by one fetch."""
     metadata = row.get("metadata") if isinstance(row.get("metadata"), dict) else {}
+    # X posts do not have a provider title. Formal topic collection temporarily
+    # uses ``title`` for the search that found a post, but that search belongs to
+    # the immutable fetch receipt rather than the globally deduplicated post.
+    # Excluding it keeps one provider post content-addressed identically when
+    # two independently declared searches return the same post.
+    title = None if row.get("source") == "x" else row.get("title")
     return content_id(
         {
             "source": row.get("source"),
@@ -36,7 +42,7 @@ def raw_content_id(row: dict) -> str:
             "publisher_domain": metadata.get("publisher_domain")
             or row.get("publisher_domain"),
             "article_url": metadata.get("article_url") or row.get("article_url"),
-            "title_sha256": _text_sha256(row.get("title") or ""),
+            "title_sha256": _text_sha256(title or ""),
             "text_sha256": _text_sha256(row.get("body") or row.get("text") or ""),
             "verified_type": metadata.get("verified_type"),
             "profile_screening_complete": metadata.get("profile_screening_complete"),

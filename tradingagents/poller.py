@@ -102,8 +102,8 @@ from tradingagents.research_protocol import (
     GLOBAL_EVENT_V2_COLLECTION_PROTOCOL_ID,
     GLOBAL_EVENT_V2_COLLECTOR_SEMANTICS_ID,
     GLOBAL_EVENT_V2_COLLECTOR_SEMANTICS_MANIFEST,
-    GLOBAL_EVENT_V2_COMPATIBLE_COLLECTOR_IDENTITIES,
     GLOBAL_EVENT_V2_CURRENT_COLLECTOR_IDENTITY,
+    GLOBAL_EVENT_V2_OPERATIONAL_PRIOR_COLLECTOR_IDENTITIES,
     GLOBAL_EVENT_V2_PROTOCOL,
     build_identity,
     canonical_json,
@@ -181,14 +181,55 @@ _DISCOVERY_STORY_GROUPING = _DISCOVERY_POLICY["story_grouping"]
 _DISCOVERY_TREND_MATCHING = _DISCOVERY_POLICY["trend_matching"]
 _DISCOVERY_QUERY = _DISCOVERY_POLICY["query"]
 _DISCOVERY_RANKING = _DISCOVERY_POLICY["ranking"]
+_DISCOVERY_PRIORITIZATION = _DISCOVERY_POLICY["prioritization"]
 _DISCOVERY_ALLOCATION = _DISCOVERY_POLICY["allocation"]
 _DISCOVERY_AUDIT = _DISCOVERY_POLICY["audit_record"]
 _DISCOVERY_CATEGORIES = tuple(_DISCOVERY_INPUTS["categories"])
 _QUERY_STOPWORDS = frozenset(_DISCOVERY_NORMALIZATION["stopwords"])
 _GENERIC_CAPITALIZED = frozenset(_DISCOVERY_QUERY["generic_capitalized_terms"])
+_QUERY_VERSION_TOKEN = re.compile(str(_DISCOVERY_QUERY["version_token_pattern"]))
+_QUERY_EVENT_SIGNAL = re.compile(
+    str(_DISCOVERY_QUERY["event_signal_pattern"]), re.IGNORECASE | re.UNICODE
+)
 _LOW_INFORMATION_HEADLINE = re.compile(
     str(_DISCOVERY_INPUTS["low_information_pattern"]),
     int(_DISCOVERY_INPUTS["low_information_flags"]),
+)
+_DISCOVERY_PATTERN_FLAGS = int(_DISCOVERY_PRIORITIZATION["pattern_flags"])
+_STRATEGIC_DOMAIN_PATTERNS = tuple(
+    (name, re.compile(str(pattern), _DISCOVERY_PATTERN_FLAGS))
+    for name, pattern in _DISCOVERY_PRIORITIZATION["strategic_domain_patterns"]
+)
+_MODEL_IDENTIFIER = re.compile(
+    str(_DISCOVERY_PRIORITIZATION["model_identifier_pattern"])
+)
+_AMBIGUOUS_SEMICONDUCTOR = re.compile(
+    str(_DISCOVERY_PRIORITIZATION["ambiguous_semiconductor_pattern"]),
+    _DISCOVERY_PATTERN_FLAGS,
+)
+_AMBIGUOUS_SEMICONDUCTOR_CONTEXT = re.compile(
+    str(_DISCOVERY_PRIORITIZATION["ambiguous_semiconductor_context_pattern"]),
+    _DISCOVERY_PATTERN_FLAGS,
+)
+_STRATEGIC_MATERIAL_EVENT = re.compile(
+    str(_DISCOVERY_PRIORITIZATION["material_event_pattern"]),
+    _DISCOVERY_PATTERN_FLAGS,
+)
+_STRATEGIC_CONTEXT = re.compile(
+    str(_DISCOVERY_PRIORITIZATION["strategic_context_pattern"]),
+    _DISCOVERY_PATTERN_FLAGS,
+)
+_MAJOR_GLOBAL_IMPACT = re.compile(
+    str(_DISCOVERY_PRIORITIZATION["major_global_impact_pattern"]),
+    _DISCOVERY_PATTERN_FLAGS,
+)
+_CONSUMER_GADGET = re.compile(
+    str(_DISCOVERY_PRIORITIZATION["consumer_gadget_pattern"]),
+    _DISCOVERY_PATTERN_FLAGS,
+)
+_CONSUMER_STRATEGIC_OVERRIDE = re.compile(
+    str(_DISCOVERY_PRIORITIZATION["consumer_strategic_override_pattern"]),
+    _DISCOVERY_PATTERN_FLAGS,
 )
 
 _GLOBALNEWS_RETRY_POLICY = GLOBAL_EVENT_V2_PROTOCOL["evidence"]["query_cycle"][
@@ -1335,56 +1376,140 @@ def _trend_matches_headline(trend: str, headline: str) -> bool:
     return len(meaningful & headline_words) >= needed
 
 
-def _headline_query(title: str) -> str:
+def _headline_query(
+    title: str,
+    *,
+    domain_signals: tuple[str, ...] = (),
+    context_signals: tuple[str, ...] = (),
+) -> str:
     """Turn a discovered headline into a compact X query without a watchlist.
 
     Named phrases are extracted from the headline itself and paired with one
     descriptive word. This is broad enough to capture public reaction while
     avoiding a brittle exact-headline search.
     """
+    if _DISCOVERY_QUERY["preferred_signal_order"] != (
+        "domain-then-event-then-context-matches-in-headline-v2"
+    ):
+        raise RuntimeError("discovery preferred-signal policy is unsupported")
     headline = _headline_without_publisher(title)
     tokens = re.findall(str(_DISCOVERY_QUERY["token_pattern"]), headline)
-    capitalized_runs: list[list[str]] = []
-    run: list[str] = []
-    for token in tokens:
-        is_capitalized = _is_capitalized_anchor(token)
-        if is_capitalized and _discovery_lower(token) not in _QUERY_STOPWORDS:
-            run.append(token)
+    headline_words = {_discovery_lower(token) for token in tokens}
+
+    def grounded_signal_words(value: object) -> set[str]:
+        words = {
+            _discovery_lower(word)
+            for word in re.findall(
+                str(_DISCOVERY_QUERY["token_pattern"]), str(value)
+            )
+        }
+        return words if words and words.issubset(headline_words) else set()
+
+    domain_signals = tuple(
+        signal for signal in domain_signals if grounded_signal_words(signal)
+    )
+    context_signals = tuple(
+        signal for signal in context_signals if grounded_signal_words(signal)
+    )
+    capitalized_runs: list[list[tuple[int, str]]] = []
+    run: list[tuple[int, str]] = []
+    for position, token in enumerate(tokens):
+        version_token = _QUERY_VERSION_TOKEN.fullmatch(token) is not None
+        if run and token[0].isdigit() and version_token:
+            run.append((position, token))
+            continue
+        named_token = _is_capitalized_anchor(token) or (
+            version_token and not token[0].isdigit()
+        )
+        event_boundary = bool(
+            _STRATEGIC_MATERIAL_EVENT.fullmatch(token)
+            or _QUERY_EVENT_SIGNAL.fullmatch(token)
+        )
+        if (
+            named_token
+            and not event_boundary
+            and _discovery_lower(token) not in _QUERY_STOPWORDS
+        ):
+            run.append((position, token))
         elif run:
             capitalized_runs.append(run)
             run = []
     if run:
         capitalized_runs.append(run)
 
-    anchors = []
-    for words in capitalized_runs:
-        while words and words[0] in _GENERIC_CAPITALIZED:
-            words = words[1:]
-        if not words:
+    anchors: dict[str, tuple[str, int]] = {}
+    for positioned_words in capitalized_runs:
+        run_word_count = len(positioned_words)
+        while positioned_words and positioned_words[0][1] in _GENERIC_CAPITALIZED:
+            positioned_words = positioned_words[1:]
+        if not positioned_words:
             continue
-        distinctive = [word for word in words if _is_distinctive_anchor(word)]
-        if len(words) >= int(_DISCOVERY_QUERY["long_run_min_words"]):
+        distinctive = [
+            item for item in positioned_words if _is_distinctive_anchor(item[1])
+        ]
+        if run_word_count >= int(_DISCOVERY_QUERY["long_run_min_words"]):
             cap = int(_DISCOVERY_QUERY["long_run_word_cap"])
-            words = distinctive[:cap] or words[:cap]
-        phrase = " ".join(words[: int(_DISCOVERY_QUERY["phrase_word_cap"])])
-        if len(words) >= int(_DISCOVERY_QUERY["qualified_phrase_min_words"]) or distinctive:
-            anchors.append((phrase, bool(distinctive)))
-    anchors = sorted(
-        set(anchors),
+            positioned_words = distinctive[:cap] or positioned_words[:cap]
+        positioned_words = positioned_words[
+            :int(_DISCOVERY_QUERY["phrase_word_cap"])
+        ]
+        phrase = " ".join(word for _position, word in positioned_words)
+        if (
+            len(positioned_words)
+            >= int(_DISCOVERY_QUERY["qualified_phrase_min_words"])
+            or distinctive
+        ):
+            identity = _discovery_lower(phrase)
+            anchors.setdefault(identity, (phrase, positioned_words[0][0]))
+    ordered_anchors = list(anchors.values())
+    domain_word_sets = [
+        grounded_signal_words(signal) for signal in domain_signals
+    ]
+    ordered_anchors = [
+        item
+        for item in ordered_anchors
+        if not any(
+            {
+                _discovery_lower(word)
+                for word in re.findall(
+                    str(_DISCOVERY_QUERY["token_pattern"]), item[0]
+                )
+            } < signal_words
+            for signal_words in domain_word_sets
+        )
+    ]
+    short_uppercase_max = int(
+        _DISCOVERY_QUERY["deferred_short_uppercase_max_chars"]
+    )
+    substantive_anchors = [
+        item for item in ordered_anchors
+        if not (
+            len(item[0].split()) == 1
+            and item[0].isupper()
+            and len(item[0]) <= short_uppercase_max
+        )
+    ]
+    ordered_anchors = sorted(
+        substantive_anchors or ordered_anchors,
         key=lambda value: _discovery_order_key(
             {
-                "distinctive-desc": value[1],
-                "word-count-desc": len(value[0].split()),
-                "character-count-desc": len(value[0]),
+                "word-count-desc": -len(value[0].split()),
+                "position-asc": value[1],
+                "character-count-desc": -len(value[0]),
+                "phrase-asc": value[0],
             },
             _DISCOVERY_QUERY["anchor_order"],
         ),
-        reverse=True,
     )
 
-    chosen = [phrase for phrase, _distinctive in anchors[: int(_DISCOVERY_QUERY["anchor_cap"])]]
+    chosen = [
+        phrase
+        for phrase, _position in ordered_anchors[
+            :int(_DISCOVERY_QUERY["anchor_cap"])
+        ]
+    ]
     anchor_words = {_discovery_lower(word) for phrase in chosen for word in phrase.split()}
-    signals = [
+    ordinary_signals = [
         token
         for token in tokens
         if len(token) >= int(_DISCOVERY_QUERY["signal_min_chars"])
@@ -1392,14 +1517,60 @@ def _headline_query(title: str) -> str:
         and _discovery_lower(token) not in anchor_words
         and token not in _GENERIC_CAPITALIZED
     ]
+    if _DISCOVERY_QUERY["preferred_signal_anchor_deduplication"] != (
+        "casefolded-token-set-containment-v2"
+    ):
+        raise RuntimeError("discovery preferred-signal deduplication is unsupported")
+    signals: list[str] = []
+    signal_word_sets: list[set[str]] = []
+    event_signals = tuple(
+        match.group(0) for match in _QUERY_EVENT_SIGNAL.finditer(headline)
+    )
+    for candidate_signal in (
+        *domain_signals,
+        *event_signals,
+        *context_signals,
+        *ordinary_signals,
+    ):
+        cleaned = " ".join(str(candidate_signal).replace('"', "").split())
+        identity = _discovery_lower(cleaned)
+        identity_words = grounded_signal_words(cleaned)
+        if (
+            not cleaned
+            or not identity_words
+            or (identity_words and identity_words.issubset(anchor_words))
+            or any(
+                identity_words and identity_words.issubset(existing)
+                for existing in signal_word_sets
+            )
+            or any(_discovery_lower(existing) == identity for existing in signals)
+        ):
+            continue
+        signals.append(cleaned)
+        signal_word_sets.append(identity_words)
 
     quote = str(_DISCOVERY_QUERY["phrase_quote"])
-    parts = [f"{quote}{phrase.replace(quote, '')}{quote}" for phrase in chosen]
-    if parts and len(parts) < int(_DISCOVERY_QUERY["query_part_cap"]) and signals:
-        parts.append(signals[0])
-    if not parts:
-        parts = signals[: int(_DISCOVERY_QUERY["fallback_signal_cap"])]
+    part_cap = int(_DISCOVERY_QUERY["query_part_cap"])
+    values = chosen + signals[:max(0, part_cap - len(chosen))]
+    if not chosen:
+        values = signals[:int(_DISCOVERY_QUERY["fallback_signal_cap"])]
+    parts = [
+        (
+            f"{quote}{value.replace(quote, '')}{quote}"
+            if len(re.findall(str(_DISCOVERY_QUERY["token_pattern"]), value)) > 1
+            else value
+        )
+        for value in values
+    ]
     return " ".join(parts)[: int(_DISCOVERY_QUERY["max_query_chars"])]
+
+
+def _discovery_query_identity(query: str) -> str:
+    if _DISCOVERY_QUERY["query_identity"] != (
+        "unicode-casefold-whitespace-collapse-v1"
+    ):
+        raise RuntimeError("discovery query-identity policy is unsupported")
+    return " ".join(query.split()).casefold()
 
 
 def _looks_company_authored(headline: dict) -> bool:
@@ -1407,24 +1578,216 @@ def _looks_company_authored(headline: dict) -> bool:
     return looks_company_authored(headline.get("publisher"), headline.get("title"))
 
 
+def _strategic_title_classification(headline: Mapping[str, object]) -> dict:
+    """Classify one title with its own feed category and no entity watchlist."""
+    title = _headline_without_publisher(str(headline.get("title") or ""))
+    category = headline.get("category")
+    domains = {
+        name for name, pattern in _STRATEGIC_DOMAIN_PATTERNS
+        if pattern.search(title)
+    }
+    if (
+        _AMBIGUOUS_SEMICONDUCTOR.search(title)
+        and _AMBIGUOUS_SEMICONDUCTOR_CONTEXT.search(title)
+    ):
+        domains.add("semiconductors")
+    consumer = bool(_CONSUMER_GADGET.search(title))
+    qualified = bool(domains) and bool(_STRATEGIC_MATERIAL_EVENT.search(title))
+    if consumer and not _CONSUMER_STRATEGIC_OVERRIDE.search(title):
+        qualified = False
+    if not qualified:
+        domains.clear()
+    return {
+        "strategic_technology": bool(domains),
+        "strategic_subdomains": sorted(domains),
+        "strategic_context": bool(domains and _STRATEGIC_CONTEXT.search(title)),
+        "major_global_impact": bool(
+            category == "world" or _MAJOR_GLOBAL_IMPACT.search(title)
+        ),
+        "consumer_only": consumer and not domains,
+    }
+
+
+def _strategic_technology_classification(candidate: Mapping[str, object]) -> dict:
+    """Aggregate immutable per-title classifications across one story cluster."""
+    if _DISCOVERY_PRIORITIZATION["classification_text"] != (
+        "each-grouped-lineage-title"
+    ):
+        raise RuntimeError("discovery classification scope is unsupported")
+    raw_lineage = candidate.get("lineage")
+    lineage = raw_lineage if isinstance(raw_lineage, list) else [candidate]
+    classified = [
+        _strategic_title_classification(headline)
+        for headline in lineage if isinstance(headline, Mapping)
+    ]
+    subdomains = sorted({
+        domain for item in classified for domain in item["strategic_subdomains"]
+    })
+    return {
+        "strategic_technology": bool(subdomains),
+        "strategic_subdomains": subdomains,
+        "strategic_context": any(
+            item["strategic_context"] for item in classified
+        ),
+        "major_global_impact": any(
+            item["major_global_impact"] for item in classified
+        ),
+        "consumer_only": bool(classified) and all(
+            item["consumer_only"] for item in classified
+        ),
+    }
+
+
+def _strategic_query_signals(
+    headline: Mapping[str, object]
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    classification = _strategic_title_classification(headline)
+    if not classification["strategic_technology"]:
+        return (), ()
+    title = _headline_without_publisher(str(headline.get("title") or ""))
+    domain_matches = [
+        (match.start(), -len(match.group(0)), match.group(0))
+        for _name, pattern in _STRATEGIC_DOMAIN_PATTERNS
+        for match in pattern.finditer(title)
+    ]
+    if "semiconductors" in classification["strategic_subdomains"]:
+        domain_matches.extend(
+            (match.start(), -len(match.group(0)), match.group(0))
+            for match in _AMBIGUOUS_SEMICONDUCTOR.finditer(title)
+        )
+    if "artificial_intelligence" in classification["strategic_subdomains"]:
+        domain_matches.extend(
+            (match.start(), -len(match.group(0)), match.group(0))
+            for match in _MODEL_IDENTIFIER.finditer(title)
+        )
+    context_matches = [
+        (match.start(), -len(match.group(0)), match.group(0))
+        for match in _STRATEGIC_CONTEXT.finditer(title)
+    ]
+    return tuple(dict.fromkeys(
+        value for _start, _negative_length, value in sorted(set(domain_matches))
+    )), tuple(dict.fromkeys(
+        value for _start, _negative_length, value in sorted(set(context_matches))
+    ))
+
+
+def _canonical_discovery_headline(
+    candidate: Mapping[str, object], classification: Mapping[str, object]
+) -> Mapping[str, object]:
+    raw_lineage = candidate.get("lineage")
+    raw_lineage = raw_lineage if isinstance(raw_lineage, list) else []
+    lineage = [
+        headline for headline in raw_lineage
+        if isinstance(headline, Mapping)
+    ]
+    if not lineage:
+        return candidate
+    classified = [
+        (headline, _strategic_title_classification(headline))
+        for headline in lineage
+    ]
+    qualified: list[Mapping[str, object]] = []
+    for role in _DISCOVERY_RANKING["canonical_role_order"]:
+        if role in {"strategic_technology", "major_global_impact"} and classification[
+            role
+        ]:
+            qualified = [headline for headline, item in classified if item[role]]
+        elif role == "any":
+            qualified = lineage
+        elif role not in {"strategic_technology", "major_global_impact"}:
+            raise RuntimeError("discovery canonical-role policy is unsupported")
+        if qualified:
+            break
+    return min(
+        qualified,
+        key=lambda headline: _discovery_order_key(
+            {
+                "strategic-context-desc": -int(
+                    _strategic_title_classification(headline)["strategic_context"]
+                ),
+                "rank-asc": headline.get(
+                    "rank", int(_DISCOVERY_RANKING["missing_rank"])
+                ),
+                "created-utc-desc": -(headline.get("created_utc") or 0),
+                "topic-key-asc": _topic_key(str(headline.get("title") or "")),
+                "external-id-asc": str(headline.get("external_id") or ""),
+            },
+            _DISCOVERY_RANKING["canonical_headline_order"],
+        ),
+    )
+
+
+def _discovery_candidate_order_values(
+    candidate: Mapping[str, object], *, used_subdomains: frozenset[str] = frozenset()
+) -> dict:
+    raw_lineage = candidate.get("lineage")
+    lineage = raw_lineage if isinstance(raw_lineage, list) else []
+    publisher_domains = {
+        str((headline.get("metadata") or {}).get("publisher_domain") or "").lower()
+        for headline in lineage
+        if isinstance(headline, Mapping)
+        and isinstance(headline.get("metadata"), Mapping)
+        and (headline.get("metadata") or {}).get("publisher_domain")
+    }
+    ranks = candidate.get("ranks")
+    rank_values = list(ranks.values()) if isinstance(ranks, Mapping) else []
+    return {
+        "independent-publisher-count-desc": -len(publisher_domains),
+        "strategic-context-desc": -int(bool(candidate.get("strategic_context"))),
+        "cross-region-count-desc": -len(candidate.get("regions") or ()),
+        "trend-match-desc": -int(bool(candidate.get("trend_match"))),
+        "best-rank-asc": min(
+            rank_values or [int(_DISCOVERY_RANKING["missing_rank"])]
+        ),
+        "new-subdomain-count-desc": -len(
+            set(candidate.get("strategic_subdomains") or ()) - used_subdomains
+        ),
+        "created-utc-desc": -(
+            candidate.get("created_utc")
+            or int(_DISCOVERY_RANKING["missing_created_utc"])
+        ),
+        "topic-key-asc": _topic_key(str(candidate.get("title") or "")),
+        "query-asc": str(candidate.get("query") or ""),
+    }
+
+
+def _discovery_candidate_category(candidate: Mapping[str, object]) -> str:
+    categories = candidate.get("categories") or ()
+    ranks = candidate.get("ranks")
+    ranks = ranks if isinstance(ranks, Mapping) else {}
+    eligible = [category for category in _DISCOVERY_CATEGORIES if category in categories]
+    if not eligible:
+        raise ValueError("discovery candidate has no configured category")
+    return min(
+        eligible,
+        key=lambda category: (
+            ranks.get(category, int(_DISCOVERY_RANKING["missing_rank"])),
+            _DISCOVERY_CATEGORIES.index(category),
+        ),
+    )
+
+
 def discover_x_topics(
     max_topics: int,
     *,
     headlines: list[dict] | None = None,
     trends: list[dict] | None = None,
+    captured_utc: float | None = None,
 ) -> list[dict]:
-    """Select a small, diverse set of current high-information news topics.
+    """Select two strategic-technology stories plus one major global story.
 
     Ranked top-news feeds supply candidates. US and worldwide X trends can
     boost a matching headline, but cannot introduce an entertainment-only
-    search on their own. One candidate per world/business/technology category
-    maximizes coverage when the normal three-topic budget is used.
+    search on their own. Queries remain derived only from eligible editorial
+    headlines; the frozen taxonomy affects ranking, never query construction.
     """
     headlines = (
         fetch_top_news_headlines(limit_per_feed=int(_DISCOVERY_INPUTS["ranked_feed_limit"]))
         if headlines is None
         else headlines
     )
+    if captured_utc is not None:
+        headlines = _formally_grounded_discovery_headlines(headlines, captured_utc)
     if trends is None:
         trends = [
             trend
@@ -1436,8 +1799,6 @@ def discover_x_topics(
     grouped: dict[str, dict] = {}
     if _DISCOVERY_STORY_GROUPING["resolution"] != "first-matching-input-group":
         raise RuntimeError("discovery story-group resolution policy is unsupported")
-    if _DISCOVERY_ALLOCATION["representation_order"] != "configured-category-order":
-        raise RuntimeError("discovery representation policy is unsupported")
     for headline in headlines:
         if (
             bool(_DISCOVERY_INPUTS["exclude_low_information"])
@@ -1481,122 +1842,163 @@ def discover_x_topics(
         )
 
     candidates = []
+    if _DISCOVERY_TREND_MATCHING["headline_scope"] != (
+        "all-grouped-lineage-titles-v1"
+    ):
+        raise RuntimeError("discovery trend-matching scope is unsupported")
     for candidate in grouped.values():
-        best_rank = min(candidate["ranks"].values())
-        cross_feed_bonus = int(_DISCOVERY_RANKING["cross_feed_weight"]) * (
-            len(candidate["categories"]) - int(_DISCOVERY_RANKING["cross_source_baseline_count"])
+        classification = _strategic_technology_classification(candidate)
+        canonical = _canonical_discovery_headline(candidate, classification)
+        candidate = {
+            **candidate,
+            **{
+                field: deepcopy(canonical.get(field))
+                for field in _DISCOVERY_RANKING["lineage_fields"]
+            },
+            **classification,
+        }
+        candidate["trend_match"] = any(
+            _trend_matches_headline(name, str(headline.get("title") or ""))
+            for name in trend_names
+            for headline in candidate["lineage"]
         )
-        cross_region_bonus = int(_DISCOVERY_RANKING["cross_region_weight"]) * (
-            len(candidate["regions"]) - int(_DISCOVERY_RANKING["cross_source_baseline_count"])
+        domain_signals, context_signals = _strategic_query_signals(canonical)
+        candidate["query"] = _headline_query(
+            str(candidate["title"] or ""),
+            domain_signals=domain_signals,
+            context_signals=context_signals,
         )
-        trend_bonus = (
-            int(_DISCOVERY_RANKING["trend_match_weight"])
-            if any(_trend_matches_headline(name, candidate["title"]) for name in trend_names)
-            else 0
-        )
-        candidate["score"] = (
-            int(_DISCOVERY_RANKING["score_base"])
-            - min(best_rank, int(_DISCOVERY_RANKING["score_rank_cap"]))
-            * int(_DISCOVERY_RANKING["score_rank_weight"])
-            + cross_feed_bonus
-            + cross_region_bonus
-            + trend_bonus
-        )
-        candidate["query"] = _headline_query(candidate["title"])
         if candidate["query"]:
             candidates.append(candidate)
 
-    chosen = []
-    used_keys = set()
-    for category in _DISCOVERY_CATEGORIES:
-        eligible = [
-            candidate
-            for candidate in candidates
-            if category in candidate["categories"]
+    chosen: list[dict] = []
+    used_keys: set[str] = set()
+    used_queries: set[str] = set()
+
+    def available(candidate: dict) -> bool:
+        return (
+            any(category in candidate["categories"] for category in _DISCOVERY_CATEGORIES)
             and _topic_key(candidate["title"]) not in used_keys
-        ]
+            and (
+                not bool(_DISCOVERY_ALLOCATION["require_distinct_queries"])
+                or _discovery_query_identity(candidate["query"]) not in used_queries
+            )
+        )
+
+    def choose(pool: list[dict], order: object, role: str) -> dict | None:
+        eligible = [candidate for candidate in pool if available(candidate)]
         if not eligible or len(chosen) >= max_topics:
-            continue
-        best = min(
+            return None
+        selected = min(
             eligible,
             key=lambda candidate: _discovery_order_key(
-                {
-                    "category-adjusted-score-desc": -(
-                        candidate["score"]
-                        - candidate["ranks"].get(
-                            category,
-                            int(_DISCOVERY_RANKING["category_missing_rank"]),
-                        )
-                        * int(_DISCOVERY_RANKING["category_rank_weight"])
+                _discovery_candidate_order_values(
+                    candidate,
+                    used_subdomains=frozenset(
+                        domain
+                        for prior in chosen
+                        if prior.get("selection_role") == "strategic_technology"
+                        for domain in prior.get("strategic_subdomains", ())
                     ),
-                    "created-utc-desc": -(
-                        candidate.get("created_utc")
-                        or int(_DISCOVERY_RANKING["missing_created_utc"])
-                    ),
-                    "topic-key-asc": _topic_key(candidate["title"]),
-                    "query-asc": candidate["query"],
-                },
-                _DISCOVERY_ALLOCATION["category_candidate_order"],
-            ),
-        )
-        best = {
-            **best,
-            "topic": f"{_DISCOVERY_ALLOCATION['topic_prefix']}{category}",
-            "category": category,
-        }
-        chosen.append(best)
-        used_keys.add(_topic_key(best["title"]))
-
-    if len(chosen) < max_topics:
-        remaining = sorted(
-            candidates,
-            key=lambda candidate: _discovery_order_key(
-                {
-                    "score-desc": -candidate["score"],
-                    "created-utc-desc": -(
-                        candidate.get("created_utc")
-                        or int(_DISCOVERY_RANKING["missing_created_utc"])
-                    ),
-                    "topic-key-asc": _topic_key(candidate["title"]),
-                    "query-asc": candidate["query"],
-                },
-                _DISCOVERY_ALLOCATION["remaining_candidate_order"],
-            ),
-        )
-        for candidate in remaining:
-            key = _topic_key(candidate["title"])
-            if key in used_keys:
-                continue
-            formal_categories = [
-                category
-                for category in _DISCOVERY_CATEGORIES
-                if category in candidate["categories"]
-            ]
-            if not formal_categories:
-                continue
-            category = min(
-                formal_categories,
-                key=lambda value: _discovery_order_key(
-                    {
-                        "rank-asc": candidate["ranks"].get(
-                            value, int(_DISCOVERY_RANKING["missing_rank"])
-                        ),
-                        "configured-category-order": (_DISCOVERY_CATEGORIES.index(value)),
-                    },
-                    _DISCOVERY_ALLOCATION["fallback_category_order"],
                 ),
+                order,
+            ),
+        )
+        selected = {
+            **selected,
+            "category": _discovery_candidate_category(selected),
+            "selection_role": role,
+        }
+        chosen.append(selected)
+        used_keys.add(_topic_key(selected["title"]))
+        used_queries.add(_discovery_query_identity(selected["query"]))
+        return selected
+
+    strategic = [
+        candidate for candidate in candidates
+        if candidate["strategic_technology"]
+    ]
+    def eligible_major_global(candidate: dict) -> bool:
+        categories = set(candidate["categories"])
+        eligible_categories = categories.intersection(
+            _DISCOVERY_ALLOCATION["major_global_categories"]
+        )
+        if not eligible_categories:
+            return False
+        return not (
+            eligible_categories == {"general"}
+            and bool(
+                _DISCOVERY_ALLOCATION[
+                    "general_category_requires_major_global_impact"
+                ]
             )
-            chosen.append(
-                {
-                    **candidate,
-                    "topic": f"{_DISCOVERY_ALLOCATION['topic_prefix']}{category}",
-                    "category": category,
-                }
+            and not candidate["major_global_impact"]
+        )
+
+    major_global = [
+        candidate for candidate in candidates
+        if eligible_major_global(candidate)
+        and (
+            not bool(
+                _DISCOVERY_ALLOCATION[
+                    "major_global_excludes_strategic_technology"
+                ]
             )
-            used_keys.add(key)
-            if len(chosen) >= max_topics:
-                break
-    return chosen
+            or not candidate["strategic_technology"]
+        )
+        and not candidate["consumer_only"]
+    ]
+    for role in tuple(_DISCOVERY_ALLOCATION["target_roles"])[:max_topics]:
+        if role == "strategic_technology":
+            choose(
+                strategic,
+                _DISCOVERY_ALLOCATION["strategic_candidate_order"],
+                role,
+            )
+        elif role == "major_global":
+            choose(
+                major_global,
+                _DISCOVERY_ALLOCATION["major_global_candidate_order"],
+                role,
+            )
+        else:
+            raise RuntimeError("discovery target-role policy is unsupported")
+
+    fallback = [
+        candidate for candidate in candidates
+        if not (
+            bool(_DISCOVERY_ALLOCATION["exclude_consumer_only_from_fallback"])
+            and candidate["consumer_only"]
+        )
+        and (
+            (
+                bool(_DISCOVERY_ALLOCATION["fallback_allows_strategic_technology"])
+                and candidate["strategic_technology"]
+            )
+            or any(
+                category in candidate["categories"]
+                for category in _DISCOVERY_ALLOCATION["fallback_categories"]
+            )
+            or (
+                bool(_DISCOVERY_ALLOCATION["fallback_allows_major_global_general"])
+                and "general" in candidate["categories"]
+                and candidate["major_global_impact"]
+            )
+        )
+    ]
+    while len(chosen) < max_topics:
+        if choose(
+            fallback,
+            _DISCOVERY_ALLOCATION["fallback_candidate_order"],
+            str(_DISCOVERY_ALLOCATION["fallback_role"]),
+        ) is None:
+            break
+
+    prefix = str(_DISCOVERY_ALLOCATION["slot_topic_prefix"])
+    return [
+        {**candidate, "topic": f"{prefix}{index}"}
+        for index, candidate in enumerate(chosen, start=1)
+    ]
 
 
 def _group_x_search_topics(topics: list[dict]) -> list[dict]:
@@ -1623,18 +2025,23 @@ def _group_x_search_topics(topics: list[dict]) -> list[dict]:
                 "topic": topic_name,
                 "labels": set(),
                 "categories": set(),
+                "selection_roles": set(),
                 "selected_external_ids": set(),
             },
         )
         group["topic"] = min(group["topic"], topic_name)
         group["labels"].add(f"@{topic_name}".upper())
         group["categories"].add(category)
+        role = topic.get("selection_role")
+        if isinstance(role, str) and role:
+            group["selection_roles"].add(role)
         group["selected_external_ids"].add(external_id)
     return [
         {
             **group,
             "labels": sorted(group["labels"]),
             "categories": sorted(group["categories"]),
+            "selection_roles": sorted(group["selection_roles"]),
             "selected_external_ids": sorted(group["selected_external_ids"]),
         }
         for _query, group in sorted(grouped.items())
@@ -1733,13 +2140,11 @@ def validate_x_discovery_decision(manifest: dict) -> None:
     max_topics = manifest.get("max_topics")
     if not isinstance(headlines, list) or not isinstance(trends, list):
         raise ValueError("X discovery decision input is malformed")
-    topics = _formally_grounded_discovery_topics(
-        discover_x_topics(
-            max_topics=max_topics,
-            headlines=deepcopy(headlines),
-            trends=deepcopy(trends),
-        ),
-        captured,
+    topics = discover_x_topics(
+        max_topics=max_topics,
+        headlines=deepcopy(headlines),
+        trends=deepcopy(trends),
+        captured_utc=captured,
     )
     expected = _x_discovery_decision_manifest(
         collection_cycle_id=manifest.get("collection_cycle_id"),
@@ -1793,6 +2198,51 @@ def _discovery_news_row(topic: dict, now: float, headline: dict | None = None) -
     }
 
 
+def _validated_discovery_capture(captured_utc: float) -> float:
+    if (
+        isinstance(captured_utc, bool)
+        or not isinstance(captured_utc, (int, float))
+        or not math.isfinite(float(captured_utc))
+    ):
+        raise ValueError("discovery capture time must be finite")
+    return float(captured_utc)
+
+
+def _discovery_headline_is_formally_grounded(
+    headline: dict, captured_utc: float
+) -> bool:
+    try:
+        row = _discovery_news_row(
+            {"topic": "trend_slot_1"}, captured_utc, headline
+        )
+    except (KeyError, TypeError):
+        return False
+    external_id = row.get("external_id")
+    published = row.get("created_utc")
+    lookback = float(GLOBAL_EVENT_V2_PROTOCOL["evidence"]["lookback_days"] * 86400)
+    return (
+        isinstance(external_id, str)
+        and bool(external_id)
+        and not isinstance(published, bool)
+        and isinstance(published, (int, float))
+        and math.isfinite(float(published))
+        and captured_utc - lookback <= float(published) <= captured_utc
+        and global_research.is_independent_editorial_evidence(row)
+        and not global_research.is_company_authored_evidence(row)
+    )
+
+
+def _formally_grounded_discovery_headlines(
+    headlines: list[dict], captured_utc: float
+) -> list[dict]:
+    """Filter before grouping so every selected query has eligible lineage."""
+    captured = _validated_discovery_capture(captured_utc)
+    return [
+        headline for headline in headlines
+        if _discovery_headline_is_formally_grounded(headline, captured)
+    ]
+
+
 def _formally_grounded_discovery_topics(topics: list[dict], captured_utc: float) -> list[dict]:
     """Keep topics grounded in recent, independent editorial discovery lineage.
 
@@ -1805,39 +2255,14 @@ def _formally_grounded_discovery_topics(topics: list[dict], captured_utc: float)
     search, but the discovery headline itself never crosses the forecast
     boundary.
     """
-    if (
-        isinstance(captured_utc, bool)
-        or not isinstance(captured_utc, (int, float))
-        or not math.isfinite(float(captured_utc))
-    ):
-        raise ValueError("discovery capture time must be finite")
-    captured = float(captured_utc)
-    lookback = float(GLOBAL_EVENT_V2_PROTOCOL["evidence"]["lookback_days"] * 86400)
-
-    def eligible_lineage(headline: dict, topic: dict) -> bool:
-        try:
-            row = _discovery_news_row(topic, captured, headline)
-        except (KeyError, TypeError):
-            return False
-        external_id = row.get("external_id")
-        published = row.get("created_utc")
-        return (
-            isinstance(external_id, str)
-            and bool(external_id)
-            and not isinstance(published, bool)
-            and isinstance(published, (int, float))
-            and math.isfinite(float(published))
-            and captured - lookback <= float(published) <= captured
-            and global_research.is_independent_editorial_evidence(row)
-            and not global_research.is_company_authored_evidence(row)
-        )
+    captured = _validated_discovery_capture(captured_utc)
 
     grounded = []
     for topic in topics:
         lineage = topic.get("lineage") if isinstance(topic.get("lineage"), list) else []
         headlines = lineage or [topic]
         if any(
-            eligible_lineage(headline, topic)
+            _discovery_headline_is_formally_grounded(headline, captured)
             for headline in headlines
             if isinstance(headline, dict)
         ):
@@ -2097,9 +2522,9 @@ def _x_collection_cycle_spec(now: float, max_topics: int) -> dict:
 
 
 def _x_compatible_collection_cycle_specs(now: float) -> list[dict]:
-    """Rebuild only the protocol's explicitly allowlisted prior X identities."""
+    """Rebuild retired identities solely for same-day paid-attempt fencing."""
     specs = []
-    for identity in GLOBAL_EVENT_V2_COMPATIBLE_COLLECTOR_IDENTITIES:
+    for identity in GLOBAL_EVENT_V2_OPERATIONAL_PRIOR_COLLECTOR_IDENTITIES:
         specs.append(_x_collection_cycle_spec_for_identity(now, identity))
     return specs
 
@@ -2114,7 +2539,7 @@ def _is_registered_compatible_x_spec(spec: Mapping) -> bool:
     identity = spec.get("identity")
     if not isinstance(identity, Mapping):
         return False
-    for registered in GLOBAL_EVENT_V2_COMPATIBLE_COLLECTOR_IDENTITIES:
+    for registered in GLOBAL_EVENT_V2_OPERATIONAL_PRIOR_COLLECTOR_IDENTITIES:
         if (
             identity.get("protocol_id"),
             identity.get("collector_semantics_id"),
@@ -2188,10 +2613,10 @@ def _compatible_x_cycle_checkpoint(store, spec: dict) -> Mapping | None:
 def _x_daily_cycle_resolution(store, now: float, max_topics: int) -> dict:
     """Resolve one same-day attempt, preferring current over prior identities.
 
-    Any exact allowlisted prior attempt blocks creation of a fresh paid identity.
-    When more than one prior identity exists, select the newest present
-    compatible cycle. This is the same precedence rule used by the research
-    projection and never depends on terminal status or content.
+    Any exact registered prior attempt blocks creation of a fresh paid identity.
+    When more than one prior identity exists, select the newest present cycle.
+    This operational fence never makes retired evidence formally compatible and
+    never depends on terminal status or content.
     """
     current_spec = _x_collection_cycle_spec(now, max_topics)
     compatible_specs = _x_compatible_collection_cycle_specs(now)
@@ -2648,13 +3073,11 @@ def _poll_x_cycle_children(
     discovery_box: dict[str, list[dict]] = {}
 
     def discover(captured):
-        topics = _formally_grounded_discovery_topics(
-            discover_x_topics(
-                max_topics=max_topics,
-                headlines=discovery_headlines,
-                trends=trends,
-            ),
-            captured,
+        topics = discover_x_topics(
+            max_topics=max_topics,
+            headlines=discovery_headlines,
+            trends=trends,
+            captured_utc=captured,
         )
         search_requests = _group_x_search_topics(topics)
         decision = _x_discovery_decision_manifest(
@@ -2717,6 +3140,10 @@ def _poll_x_cycle_children(
                     item["topic"], item["query_key"], captured, limit=limit
                 ),
                 labels=request["labels"],
+                formal_eligibility_fn=lambda row, cutoff, item=request: (
+                    row.get("title") == item["query_key"]
+                    and is_formally_eligible_evidence(row, as_of_utc=cutoff)
+                ),
                 cost_units=1.0,
                 budget_limits=_x_request_budget_limits(
                     "search", now, request["query_key"]
@@ -2763,11 +3190,41 @@ def poll_x_topics_once(
     if resolution["origin"] == "unknown":
         raise ValueError("same-day X collection identity is not recognized")
     if resolution["origin"] == "compatible":
+        prior_cycle = resolution["cycle"]
+        if resolution["state"] == "running" and prior_cycle is not None:
+            observed_utc = store.server_observed_utc()
+            stale_seconds = float(evidence_policy["x_cycle_recovery_stale_seconds"])
+            server_started = prior_cycle.get("server_started_utc")
+            if (
+                isinstance(server_started, bool)
+                or not isinstance(server_started, (int, float))
+                or not math.isfinite(float(server_started))
+            ):
+                raise ValueError("running X cycle lacks a server start observation")
+            if observed_utc - float(server_started) < stale_seconds:
+                return [
+                    (slot["provider"], slot["query_key"])
+                    for slot in store.collection_cycle_slots(
+                        prior_cycle["collection_cycle_id"]
+                    )
+                ]
+            prior_cycle = store.recover_collection_cycle(
+                prior_cycle["collection_cycle_id"],
+                recovered_utc=observed_utc,
+                minimum_age_seconds=stale_seconds,
+            )
+            if _x_collection_cycle_state(resolution["spec"], prior_cycle) not in {
+                "complete",
+                "incomplete",
+            }:
+                raise ValueError("recovered X collection cycle manifest is invalid")
+            store.set_meta("last_x_poll_utc", now)
+            return _cycle_manifest_slots(prior_cycle)
         if resolution["state"] not in {"checkpointed", "complete"} \
-                or resolution["cycle"] is None:
+                or prior_cycle is None:
             raise ValueError("same-day compatible X collection cycle is not uniquely complete")
         store.set_meta("last_x_poll_utc", now)
-        return _cycle_manifest_slots(resolution["cycle"])
+        return _cycle_manifest_slots(prior_cycle)
     if resolution["origin"] == "current" and resolution["cycle"] is None:
         raise ValueError("existing X collection cycle is invalid")
     spec = resolution["spec"]
@@ -2904,16 +3361,27 @@ def run_cycle(
     ):
         raise ValueError("X cycle interval must exactly match the frozen protocol")
     x_resolution = _x_daily_cycle_resolution(store, now, x_topic_limit) if x_enabled else None
-    x_due = bool(
+    prior_handoff_due = bool(
         x_enabled
-        and _x_start_window_open(now)
-        and (
-            (force_x and x_resolution["origin"] in {None, "current"})
-            or (
-                not force_x
-                and (
-                    x_resolution["origin"] is None
-                    or (x_resolution["origin"] == "current" and x_resolution["state"] == "running")
+        and x_resolution["origin"] == "compatible"
+        and x_resolution["state"] == "running"
+    )
+    x_due = bool(
+        prior_handoff_due
+        or (
+            x_enabled
+            and _x_start_window_open(now)
+            and (
+                (force_x and x_resolution["origin"] in {None, "current"})
+                or (
+                    not force_x
+                    and (
+                        x_resolution["origin"] is None
+                        or (
+                            x_resolution["origin"] == "current"
+                            and x_resolution["state"] == "running"
+                        )
+                    )
                 )
             )
         )
@@ -2936,7 +3404,7 @@ def run_cycle(
     periodic_requirements = {}
     if x_enabled:
         periodic_requirements["x_daily"] = _x_daily_requirement_state(
-            store, now, x_topic_limit
+            store, cycle_completed, x_topic_limit
         )
     coverage = _check_cycle_query_coverage(
         store,
@@ -3138,10 +3606,16 @@ def _x_cycle_audit_projection(store, period_date) -> dict:
         int(GLOBAL_EVENT_V2_PROTOCOL["evidence"]["max_x_search_requests_per_utc_day"]),
     )
     cycle = resolution["cycle"]
+    identity_origin = (
+        "prior_deployment"
+        if resolution["origin"] == "compatible"
+        else str(resolution["origin"] or "none")
+    )
     if resolution["origin"] is None:
         return {
             "period": period_date.isoformat(),
             "state": "missing",
+            "identity_origin": identity_origin,
             "terminal_utc": None,
             "trend_requests": 0,
             "search_requests": 0,
@@ -3165,6 +3639,7 @@ def _x_cycle_audit_projection(store, period_date) -> dict:
     return {
         "period": period_date.isoformat(),
         "state": state,
+        "identity_origin": identity_origin,
         "terminal_utc": terminal,
         "trend_requests": sum(
             row.get("provider") == "xtrend" and row.get("fetch_run_id") is not None
@@ -3293,6 +3768,7 @@ def print_audit(store, *, include_history: bool = False) -> None:
             x_cycle["state"] = current_x_state
         print(f"collector_x_{label}_period={x_cycle['period']}")
         print(f"collector_x_{label}_state={x_cycle['state']}")
+        print(f"collector_x_{label}_identity_origin={x_cycle['identity_origin']}")
         print(f"collector_x_{label}_terminal_utc={x_cycle['terminal_utc'] or 'none'}")
         print(f"collector_x_{label}_trend_requests={x_cycle['trend_requests']}")
         print(f"collector_x_{label}_search_requests={x_cycle['search_requests']}")

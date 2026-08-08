@@ -435,14 +435,27 @@ def test_shared_x_cycle_structure_accepts_real_rows_and_rejects_mutations(store)
     )
     dynamic_provider["manifest"]["slot_receipts"][-1]["provider"] = "globalnews"
     invalid.append(readdress(dynamic_provider))
-    wrong_period = deepcopy(cycle)
-    wrong_period["manifest"]["server_terminal_utc"] += 86400
-    wrong_period["server_terminal_utc"] += 86400
-    invalid.append(readdress(wrong_period))
+    before_period = deepcopy(cycle)
+    period_start = datetime.fromisoformat(period).replace(
+        tzinfo=timezone.utc
+    ).timestamp()
+    before_period["manifest"]["server_terminal_utc"] = period_start - 1
+    before_period["server_terminal_utc"] = period_start - 1
+    invalid.append(readdress(before_period))
 
     assert [x_cycle_structural_state(spec, candidate) for candidate in invalid] == [
         "invalid"
     ] * len(invalid)
+
+    late = deepcopy(cycle)
+    period_end = period_start + 86400
+    late["manifest"]["server_terminal_utc"] = period_end + 1
+    late["server_terminal_utc"] = period_end + 1
+    assert x_cycle_structural_state(spec, readdress(late)) == "incomplete"
+
+    malformed_late = deepcopy(late)
+    malformed_late["manifest"]["slot_receipts"][0]["fetch_run_id"] = "not-a-uuid"
+    assert x_cycle_structural_state(spec, readdress(malformed_late)) == "invalid"
 
 
 @pytest.mark.unit

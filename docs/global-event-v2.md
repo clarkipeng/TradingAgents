@@ -79,11 +79,37 @@ feeds across several regions. Its frozen topic families cover rates, trade,
 politics and geopolitics, companies and the economy, technology, and energy.
 Queries never name a portfolio ticker or issuer.
 
-The query-free topic selector is also part of the collection contract. Its text
-normalization, story clustering, trend matching, query construction, ranking
-weights, category representation, and deterministic tie-breaks live in one
-immutable discovery policy. Changing any of those machine rules creates a new
-collection identity; editing an identity-history explanation does not.
+The query-free topic selector is also part of the collection contract. It
+targets two independently reported strategic-technology stories and one major
+global story per day. Strategic technology includes material developments in
+AI models and compute, semiconductors and their East Asian supply chains,
+cybersecurity, telecom infrastructure, robotics, quantum, space infrastructure,
+and critical power. Geographic or policy context can prioritize an already
+qualified technology story but never create a query by itself. Consumer-gadget
+coverage is excluded unless it has a systemic production, supply, policy, or
+compute consequence. Opaque release names and version numbers remain useful
+query anchors, but neither a bare product name nor the generic word "model"
+qualifies a technology slot unless at least one grouped headline explicitly
+names a frozen strategic domain.
+
+Every query is constructed only from the selected independent editorial
+headline. The taxonomy cannot inject a company, ticker, country, politician, or
+phrase into it. Three structural slot labels keep the two technology discussions
+separate through downstream round-robin selection. If qualified stories are
+scarce, the collector may use fewer searches or backfill with other
+high-information global coverage; it never spends merely to fill the quota.
+Normalization, clustering, classification, allocation, and tie-breaks live in
+one immutable discovery policy. Changing a machine rule creates a new
+collection identity.
+
+Each X fetch receipt carries the exact unfiltered editorially derived query.
+Exact-cycle replay reattaches the selected receipt's query as the row title,
+giving the model bounded context for interpreting a short reaction without
+making the globally deduplicated post depend on whichever search found it
+first. The prompt explicitly says this is search context rather than proof that
+an event occurred. The no-public-reaction arm removes the complete X channel,
+including that context, so the ablation estimates the incremental value of
+contextualized public reaction rather than sentiment text in isolation.
 
 X is a bounded public-reaction channel, not a representative opinion poll. The
 daily budget permits at most two trend requests and three searches. Selection
@@ -166,11 +192,11 @@ otherwise equivalent day look like missing evidence. The exact Git build remains
 recorded separately for implementation provenance. Forecast, portfolio, and
 evaluation artifacts continue to use the complete experiment-protocol ID. That
 full ID includes the current collection and stored-semantics IDs, the
-chronological compatibility ledger and each pair's frozen daily X cycle shape,
-and the explicit `current, then newest compatible to oldest` precedence rule.
-It excludes only the human explanation attached to each compatibility entry;
-X availability artifacts likewise contain machine identity and shape, not that
-operator prose.
+chronological retired-deployment ledger, the formal-compatibility set, and the
+same-day paid-attempt precedence rule. Retired identities may stop a rollout
+from repeating an already attempted paid X cycle, but their observations cannot
+enter this new sampling baseline. It excludes human explanation prose from the
+content identity.
 
 A snapshot is useful only if it can be reconstructed without asking a live
 provider what used to be present. Historical provider IDs alone are not enough.

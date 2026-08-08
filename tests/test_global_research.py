@@ -32,6 +32,7 @@ from tradingagents.research_protocol import (
     GLOBAL_EVENT_V2_COLLECTION_PROTOCOL_MANIFEST,
     GLOBAL_EVENT_V2_COLLECTOR_SEMANTICS_ID,
     GLOBAL_EVENT_V2_COLLECTOR_SEMANTICS_MANIFEST,
+    GLOBAL_EVENT_V2_COMPATIBLE_COLLECTOR_IDENTITIES,
     GLOBAL_EVENT_V2_LEGACY_COLLECTOR_IDENTITIES,
     GLOBAL_EVENT_V2_PROTOCOL_ID,
     GLOBAL_EVENT_V2_PROTOCOL_MANIFEST,
@@ -166,9 +167,10 @@ def test_formal_evidence_caps_are_source_stratified():
     rows += [
         {
             "source": "x", "external_id": f"x-{index}",
-            "ticker": "@TREND_WORLD", "created_utc": 2_000.0 + index,
+            "ticker": "@TREND_SLOT_1", "created_utc": 2_000.0 + index,
             "fetched_utc": 2_001.0 + index, "author": f"public-{index}",
-            "body": f"public reaction number {index}", "labels": ["@TREND_WORLD"],
+            "title": "broad global event",
+            "body": f"public reaction number {index}", "labels": ["@TREND_SLOT_1"],
             "metadata": _x_metadata(
                 engagement=index + 1, author_id=str(10_000 + index)
             ),
@@ -440,9 +442,10 @@ def test_trendnews_is_discovery_only_and_ablation_differs_only_by_x_rows():
          "title": "Ranked discovery", "created_utc": 2.0,
          "metadata": _editorial_metadata("bbc.co.uk")},
         {"source": "x", "external_id": "reaction", "author": "publicvoice",
+         "title": "global development",
          "body": "Public reaction to the global development", "created_utc": 3.0,
          "fetched_utc": 4.0,
-         "labels": ["@TREND_WORLD"], "metadata": _x_metadata()},
+         "labels": ["@TREND_SLOT_1"], "metadata": _x_metadata()},
     ]
 
     champion, without_reaction, public_reaction = partition_formal_evidence(rows)
@@ -553,15 +556,16 @@ def test_selection_manifest_is_bounded_content_addressed_and_causally_partitione
         "fetched_utc": as_of - 10,
     }
     reaction = {
-        "source": "x", "external_id": "reaction", "ticker": "@TREND_WORLD",
-        "labels": ["@TREND_WORLD"], "created_utc": as_of - 5,
+        "source": "x", "external_id": "reaction", "ticker": "@TREND_SLOT_1",
+        "labels": ["@TREND_SLOT_1"], "created_utc": as_of - 5,
         "fetched_utc": as_of - 4, "author": "publicvoice",
+        "title": "global event",
         "body": "People are reacting to the global event",
         "metadata": _x_metadata(),
     }
     unknown = {
-        "source": "trendnews", "external_id": "unknown", "ticker": "@TREND_WORLD",
-        "labels": ["@TREND_WORLD"], "created_utc": as_of - 8,
+        "source": "trendnews", "external_id": "unknown", "ticker": "@TREND_SLOT_1",
+        "labels": ["@TREND_SLOT_1"], "created_utc": as_of - 8,
         "fetched_utc": as_of - 7, "author": "Unknown Publisher",
         "title": "Unverified report", "metadata": {},
     }
@@ -765,13 +769,17 @@ def test_receipt_lineage_must_intersect_assigned_manifest_slot():
     assert bound["receipt_lineage_binding_complete"] is True
     assert all(slot["lineage_bound"] for slot in bound["query_slots"])
 
-    compatible = GLOBAL_EVENT_V2_LEGACY_COLLECTOR_IDENTITIES[0]
+    assert GLOBAL_EVENT_V2_COMPATIBLE_COLLECTOR_IDENTITIES == ()
+    retired = GLOBAL_EVENT_V2_LEGACY_COLLECTOR_IDENTITIES[0]
     coverage["query_slots"][0]["run"]["metadata_json"] = json.dumps({
-        "protocol_id": compatible["protocol_id"],
-        "collector_semantics_id": compatible["collector_semantics_id"],
+        "protocol_id": retired["protocol_id"],
+        "collector_semantics_id": retired["collector_semantics_id"],
     })
-    legacy_collector = bind_receipt_coverage_to_selection(coverage, manifest)
-    assert legacy_collector["complete"] is True
+    retired_collector = bind_receipt_coverage_to_selection(coverage, manifest)
+    assert retired_collector["complete"] is False
+    assert retired_collector["missing_query_slots"][0]["reason"] == (
+        "collector_semantics_mismatch"
+    )
 
     coverage["query_slots"][0]["run"]["metadata_json"] = json.dumps({
         "protocol_id": GLOBAL_EVENT_V2_COLLECTION_PROTOCOL_ID,
@@ -879,14 +887,14 @@ def test_observed_absent_slots_are_valid_but_one_strict_core_item_is_required():
 
 
 @pytest.mark.unit
-def test_x_selection_is_metadata_closed_diverse_deduped_and_author_capped():
+def test_x_selection_structural_queues_round_robin_independently():
     rows = [{
-        "source": "x", "external_id": "legacy", "ticker": "@TREND_WORLD",
-        "labels": ["@TREND_WORLD"], "created_utc": 10_000.0,
+        "source": "x", "external_id": "legacy", "ticker": "@TREND_SLOT_1",
+        "labels": ["@TREND_SLOT_1"], "created_utc": 10_000.0,
         "fetched_utc": 10_001.0, "author": "legacy-user",
         "body": "Legacy metadata empty reaction", "metadata": {},
     }]
-    topics = ["@TREND_WORLD", "@TREND_BUSINESS", "@TREND_TECHNOLOGY"]
+    topics = ["@TREND_SLOT_1", "@TREND_SLOT_2", "@TREND_SLOT_3"]
     for topic_index, topic in enumerate(topics):
         for index in range(10):
             author = "coordinated" if index < 4 else f"author-{topic_index}-{index}"
@@ -895,6 +903,7 @@ def test_x_selection_is_metadata_closed_diverse_deduped_and_author_capped():
                 "ticker": topic, "labels": [topic],
                 "created_utc": 1_000.0 + topic_index * 100 + index,
                 "fetched_utc": 2_000.0, "author": author,
+                "title": f"global topic query {topic_index}",
                 "body": f"Public reaction for topic {topic_index} item {index}",
                 "metadata": _x_metadata(
                     engagement=100 - index,
@@ -908,12 +917,14 @@ def test_x_selection_is_metadata_closed_diverse_deduped_and_author_capped():
         {
             "source": "x", "external_id": "duplicate-low", "ticker": topics[0],
             "labels": [topics[0]], "created_utc": 3_000.0, "fetched_utc": 3_001.0,
+            "title": "global topic query 0",
             "author": "copy-low", "body": "Same reaction @someone https://one.example",
             "metadata": _x_metadata(engagement=1, author_id="200001"),
         },
         {
             "source": "x", "external_id": "duplicate-high", "ticker": topics[1],
             "labels": [topics[1]], "created_utc": 2_999.0, "fetched_utc": 3_001.0,
+            "title": "global topic query 1",
             "author": "copy-high", "body": "SAME reaction @other https://two.example",
             "metadata": _x_metadata(engagement=1000, author_id="200002"),
         },
@@ -934,6 +945,7 @@ def test_x_selection_is_metadata_closed_diverse_deduped_and_author_capped():
         topic: sum(row["public_reaction_topic"] == topic for row in selected_x)
         for topic in topics
     }
+    assert all(topic_counts.values())
     assert max(topic_counts.values()) - min(topic_counts.values()) <= 1
 
     manifest = evidence_selection_manifest(rows, as_of_utc=20_000.0)
@@ -947,9 +959,10 @@ def test_x_selection_is_metadata_closed_diverse_deduped_and_author_capped():
 @pytest.mark.unit
 def test_x_formal_eligibility_rejects_missing_metrics_high_risk_and_zero_engagement():
     base = {
-        "source": "x", "external_id": "x", "ticker": "@TREND_WORLD",
-        "labels": ["@TREND_WORLD"], "created_utc": 100.0, "fetched_utc": 101.0,
-        "author": "public-user", "body": "A sufficiently detailed public reaction",
+        "source": "x", "external_id": "x", "ticker": "@TREND_SLOT_1",
+        "labels": ["@TREND_SLOT_1"], "created_utc": 100.0, "fetched_utc": 101.0,
+        "author": "public-user", "title": "global event",
+        "body": "A sufficiently detailed public reaction",
     }
     invalid_risk = _x_metadata()
     invalid_risk["automation_risk"] = True
@@ -969,6 +982,10 @@ def test_x_formal_eligibility_rejects_missing_metrics_high_risk_and_zero_engagem
     ]
     rows = [
         {**base, "external_id": "missing", "metadata": {}},
+        {
+            **base, "external_id": "missing-context", "title": None,
+            "metadata": _x_metadata(),
+        },
         {**base, "external_id": "risky", "metadata": _x_metadata(risk=0.31)},
         {**base, "external_id": "zero", "metadata": _x_metadata(engagement=0)},
         {**base, "external_id": "bool-risk", "metadata": invalid_risk},
@@ -984,6 +1001,13 @@ def test_x_formal_eligibility_rejects_missing_metrics_high_risk_and_zero_engagem
         },
     ]
     assert [row["external_id"] for row in prepare_evidence(rows)] == ["eligible"]
+    candidates = {
+        row["external_id"]: row
+        for row in evidence_selection_manifest(rows, as_of_utc=1_000.0)["candidates"]
+    }
+    assert candidates["missing-context"]["reason"] == (
+        "missing_public_reaction_topic_context"
+    )
 
 
 @pytest.mark.unit
@@ -1227,7 +1251,7 @@ def test_prompt_canonicalization_bounds_every_item_and_drops_raw_metadata():
         "source": "x",
         "external_id": "x" * 20_000,
         "query_slot": None,
-        "public_reaction_topic": "@TREND_WORLD",
+        "public_reaction_topic": "@TREND_SLOT_1",
         "published_utc": 1.0,
         "publisher_or_author": "author" * 5_000,
         "publisher_domain": None,

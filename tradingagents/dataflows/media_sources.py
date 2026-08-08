@@ -53,12 +53,19 @@ _DEFAULT_SUBREDDITS = ("wallstreetbets", "stocks", "investing")
 _BLUESKY_SEARCH = "https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts?{qs}"
 _TRUTHSOCIAL_SEARCH = "https://truthsocial.com/api/v2/search?{qs}"
 GLOBAL_X_ADAPTER_POLICY = MappingProxyType({
-    "version": "global-event-x-request-v4",
+    "version": "global-event-x-request-v6-receipt-context",
     "recent_search": MappingProxyType({
         "endpoint": "https://api.x.com/2/tweets/search/recent?{qs}",
         "topic_sort_order": "relevancy",
         "query_language": "en",
         "query_exclusions": ("retweet", "reply"),
+        "topic_context": MappingProxyType({
+            "transient_row_field": "title",
+            "transient_row_value": "exact_unfiltered_query",
+            "durable_association": "fetch_runs.query_key",
+            "replay_row_field": "title",
+            "ticker_row_value": None,
+        }),
         "result_limit": MappingProxyType({
             "default": 10,
             "minimum": 10,
@@ -1074,6 +1081,7 @@ def fetch_x(ticker: str, now: float, limit: int = 50,
         limit=limit,
         timeout=timeout,
         sort_order="recency",
+        store_query_context=False,
     )
 
 
@@ -1092,7 +1100,8 @@ def _x_filtered_query(query: str) -> str:
 
 
 def _fetch_x_search(query: str, label: str, now: float, limit: int,
-                    timeout: float, sort_order: str) -> list[dict]:
+                    timeout: float, sort_order: str, *,
+                    store_query_context: bool = False) -> list[dict]:
     """Run one bounded X recent-search query and return media-store rows."""
     token = (os.environ.get("X_BEARER_TOKEN") or "").strip()
     if not token:
@@ -1220,6 +1229,7 @@ def _fetch_x_search(query: str, label: str, now: float, limit: int,
             "x", str(tid), label, now,
             author=user.get("username") or t.get("author_id"),
             created_utc=_iso_to_epoch(t.get("created_at")),
+            title=query if store_query_context else None,
             body=(t.get("text") or "").strip(),
             metadata={
                 "evidence_role": "unverified_public_reaction",
@@ -1423,6 +1433,7 @@ def fetch_x_topic(
         limit=limit,
         timeout=timeout,
         sort_order=GLOBAL_X_ADAPTER_POLICY["recent_search"]["topic_sort_order"],
+        store_query_context=True,
     )
 
 

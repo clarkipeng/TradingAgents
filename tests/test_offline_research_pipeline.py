@@ -200,6 +200,7 @@ def _x_cycle_store(rows, cutoff):
                 "raw_content_id": x_raw_id,
                 "row": {
                     **x_row,
+                    "title": dynamic_slots[0]["query_key"],
                     "metadata": {
                         **x_row["metadata"],
                         "receipt_labels": requests[0]["labels"],
@@ -371,13 +372,13 @@ def _x_row():
     return {
         "source": "x",
         "external_id": "reaction-1",
-        "ticker": "@TREND_WORLD",
+        "ticker": "@TREND_SLOT_1",
         "created_utc": datetime(2026, 1, 7, 1, tzinfo=timezone.utc).timestamp(),
         "fetched_utc": datetime(2026, 1, 7, 1, 30, tzinfo=timezone.utc).timestamp(),
         "author": "public-user",
-        "title": None,
+        "title": '"Bordeaux Wildfires" Force Evacuations',
         "body": "Public reaction to the global event.",
-        "labels": ["@TREND_WORLD"],
+        "labels": ["@TREND_SLOT_1"],
         "latest_observed_utc": datetime(
             2026, 1, 7, 2, tzinfo=timezone.utc
         ).timestamp(),
@@ -390,7 +391,7 @@ def _x_row():
             "profile_screening_complete": True,
             "organization_signals": [],
             "verified_type": "none",
-            "receipt_labels": ["@TREND_WORLD"],
+            "receipt_labels": ["@TREND_SLOT_1"],
             "automation_risk": 0.0,
             "engagement": {
                 "like_count": 1,

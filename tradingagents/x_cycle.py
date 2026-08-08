@@ -203,9 +203,10 @@ def x_cycle_structural_state(
         or float(started) > float(completed)
         or not _finite_number(server_terminal)
         or float(server_started) > float(server_terminal)
-        or not period_bounds[0] <= float(server_terminal) < period_bounds[1]
+        or float(server_terminal) < period_bounds[0]
     ):
         return "invalid"
+    late_terminal = float(server_terminal) >= period_bounds[1]
     expected_manifest = {
         "collection_cycle_id": spec["collection_cycle_id"],
         "cycle_kind": identity.get("cycle_kind"),
@@ -314,4 +315,7 @@ def x_cycle_structural_state(
     required_trends = {slot for slot in static_set if slot[0] == "xtrend"}
     if successful_trends != required_trends:
         return "incomplete"
-    return status
+    # A request or stale-cycle recovery may cross midnight after it starts.
+    # Keep the fully validated terminal record, but never admit a sample whose
+    # authenticated terminal observation missed its UTC collection period.
+    return "incomplete" if late_terminal else status

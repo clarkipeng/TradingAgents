@@ -193,6 +193,10 @@ def _cycle_x_item_rows(
             row = item["row"]
             if row.get("source") != "x":
                 raise ValueError("X cycle item has mismatched source provenance")
+            if row.get("title") != receipt["query_key"]:
+                raise ValueError(
+                    "X cycle item topic context differs from its receipt query"
+                )
             metadata = row.get("metadata") if isinstance(row.get("metadata"), dict) else {}
             labels = metadata.get("receipt_labels")
             if (
@@ -220,24 +224,19 @@ def _cycle_x_item_rows(
             )
             order = (float(observed), float(fetched), item["fetch_run_id"])
             prior = rows_by_pair.get(pair)
-            if prior is None:
+            if prior is None or order > prior["order"]:
                 rows_by_pair[pair] = {
                     "row": exact_row,
-                    "labels": set(labels),
+                    "labels": list(labels),
                     "order": order,
+                    "fetch_run_id": item["fetch_run_id"],
                 }
-            else:
-                prior["labels"].update(labels)
-                if order > prior["order"]:
-                    prior["row"] = exact_row
-                    prior["order"] = order
     for value in rows_by_pair.values():
-        value["labels"] = sorted(value["labels"])
-        value["row"]["labels"] = value["labels"]
+        value["row"]["labels"] = list(value["labels"])
         metadata = value["row"].get("metadata")
         value["row"]["metadata"] = {
             **(metadata if isinstance(metadata, dict) else {}),
-            "receipt_labels": value["labels"],
+            "receipt_labels": list(value["labels"]),
         }
     return rows_by_pair
 
@@ -269,6 +268,8 @@ def _select_cycle_x_rows(
         item_evidence_id: value
         for item_evidence_id, value in latest.items()
         if value[1] in receipt_runs_by_pair
+        and cycle_x_rows[value[1]].get("fetch_run_id")
+        in receipt_runs_by_pair[value[1]]
         and is_formally_eligible_evidence(value[2], as_of_utc=cutoff_utc)
     }
     return (
@@ -410,7 +411,9 @@ def project_x_cycle_availability(
         {
             "evidence_id": evidence_id,
             "raw_content_id": raw_content_id,
-            "fetch_run_ids": sorted(receipt_runs_by_pair[(evidence_id, raw_content_id)]),
+            "fetch_run_ids": [
+                cycle_x_rows[(evidence_id, raw_content_id)]["fetch_run_id"]
+            ],
             "labels": cycle_x_rows[(evidence_id, raw_content_id)]["labels"],
         }
         for evidence_id, raw_content_id in sorted(eligible_pairs)
@@ -439,7 +442,7 @@ def bind_x_availability_to_selection(
 
 def _validate_bound_discovery_decision(
     artifact: object, cycle_manifest: dict[str, Any]
-) -> dict[str, list[str]]:
+) -> dict[str, dict[str, Any]]:
     if not isinstance(artifact, dict) or set(artifact) != {
         "discovery_decision_id", "fetch_run_id", "raw_content_id", "manifest"
     }:
@@ -482,7 +485,7 @@ def _validate_bound_discovery_decision(
     ]
     if expected_dynamic != cycle_manifest["expected_dynamic_slots"]:
         raise ValueError("X cycle searches differ from their discovery decision")
-    labels_by_fetch: dict[str, list[str]] = {}
+    request_by_fetch: dict[str, dict[str, Any]] = {}
     request_by_query = {
         request["query_key"]: request for request in decision["search_requests"]
     }
@@ -492,8 +495,11 @@ def _validate_bound_discovery_decision(
         request = request_by_query.get(receipt["query_key"])
         if request is None:
             raise ValueError("X receipt is absent from its discovery decision")
-        labels_by_fetch[receipt["fetch_run_id"]] = request["labels"]
-    return labels_by_fetch
+        request_by_fetch[receipt["fetch_run_id"]] = {
+            "query_key": request["query_key"],
+            "labels": request["labels"],
+        }
+    return request_by_fetch
 
 
 def validate_bound_x_selection(
@@ -577,7 +583,7 @@ def validate_bound_x_selection(
         raise ValueError("X availability state disagrees with its selected cycle")
     manifest = availability.get("cycle_manifest")
     manifest_id = availability.get("manifest_id")
-    labels_by_fetch: dict[str, list[str]] = {}
+    request_by_fetch: dict[str, dict[str, Any]] = {}
     if state in {"complete_zero_eligible", "complete_with_eligible"}:
         if selected_candidate is None or not isinstance(manifest, dict):
             raise ValueError("complete X availability lacks its exact cycle manifest")
@@ -603,7 +609,7 @@ def validate_bound_x_selection(
             selected_candidate["spec"], reconstructed_cycle
         ) != "complete":
             raise ValueError("complete X availability cycle manifest is invalid")
-        labels_by_fetch = _validate_bound_discovery_decision(
+        request_by_fetch = _validate_bound_discovery_decision(
             availability.get("discovery_decision"), manifest
         )
         terminal = availability.get("server_terminal_utc")
@@ -693,11 +699,17 @@ def validate_bound_x_selection(
     ):
         raise ValueError("X availability lineage is absent from its cycle manifest")
     if any(
+        fetch_run_id not in request_by_fetch
+        for item in lineage
+        for fetch_run_id in item["fetch_run_ids"]
+    ):
+        raise ValueError("X availability lineage is absent from its discovery decision")
+    if any(
         item["labels"]
         != sorted({
             label
             for fetch_run_id in item["fetch_run_ids"]
-            for label in labels_by_fetch.get(fetch_run_id, [])
+            for label in request_by_fetch[fetch_run_id]["labels"]
         })
         for item in lineage
     ):
@@ -725,6 +737,16 @@ def validate_bound_x_selection(
     server_started = availability.get("server_started_utc")
     server_terminal = availability.get("server_terminal_utc")
     for pair, row in raw_x_rows.items():
+        lineage_item = lineage_by_pair[pair]
+        expected_queries = {
+            request_by_fetch[fetch_run_id]["query_key"]
+            for fetch_run_id in lineage_item["fetch_run_ids"]
+        }
+        topic_context = row.get("title")
+        if not isinstance(topic_context, str) or expected_queries != {topic_context}:
+            raise ValueError(
+                "snapshot X topic context differs from its discovery query"
+            )
         labels = row.get("labels")
         latest = row.get("latest_observed_utc")
         fetched = row.get("fetched_utc")

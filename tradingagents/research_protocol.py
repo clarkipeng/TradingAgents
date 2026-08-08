@@ -52,6 +52,7 @@ def experiment_protocol_manifest(
     collection_protocol_id: str,
     collector_semantics_id: str,
     collector_identity_history: tuple[Mapping[str, Any], ...],
+    formally_compatible_identities: tuple[Mapping[str, Any], ...] = (),
 ) -> dict[str, Any]:
     """Bind the economic protocol to its current evidence contract."""
     manifest = deepcopy(dict(protocol))
@@ -63,13 +64,23 @@ def experiment_protocol_manifest(
             "expected_collector_semantics_id",
         ):
             evidence.pop(compatibility_key, None)
+    retired = collector_identity_history[:-1]
+    retired_manifest = collector_identity_history_manifest(retired)
+    formal_manifest = collector_identity_history_manifest(
+        formally_compatible_identities
+    )
+    retired_shapes = {canonical_json(entry) for entry in retired_manifest}
+    formal_shapes = [canonical_json(entry) for entry in formal_manifest]
+    if len(formal_shapes) != len(set(formal_shapes)):
+        raise ValueError("formal collector compatibility must be unique")
+    if any(shape not in retired_shapes for shape in formal_shapes):
+        raise ValueError("formal collector compatibility must reference retired history")
     manifest["collection_contract"] = {
         "collection_protocol_id": collection_protocol_id,
         "collector_semantics_id": collector_semantics_id,
-        "compatible_identity_history": collector_identity_history_manifest(
-            collector_identity_history[:-1]
-        ),
-        "compatibility_precedence": COLLECTOR_COMPATIBILITY_PRECEDENCE,
+        "retired_identity_history": retired_manifest,
+        "formally_compatible_identity_history": formal_manifest,
+        "same_day_paid_attempt_precedence": COLLECTOR_COMPATIBILITY_PRECEDENCE,
     }
     return manifest
 
@@ -210,7 +221,7 @@ GLOBAL_EVENT_V2_PROTOCOL: dict[str, Any] = {
             ],
         },
         "fetch_receipt_evidence_lineage": {
-            "version": "atomic-provider-snapshot-content-v3",
+            "version": "atomic-provider-snapshot-content-v4-x-receipt-context",
             "persisted_item_lineage": "every stored media response item",
             "formal_projection_providers": ["globalnews", "trendnews", "x"],
             "google_news_content_vintages": (
@@ -234,7 +245,8 @@ GLOBAL_EVENT_V2_PROTOCOL: dict[str, Any] = {
             ),
             "raw_content_id": (
                 "sha256 content ID of canonical provider snapshot content/provenance; "
-                "receipt time and storage-derived labels are excluded"
+                "receipt time, storage-derived labels, and X receipt-query context "
+                "are excluded"
             ),
             "observation_time_binding": (
                 "PostgreSQL trigger-owned server_started_utc/server_terminal_utc authenticate "
@@ -311,7 +323,10 @@ GLOBAL_EVENT_V2_PROTOCOL: dict[str, Any] = {
             "collector-only provenance for selecting bounded X discussion topics; never "
             "forecast evidence, so public-reaction ablations differ only by X rows"
         ),
-        "x_role": "unverified public reaction only",
+        "x_role": (
+            "content-bound editorial search context plus unverified public reaction; "
+            "the stored query is context, not a verified claim that the event occurred"
+        ),
         "x_unavailable_policy": (
             "retain the interval; use no X evidence and a neutral public-reaction target; "
             "reuse the champion bundle when canonical champion and no-reaction inputs match"
@@ -362,8 +377,11 @@ GLOBAL_EVENT_V2_PROTOCOL: dict[str, Any] = {
             "nominal_max_usd_per_day_before_deduplication": 1.05,
         },
         "x_formal_policy": {
-            "version": "topic-diverse-public-reaction-v4-profile-screened",
+            "version": "topic-diverse-public-reaction-v7-receipt-context",
             "required_evidence_role": "unverified_public_reaction",
+            "required_topic_context": (
+                "exact-cycle-title-equals-selected-receipt-query-v2"
+            ),
             "required_immutable_author_id": True,
             "required_account_created_utc": True,
             "required_automation_signals_complete": True,
@@ -385,7 +403,7 @@ GLOBAL_EVENT_V2_PROTOCOL: dict[str, Any] = {
                 "that every remaining unverified account is an unaffiliated person"
             ),
             "topic_labels": [
-                "@TREND_WORLD", "@TREND_BUSINESS", "@TREND_TECHNOLOGY",
+                "@TREND_SLOT_1", "@TREND_SLOT_2", "@TREND_SLOT_3",
             ],
             "topic_assignment": (
                 "lexicographically-smallest-sha256-source-nul-external-id-nul-topic"
@@ -431,7 +449,7 @@ GLOBAL_EVENT_V2_PROTOCOL: dict[str, Any] = {
         "reasoning_effort": "low",
         "temperature": None,
         "prompt_policy_version": (
-            "global-event-structured-v5-bounded-explicit-excess-return"
+            "global-event-structured-v6-x-search-context-explicit"
         ),
         "structured_output_schema": (
             "daily-global-forecast-bounded-v4-coherent-grounded-onset"
@@ -968,6 +986,19 @@ GLOBAL_EVENT_V2_COLLECTOR_IDENTITY_HISTORY = validated_collector_identity_histor
                 "official-account screening, and X Post metric normalization"
             ),
         },
+        {
+            "protocol_id": "protocol_438764472436ad07e26a2ade",
+            "collector_semantics_id": "collector_077b2fea4605a8cdb260dd4b",
+            "x_daily_static_slots": _GLOBAL_EVENT_V2_HISTORICAL_X_DAILY_STATIC_SLOTS,
+            "x_daily_max_dynamic_slots": (
+                _GLOBAL_EVENT_V2_HISTORICAL_X_DAILY_MAX_DYNAMIC_SLOTS
+            ),
+            "reason": (
+                "current strategic-technology-first discovery with independent "
+                "structural sampling slots, receipt-bound query context, and a "
+                "fresh formal baseline"
+            ),
+        },
     ],
     current_identity=(
         GLOBAL_EVENT_V2_COLLECTION_PROTOCOL_ID,
@@ -983,20 +1014,23 @@ GLOBAL_EVENT_V2_LEGACY_COLLECTOR_IDENTITIES = (
 GLOBAL_EVENT_V2_CURRENT_COLLECTOR_IDENTITY = (
     GLOBAL_EVENT_V2_COLLECTOR_IDENTITY_HISTORY[-1]
 )
-# The ledger stays chronological for append-only maintenance. Selection order is
-# explicit and outcome-blind: current first, then compatible rows newest-first.
-GLOBAL_EVENT_V2_COMPATIBLE_COLLECTOR_IDENTITIES = tuple(
+# Retired deployments remain registered only to prevent a second paid X attempt
+# during a same-day rollout. Their different sampling policies are not formal
+# evidence for this baseline.
+GLOBAL_EVENT_V2_OPERATIONAL_PRIOR_COLLECTOR_IDENTITIES = tuple(
     reversed(GLOBAL_EVENT_V2_LEGACY_COLLECTOR_IDENTITIES)
 )
+GLOBAL_EVENT_V2_COMPATIBLE_COLLECTOR_IDENTITIES: tuple[Mapping[str, Any], ...] = ()
 
 # Forecast, portfolio, evaluation, and promotion artifacts retain the complete
-# experiment identity. It binds current collection/storage semantics and the
-# ordered compatible pairs with their frozen X shapes, but not explanatory notes.
+# experiment identity. It binds current collection/storage semantics, retired
+# deployment shapes, and the separate formal-compatibility set, but not notes.
 GLOBAL_EVENT_V2_PROTOCOL_MANIFEST = experiment_protocol_manifest(
     GLOBAL_EVENT_V2_PROTOCOL,
     collection_protocol_id=GLOBAL_EVENT_V2_COLLECTION_PROTOCOL_ID,
     collector_semantics_id=GLOBAL_EVENT_V2_COLLECTOR_SEMANTICS_ID,
     collector_identity_history=GLOBAL_EVENT_V2_COLLECTOR_IDENTITY_HISTORY,
+    formally_compatible_identities=GLOBAL_EVENT_V2_COMPATIBLE_COLLECTOR_IDENTITIES,
 )
 GLOBAL_EVENT_V2_PROTOCOL_ID = content_id(
     GLOBAL_EVENT_V2_PROTOCOL_MANIFEST,

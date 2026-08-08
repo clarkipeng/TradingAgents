@@ -265,7 +265,8 @@ app-level version, when investigating a stopped rollout.
 
 The read-only release preflight projects every distinct `x-daily` cycle ID,
 protocol ID, and collector-semantics ID stored for the database server's current
-UTC day. It reconstructs the candidate's current and compatible cycle IDs,
+UTC day. It reconstructs the candidate's current and registered
+prior-deployment cycle IDs,
 requires an exact identity match, and authenticates each observed terminal
 envelope and content hash. It deliberately does **not** certify evidence health:
 a registered, authenticated terminal shape from an older collector may be
@@ -309,14 +310,21 @@ closed unless
 `MEDIA_DB_DIRECT_URL` is configured. The current collection-protocol and stored-
 semantics IDs are derived from their declarative manifests; inspect preflight or
 audit output instead of copying an ID from this runbook. Only exact historical
-identity pairs in the separate frozen read-compatibility registry remain
-readable. The append-only ledger is chronological; the full experiment identity
-binds that ledger's machine-readable pairs and frozen daily X cycle shapes plus
-an explicit selection rule. Runtime and research both prefer the current
-identity, then inspect compatible identities from newest to oldest, before
-examining status or content. Human explanatory reasons are absent from
-content-addressed X availability. Changes to the current collection or stored-
-semantics manifests also change the full experiment identity.
+identity pairs in the frozen retired-deployment registry remain operationally
+recognizable. The append-only ledger is chronological; the full experiment
+identity binds its machine-readable pairs and frozen daily X cycle shapes plus
+the separate formal-compatibility set. Runtime checks the current identity and
+then prior deployments, newest first, solely to fence duplicate same-day paid
+work. Research accepts only the current identity for the strategic-technology
+baseline. Human explanatory reasons are absent from content-addressed X
+availability. Changes to the current collection or stored-semantics manifests
+also change the full experiment identity.
+The first formally admissible X sample for a newly deployed sampling identity is
+therefore the next UTC day's cycle. A same-day retired cycle may fence another
+paid attempt, but it is audit history rather than evidence for the new baseline.
+`poller --audit` reports `collector_x_*_identity_origin=prior_deployment` for
+that handoff so operational completeness cannot be mistaken for a current-policy
+sample.
 Multiple historical cycles therefore cannot trigger a duplicate paid X attempt
 or an outcome-dependent fallback. A candidate that failed before producing live
 evidence is not made compatible merely because Fly created a failed release
