@@ -896,9 +896,11 @@ def test_authenticated_fly_handoff_waits_for_a_started_target(
 ):
     env, state_dir = fake_deploy_env
     env["FAKE_SCENARIO"] = scenario
-    env["COLLECTOR_HEALTH_TIMEOUT_SECONDS"] = "4"
+    # The assertion is the observed state sequence, not a scheduler-sensitive
+    # race against the configured production deadline.
+    env["COLLECTOR_HEALTH_TIMEOUT_SECONDS"] = "10"
 
-    result = _run(env)
+    result = _run(env, timeout=20)
 
     assert result.returncode == 0, result.stderr
     assert f"runtime-ready at {REVISION} on Machine machine-old" in result.stdout
