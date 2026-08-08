@@ -695,6 +695,7 @@ def test_pgbouncer_transaction_pool_disables_named_prepared_statements():
     from sqlalchemy import text
 
     clients = []
+    backend_pids = set()
     statement = text("SELECT CAST(:probe_value AS INTEGER)")
     try:
         clients.append(SqlAlchemyMediaStore(url, auto_migrate=False))
@@ -706,21 +707,31 @@ def test_pgbouncer_transaction_pool_disables_named_prepared_statements():
             for client_number, client in enumerate(clients):
                 expected = sequence * len(clients) + client_number
                 with client.engine.connect() as conn:
+                    backend_pids.add(conn.execute(text("SELECT pg_backend_pid()")).scalar_one())
                     assert conn.execute(
                         statement, {"probe_value": expected}
                     ).scalar_one() == expected
                     conn.commit()
+        assert len(backend_pids) == 1
     finally:
         for client in clients:
             client.close()
 
 
 @pytest.mark.integration
-def test_postgres_ingest_role_can_start_cycle_bound_fetches():
+@pytest.mark.parametrize(
+    "url_env",
+    [
+        "TRADINGAGENTS_TEST_POSTGRES_URL",
+        "TRADINGAGENTS_TEST_POSTGRES_POOL_URL",
+    ],
+    ids=["direct", "transaction-pool"],
+)
+def test_postgres_ingest_role_can_start_cycle_bound_fetches(url_env):
     """Regression: immutable slots need SELECT, not accidental row-lock authority."""
-    url = os.getenv("TRADINGAGENTS_TEST_POSTGRES_URL")
+    url = os.getenv(url_env)
     if not url:
-        pytest.skip("TRADINGAGENTS_TEST_POSTGRES_URL is not configured")
+        pytest.skip(f"{url_env} is not configured")
 
     suffix = uuid.uuid4().hex
     started = time.time()
