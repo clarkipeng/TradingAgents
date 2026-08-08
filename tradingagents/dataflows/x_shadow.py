@@ -21,7 +21,7 @@ X_SHADOW_POLICY = MappingProxyType({
     "trend_woeids": (23424975, 23424848),  # United Kingdom, India
     "max_trend_requests_per_utc_day": 2,
     "max_trends_per_request": 5,
-    "max_count_requests_per_utc_day": 3,
+    "max_count_requests_per_utc_day": 5,
     "count_window_anchor": "shadow-request-completed-hour-floor-v1",
     "restart_policy": "one-terminal-attempt-per-utc-day-v1",
     "billing_rate_snapshot": MappingProxyType({
@@ -32,8 +32,8 @@ X_SHADOW_POLICY = MappingProxyType({
         "usd_per_trend_read": 0.010,
         "usd_per_recent_count_request": 0.005,
         "daily_deduplication": "provider soft guarantee within UTC day",
-        "maximum_shadow_usd_per_day": 0.115,
-        "maximum_current_plus_shadow_usd_per_day": 1.165,
+        "maximum_shadow_usd_per_day": 0.125,
+        "maximum_current_plus_shadow_usd_per_day": 1.475,
     }),
     "receipt_accounting": MappingProxyType({
         "cost_units_semantics": "durable-request-budget-reservation-unit-not-usd",

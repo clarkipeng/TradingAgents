@@ -8,6 +8,9 @@ from pathlib import Path
 
 import pytest
 
+from tradingagents.dataflows.x_shadow import X_SHADOW_POLICY
+from tradingagents.research_protocol import GLOBAL_EVENT_V2_PROTOCOL
+
 try:
     import tomllib
 except ModuleNotFoundError:  # pragma: no cover - Python 3.10 CI
@@ -40,6 +43,11 @@ def test_fly_release_preflight_and_private_health_contract():
 
     env = config["env"]
     assert env["MEDIA_REQUIRE_ALERT_WEBHOOK"] == "true"
+    assert int(env["MEDIA_POLLER_X_TOPICS"]) == (
+        GLOBAL_EVENT_V2_PROTOCOL["evidence"][
+            "max_x_search_requests_per_utc_day"
+        ]
+    ) == X_SHADOW_POLICY["max_count_requests_per_utc_day"] == 5
     assert set(config["checks"]) == {"collector_health"}
     health = config["checks"]["collector_health"]
     assert health == {

@@ -231,6 +231,10 @@ _GOOGLE_TOP_NEWS_RSS = (
         "https://news.google.com/rss/headlines/section/topic/TECHNOLOGY"
         "?hl=en-US&gl=US&ceid=US:en"
     )),
+    ("us", "US", (
+        "https://news.google.com/rss/headlines/section/topic/NATION"
+        "?hl=en-US&gl=US&ceid=US:en"
+    )),
     ("world", "US", (
         "https://news.google.com/rss/headlines/section/topic/WORLD"
         "?hl=en-US&gl=US&ceid=US:en"
@@ -1484,8 +1488,9 @@ def fetch_top_news_headlines(limit_per_feed: int = 12,
                              timeout: float = 10.0) -> list[dict]:
     """Ranked, query-free Google News headlines used for topic discovery.
 
-    This reads the public top/general, business, technology, and world feeds;
-    it does not search for a company, person, ticker, or predefined event.
+    This reads the public top/general, business, technology, US national, and
+    world feeds; it does not search for a company, person, ticker, or predefined
+    event.
     Duplicate articles are deliberately retained across feeds because their
     cross-category appearance is a useful importance signal to the selector.
     """

@@ -125,11 +125,12 @@ def test_top_news_discovery_uses_ranked_feeds_without_search_queries(monkeypatch
 
     rows = media_sources.fetch_top_news_headlines(limit_per_feed=1)
 
-    assert len(rows) == 8
+    assert len(rows) == 9
     assert {row["category"] for row in rows} == {
-        "general", "business", "technology", "world",
+        "general", "business", "technology", "us", "world",
     }
     assert all("/rss/search" not in url for url in urls)
+    assert any("/topic/NATION" in url for url in urls)
     assert all(row["rank"] == 0 for row in rows)
     assert {row["region"] for row in rows} == {"US", "GB", "IN", "SG", "AU"}
     assert {row["metadata"]["provider_external_id"] for row in rows} == {"0"}
@@ -164,7 +165,7 @@ def test_top_news_partial_upstream_failure_fails_the_whole_discovery_slot(monkey
         nonlocal calls
         del request, timeout
         calls += 1
-        if calls < 8:
+        if calls < len(media_sources._GOOGLE_TOP_NEWS_RSS):
             raise OSError("unavailable")
         return _rss("Observed global event - Reuters")
 

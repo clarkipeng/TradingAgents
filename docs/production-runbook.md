@@ -48,7 +48,7 @@ The same singleton worker also runs non-gating discovery shadow cycles; there is
 no second Fly worker, database, model process, broker process, or additional
 secret. The public-source cycle makes four daily GDELT requests and one bounded
 Hacker News top-feed sample. After formal X completes, the X shadow cycle makes
-two five-result regional trend requests and up to three recent-count requests;
+two five-result regional trend requests and up to five recent-count requests;
 it retrieves no additional posts or users. Shadow failures and staleness remain
 visible in receipts and audit output but do not affect formal coverage or
 readiness. No schema migration is required.
@@ -429,7 +429,7 @@ healthy cycle has a successful receipt for every configured broad-news slot.
 That receipt may prove zero forecast-eligible stories with exact `0`/`[]`
 lineage; a raw empty or failed provider response is unhealthy. X should run only
 once per UTC day from 21:00 through 23:45 UTC, with at most two trend requests,
-three searches, and ten returned posts per search. `scheduled` before 21:00 is
+five searches, and ten returned posts per search. `scheduled` before 21:00 is
 expected; `missing`, `incomplete`, or `invalid` after the window warrants
 investigation.
 
@@ -440,8 +440,9 @@ same-day shadow identity is never retried, and a deployment that encounters an
 older same-day shadow policy waits until the next UTC day instead of issuing a
 second provider attempt. Current X billing is per returned trend resource and
 per recent-count request; `fetch_runs.cost_units` remains a durable request
-budget unit, not dollars. With five trends per added region and three counts,
-the new X shadow ceiling is $3.45 per 30 days before deduplication.
+budget unit, not dollars. With five trends per added region and five counts,
+the X shadow ceiling is $3.75 per 30 days before deduplication; formal collection
+plus shadow is capped at $44.25 per 30 days before deduplication.
 
 Also check:
 

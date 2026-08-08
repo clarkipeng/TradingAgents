@@ -12,7 +12,7 @@ container can run with no CLI arguments. Env vars (CLI flags override them):
     MEDIA_POLLER_SOURCES   subset of the sources; default = keyless (+x if token)
     MEDIA_POLLER_INTERVAL  seconds between broad-news cycles
     MEDIA_POLLER_X_INTERVAL seconds between X discovery cycles
-    MEDIA_POLLER_X_TOPICS  max discovered topics per cycle           (default 3)
+    MEDIA_POLLER_X_TOPICS  max discovered topics per cycle           (default 5)
     MEDIA_POLLER_X_LIMIT   results per discovered X query            (default 10)
     MEDIA_POLLER_ONCE      "1"/"true" → poll once and exit (for cron/scheduler)
     MEDIA_COLLECTION_ENABLED explicit global-collector enable switch (default false)
@@ -1604,6 +1604,7 @@ def _strategic_title_classification(headline: Mapping[str, object]) -> dict:
         "major_global_impact": bool(
             category == "world" or _MAJOR_GLOBAL_IMPACT.search(title)
         ),
+        "us_ranked_story": category == _DISCOVERY_ALLOCATION["major_us_category"],
         "consumer_only": consumer and not domains,
     }
 
@@ -1632,6 +1633,7 @@ def _strategic_technology_classification(candidate: Mapping[str, object]) -> dic
         "major_global_impact": any(
             item["major_global_impact"] for item in classified
         ),
+        "us_ranked_story": any(item["us_ranked_story"] for item in classified),
         "consumer_only": bool(classified) and all(
             item["consumer_only"] for item in classified
         ),
@@ -1774,12 +1776,14 @@ def discover_x_topics(
     trends: list[dict] | None = None,
     captured_utc: float | None = None,
 ) -> list[dict]:
-    """Select two strategic-technology stories plus one major global story.
+    """Select two strategic-technology stories plus three major-news stories.
 
-    Ranked top-news feeds supply candidates. US and worldwide X trends can
-    boost a matching headline, but cannot introduce an entertainment-only
-    search on their own. Queries remain derived only from eligible editorial
-    headlines; the frozen taxonomy affects ranking, never query construction.
+    One major-news slot must originate in the US national top-news feed; two are
+    globally unrestricted. Ranked feeds supply every candidate. US and
+    worldwide X trends can boost a matching headline, but cannot introduce an
+    entertainment-only search on their own. Queries remain derived only from
+    eligible editorial headlines; the frozen taxonomy affects ranking, never
+    query construction.
     """
     headlines = (
         fetch_top_news_headlines(limit_per_feed=int(_DISCOVERY_INPUTS["ranked_feed_limit"]))
@@ -1948,6 +1952,10 @@ def discover_x_topics(
         )
         and not candidate["consumer_only"]
     ]
+    major_us = [
+        candidate for candidate in major_global
+        if candidate["us_ranked_story"]
+    ]
     for role in tuple(_DISCOVERY_ALLOCATION["target_roles"])[:max_topics]:
         if role == "strategic_technology":
             choose(
@@ -1955,41 +1963,19 @@ def discover_x_topics(
                 _DISCOVERY_ALLOCATION["strategic_candidate_order"],
                 role,
             )
-        elif role == "major_global":
+        elif role in {"major_us", "major_global"}:
             choose(
-                major_global,
+                major_us if role == "major_us" else major_global,
                 _DISCOVERY_ALLOCATION["major_global_candidate_order"],
                 role,
             )
         else:
             raise RuntimeError("discovery target-role policy is unsupported")
 
-    fallback = [
-        candidate for candidate in candidates
-        if not (
-            bool(_DISCOVERY_ALLOCATION["exclude_consumer_only_from_fallback"])
-            and candidate["consumer_only"]
-        )
-        and (
-            (
-                bool(_DISCOVERY_ALLOCATION["fallback_allows_strategic_technology"])
-                and candidate["strategic_technology"]
-            )
-            or any(
-                category in candidate["categories"]
-                for category in _DISCOVERY_ALLOCATION["fallback_categories"]
-            )
-            or (
-                bool(_DISCOVERY_ALLOCATION["fallback_allows_major_global_general"])
-                and "general" in candidate["categories"]
-                and candidate["major_global_impact"]
-            )
-        )
-    ]
     while len(chosen) < max_topics:
         if choose(
-            fallback,
-            _DISCOVERY_ALLOCATION["fallback_candidate_order"],
+            major_global,
+            _DISCOVERY_ALLOCATION["major_global_candidate_order"],
             str(_DISCOVERY_ALLOCATION["fallback_role"]),
         ) is None:
             break

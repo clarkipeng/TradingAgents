@@ -202,7 +202,7 @@ def test_discovery_policy_is_immutable_complete_and_identity_bound(monkeypatch):
         "audit_record",
     }
     assert policy["version"] == (
-        "ranked-strategic-technology-topic-discovery-v7-explicit-domain"
+        "ranked-strategic-technology-topic-discovery-v8-five-slots"
     )
     assert set(policy["normalization"]) == {
         "publisher_suffix_pattern",
@@ -276,7 +276,7 @@ def test_discovery_policy_is_immutable_complete_and_identity_bound(monkeypatch):
         "pattern_flags",
     }
     assert policy["prioritization"]["version"] == (
-        "strategic-technology-two-plus-global-v3-explicit-domain"
+        "strategic-technology-two-plus-us-and-two-global-v4-explicit-domain"
     )
     assert [name for name, _pattern in policy["prioritization"][
         "strategic_domain_patterns"
@@ -297,24 +297,35 @@ def test_discovery_policy_is_immutable_complete_and_identity_bound(monkeypatch):
         "major_global_categories",
         "general_category_requires_major_global_impact",
         "major_global_excludes_strategic_technology",
-        "exclude_consumer_only_from_fallback",
-        "fallback_categories",
-        "fallback_allows_strategic_technology",
-        "fallback_allows_major_global_general",
+        "major_us_category",
         "require_distinct_queries",
         "slot_topic_prefix",
         "strategic_candidate_order",
         "major_global_candidate_order",
-        "fallback_candidate_order",
         "search_request_grouping",
         "search_request_order",
     }
     assert policy["allocation"]["target_roles"] == [
         "strategic_technology",
         "strategic_technology",
+        "major_us",
+        "major_global",
         "major_global",
     ]
-    assert policy["allocation"]["major_global_categories"] == ["world", "general"]
+    assert set(policy["inputs"]["categories"]) == {
+        category for category, _region, _url in media_sources._GOOGLE_TOP_NEWS_RSS
+    }
+    topic_limit = GLOBAL_EVENT_V2_PROTOCOL["evidence"][
+        "max_x_search_requests_per_utc_day"
+    ]
+    assert topic_limit == len(policy["allocation"]["target_roles"]) == 5
+    assert GLOBAL_EVENT_V2_PROTOCOL["evidence"]["x_formal_policy"][
+        "topic_labels"
+    ] == [f"@TREND_SLOT_{index}" for index in range(1, topic_limit + 1)]
+    assert policy["allocation"]["major_global_categories"] == [
+        "world", "business", "general", "us",
+    ]
+    assert policy["allocation"]["major_us_category"] == "us"
     assert policy["allocation"]["require_distinct_queries"] is True
     assert set(policy["audit_record"]) == {
         "version",
@@ -323,12 +334,13 @@ def test_discovery_policy_is_immutable_complete_and_identity_bound(monkeypatch):
         "trend_fields",
         "selected_topic_fields",
     }
-    assert policy["audit_record"]["selected_topic_fields"][-6:] == [
+    assert policy["audit_record"]["selected_topic_fields"][-7:] == [
         "selection_role",
         "strategic_technology",
         "strategic_subdomains",
         "strategic_context",
         "major_global_impact",
+        "us_ranked_story",
         "consumer_only",
     ]
     with pytest.raises(TypeError):
@@ -449,6 +461,7 @@ def test_identity_history_has_frozen_golden_pairs_and_x_cycle_shapes():
         ("protocol_79b64af05d79c66399d66385", "collector_c985ba5adc18bbcbc5f329f3"),
         ("protocol_b19d2d7e9a3bdc6bd398d66c", "collector_f4ed952ec4c96058c0e7d5a8"),
         ("protocol_438764472436ad07e26a2ade", "collector_077b2fea4605a8cdb260dd4b"),
+        ("protocol_b1f2c6f59e6290947cb5be0d", "collector_077b2fea4605a8cdb260dd4b"),
     ]
     assert {
         (
@@ -464,15 +477,23 @@ def test_identity_history_has_frozen_golden_pairs_and_x_cycle_shapes():
                 ("trendnews", "ranked-global-discovery"),
             ),
             3,
-        )
+        ),
+        (
+            (
+                ("xtrend", "woeid:1"),
+                ("xtrend", "woeid:23424977"),
+                ("trendnews", "ranked-global-discovery"),
+            ),
+            5,
+        ),
     }
     assert GLOBAL_EVENT_V2_COLLECTION_PROTOCOL_ID == (
-        "protocol_438764472436ad07e26a2ade"
+        "protocol_b1f2c6f59e6290947cb5be0d"
     )
     assert GLOBAL_EVENT_V2_COLLECTOR_SEMANTICS_ID == (
         "collector_077b2fea4605a8cdb260dd4b"
     )
-    assert GLOBAL_EVENT_V2_PROTOCOL_ID == "protocol_b348fa8c6bac9226e8ac3042"
+    assert GLOBAL_EVENT_V2_PROTOCOL_ID == "protocol_282645475c60166a70209c6f"
 
 
 @pytest.mark.unit

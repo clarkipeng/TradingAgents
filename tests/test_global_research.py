@@ -12,6 +12,7 @@ from tradingagents.global_research import (
     FORMAL_GLOBALNEWS_QUERY_SLOTS,
     FORMAL_HISTORY_CANDIDATE_LIMIT,
     FORMAL_SOURCE_HISTORY_BUCKET_LIMITS,
+    FORMAL_X_TOPIC_LABELS,
     AssetForecast,
     GlobalEvent,
     _formal_query_slot,
@@ -894,7 +895,7 @@ def test_x_selection_structural_queues_round_robin_independently():
         "fetched_utc": 10_001.0, "author": "legacy-user",
         "body": "Legacy metadata empty reaction", "metadata": {},
     }]
-    topics = ["@TREND_SLOT_1", "@TREND_SLOT_2", "@TREND_SLOT_3"]
+    topics = list(FORMAL_X_TOPIC_LABELS)
     for topic_index, topic in enumerate(topics):
         for index in range(10):
             author = "coordinated" if index < 4 else f"author-{topic_index}-{index}"

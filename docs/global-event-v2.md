@@ -80,8 +80,9 @@ politics and geopolitics, companies and the economy, technology, and energy.
 Queries never name a portfolio ticker or issuer.
 
 The query-free topic selector is also part of the collection contract. It
-targets two independently reported strategic-technology stories and one major
-global story per day. Strategic technology includes material developments in
+targets two independently reported strategic-technology stories, one major
+story from the query-free US national top-news feed, and two unrestricted major global
+stories per day. Strategic technology includes material developments in
 AI models and compute, semiconductors and their East Asian supply chains,
 cybersecurity, telecom infrastructure, robotics, quantum, space infrastructure,
 and critical power. Geographic or policy context can prioritize an already
@@ -94,8 +95,8 @@ names a frozen strategic domain.
 
 Every query is constructed only from the selected independent editorial
 headline. The taxonomy cannot inject a company, ticker, country, politician, or
-phrase into it. Three structural slot labels keep the two technology discussions
-separate through downstream round-robin selection. If qualified stories are
+phrase into it. Five structural slot labels keep the discussions separate
+through downstream round-robin selection. If qualified stories are
 scarce, the collector may use fewer searches or backfill with other
 high-information global coverage; it never spends merely to fill the quota.
 Normalization, clustering, classification, allocation, and tie-breaks live in
@@ -112,7 +113,7 @@ including that context, so the ablation estimates the incremental value of
 contextualized public reaction rather than sentiment text in isolation.
 
 X is a bounded public-reaction channel, not a representative opinion poll. The
-daily budget permits at most two trend requests and three searches. Selection
+daily budget permits at most two trend requests and five searches. Selection
 caps repeat authors, discourages automated-looking activity, and excludes
 verified business and government accounts. It also freezes each author's name,
 description, URL/entities, parody flag, and identity-verification flag, then
@@ -157,16 +158,16 @@ signal is the community ranking, but it is labeled and never treated as
 independent editorial evidence.
 
 After a complete formal X cycle, a separate X shadow cycle captures only the top
-five UK and India trends and at most three 166-hour recent-count series for the
+five UK and India trends and at most five 166-hour recent-count series for the
 already-stored discovery queries. It never requests extra posts or profiles.
 The count window ends at a completed UTC hour and stays one hour inside X's
 rolling seven-day boundary. Every count snapshot is linked to the exact formal
 discovery-decision ID and its capture time. The entire retrospective series is
 available only with its terminal fetch receipt; hourly bins are descriptive
 components, never observations available at their individual bin times. At the
-pricing snapshot dated 2026-08-08, this expansion adds at most $0.115 per day
-($3.45 per 30 days) before deduplication; the formal collector plus shadow
-ceiling is $1.165 per day ($34.95 per 30 days). X's Developer Console is
+pricing snapshot dated 2026-08-08, this expansion adds at most $0.125 per day
+($3.75 per 30 days) before deduplication; the formal collector plus shadow
+ceiling is $1.475 per day ($44.25 per 30 days). X's Developer Console is
 authoritative if rates change.
 
 These sources use independent content-addressed protocol, semantics, and daily

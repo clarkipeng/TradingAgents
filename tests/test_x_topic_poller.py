@@ -23,10 +23,15 @@ from tradingagents.dataflows.x_shadow import (
 
 _X_WINDOW_OPEN_UTC = datetime(2026, 8, 5, 21, tzinfo=timezone.utc).timestamp()
 _X_WINDOW_CLOSED_UTC = datetime(2026, 8, 5, 23, 46, tzinfo=timezone.utc).timestamp()
+_X_TOPIC_LIMIT = int(
+    poller.GLOBAL_EVENT_V2_PROTOCOL["evidence"][
+        "max_x_search_requests_per_utc_day"
+    ]
+)
 
 
 def _complete_formal_x_cycle(store, monkeypatch, now, *, topic_count=1):
-    categories = ("world", "business", "technology")
+    categories = ("world", "business", "technology", "general", "us")
     topics = [
         {
             "topic": f"trend_{categories[index]}",
@@ -52,8 +57,8 @@ def _complete_formal_x_cycle(store, monkeypatch, now, *, topic_count=1):
         poller, "discover_x_topics", lambda max_topics, **_kwargs: list(topics)[:max_topics]
     )
     monkeypatch.setattr(poller, "fetch_x_topic", lambda *_args, **_kwargs: [])
-    poller.poll_x_topics_once(store, now=now, limit=10, max_topics=3)
-    cycle_id = poller._x_collection_cycle_spec(now, 3)["collection_cycle_id"]
+    poller.poll_x_topics_once(store, now=now, limit=10, max_topics=_X_TOPIC_LIMIT)
+    cycle_id = poller._x_collection_cycle_spec(now, _X_TOPIC_LIMIT)["collection_cycle_id"]
     return topics, poller._stored_x_discovery_decision(store, cycle_id)
 
 
@@ -490,7 +495,7 @@ def test_x_author_profile_rejects_malformed_present_urls(profile_fields):
 
 
 @pytest.mark.unit
-def test_discovery_prioritizes_two_strategic_technology_stories_and_global_news(
+def test_discovery_allocates_two_technology_one_us_and_two_global_stories(
     monkeypatch,
 ):
     headlines = [
@@ -505,6 +510,16 @@ def test_discovery_prioritizes_two_strategic_technology_stories_and_global_news(
             "rank": 0,
         },
         {
+            "external_id": "us",
+            "title": "US Congress passes a national immigration policy - AP",
+            "body": "",
+            "created_utc": 10.5,
+            "publisher": "Associated Press",
+            "category": "us",
+            "region": "US",
+            "rank": 1,
+        },
+        {
             "external_id": "chips",
             "title": "China chip export controls disrupt semiconductor supply - BBC",
             "body": "",
@@ -513,6 +528,16 @@ def test_discovery_prioritizes_two_strategic_technology_stories_and_global_news(
             "category": "world",
             "region": "GB",
             "rank": 2,
+        },
+        {
+            "external_id": "rates",
+            "title": "European Central Bank cuts interest rates - Reuters",
+            "body": "",
+            "created_utc": 12.5,
+            "publisher": "Reuters",
+            "category": "business",
+            "region": "GB",
+            "rank": 1,
         },
         {
             "external_id": "memory",
@@ -560,21 +585,92 @@ def test_discovery_prioritizes_two_strategic_technology_stories_and_global_news(
         ),
     )
 
-    topics = poller.discover_x_topics(max_topics=3)
+    topics = poller.discover_x_topics(max_topics=5)
 
     assert [topic["topic"] for topic in topics] == [
-        "trend_slot_1", "trend_slot_2", "trend_slot_3",
+        "trend_slot_1", "trend_slot_2", "trend_slot_3", "trend_slot_4",
+        "trend_slot_5",
     ]
     assert [topic["selection_role"] for topic in topics] == [
-        "strategic_technology", "strategic_technology", "major_global",
+        "strategic_technology", "strategic_technology", "major_us",
+        "major_global", "major_global",
     ]
     assert all(topic["query"] for topic in topics)
     assert {topic["external_id"] for topic in topics} == {
-        "global", "chips", "memory",
+        "global", "us", "chips", "memory", "rates",
     }
     assert all(topic["strategic_technology"] for topic in topics[:2])
-    assert topics[2]["strategic_technology"] is False
+    assert all(not topic["strategic_technology"] for topic in topics[2:])
+    assert topics[2]["us_ranked_story"] is True
     assert feed_limits == [20]
+
+
+@pytest.mark.unit
+def test_us_slot_uses_national_feed_not_a_us_locale_world_feed():
+    def headline(external_id, title, category, region, rank):
+        return {
+            "external_id": external_id,
+            "title": f"{title} - Reuters",
+            "body": "",
+            "created_utc": 10.0 + rank,
+            "publisher": "Reuters",
+            "category": category,
+            "region": region,
+            "rank": rank,
+        }
+
+    selected = poller.discover_x_topics(
+        max_topics=3,
+        headlines=[
+            headline("ai", "Researchers release a frontier AI model", "technology", "US", 0),
+            headline("chips", "South Korea expands HBM production", "business", "US", 1),
+            headline("world", "Governments negotiate a global trade treaty", "world", "US", 0),
+        ],
+        trends=[],
+    )
+
+    assert [topic["selection_role"] for topic in selected] == [
+        "strategic_technology", "strategic_technology", "major_global_fallback",
+    ]
+    assert selected[2]["external_id"] == "world"
+    assert selected[2]["us_ranked_story"] is False
+
+
+@pytest.mark.unit
+def test_major_news_backfill_never_adds_a_third_technology_story():
+    def headline(external_id, title, category, rank):
+        return {
+            "external_id": external_id,
+            "title": f"{title} - Reuters",
+            "body": "",
+            "created_utc": 10.0 + rank,
+            "publisher": "Reuters",
+            "category": category,
+            "region": "US",
+            "rank": rank,
+        }
+
+    selected = poller.discover_x_topics(
+        max_topics=5,
+        headlines=[
+            headline("ai", "Researchers release a frontier AI model", "technology", 0),
+            headline("chips", "South Korea expands HBM production", "business", 1),
+            headline("quantum", "Japan announces quantum computing breakthrough", "technology", 2),
+            headline("us", "Federal courts issue a national election ruling", "us", 0),
+            headline("world", "Countries agree a ceasefire in regional conflict", "world", 0),
+        ],
+        trends=[],
+    )
+
+    assert len(selected) == 4
+    assert sum(topic["strategic_technology"] for topic in selected) == 2
+    assert len(
+        {topic["external_id"] for topic in selected}
+        & {"ai", "chips", "quantum"}
+    ) == 2
+    assert {topic["selection_role"] for topic in selected[2:]} == {
+        "major_us", "major_global",
+    }
 
 
 @pytest.mark.unit
@@ -646,6 +742,7 @@ def test_consumer_story_needs_a_systemic_technology_consequence():
         "strategic_subdomains": [],
         "strategic_context": False,
         "major_global_impact": False,
+        "us_ranked_story": False,
         "consumer_only": True,
     }
     assert systemic["strategic_technology"] is True
@@ -914,7 +1011,7 @@ def test_general_feed_requires_global_impact_and_technology_noise_cannot_backfil
     )
 
     assert [item["external_id"] for item in selected] == ["policy"]
-    assert selected[0]["selection_role"] == "major_global"
+    assert selected[0]["selection_role"] == "major_global_fallback"
 
 
 @pytest.mark.unit
@@ -1180,7 +1277,7 @@ def test_x_discovery_cycle_has_independent_daily_clock(tmp_path, monkeypatch):
         ],
     )
 
-    poller.poll_x_topics_once(store, now=now, limit=10, max_topics=3)
+    poller.poll_x_topics_once(store, now=now, limit=10, max_topics=_X_TOPIC_LIMIT)
 
     assert store.get_meta("last_x_poll_utc") == now
     stats = {(row[0], row[1]) for row in store.stats()}
@@ -1212,9 +1309,9 @@ def test_x_discovery_cycle_has_independent_daily_clock(tmp_path, monkeypatch):
     assert len(cycle_ids) == 1
     cycle = store.collection_cycle(cycle_ids.pop())
     assert cycle["status"] == "complete"
-    assert poller._x_daily_requirement_state(store, now, 3) == "complete"
+    assert poller._x_daily_requirement_state(store, now, _X_TOPIC_LIMIT) == "complete"
     next_midnight = datetime(2026, 8, 6, tzinfo=timezone.utc).timestamp()
-    assert poller._x_daily_requirement_state(store, next_midnight, 3) == "scheduled"
+    assert poller._x_daily_requirement_state(store, next_midnight, _X_TOPIC_LIMIT) == "scheduled"
     assert cycle["manifest_valid"] is True
     assert {
         row["status"] for row in cycle["manifest"]["slot_receipts"]
@@ -1286,7 +1383,7 @@ def test_observed_empty_x_search_is_valid_cycle_coverage(tmp_path, monkeypatch):
     assert alerts == []
     assert store.get_meta("poller:last_success_utc") == now
     assert store.get_meta("poller:last_failure_utc") is None
-    cycle_id = poller._x_collection_cycle_spec(now, 3)["collection_cycle_id"]
+    cycle_id = poller._x_collection_cycle_spec(now, _X_TOPIC_LIMIT)["collection_cycle_id"]
     cycle = store.collection_cycle(cycle_id)
     assert cycle["status"] == "complete"
     outcomes = {
@@ -1328,7 +1425,7 @@ def test_x_source_enables_discovery_not_per_ticker_queries(tmp_path, monkeypatch
     assert captured["sources"] == []
     assert captured["x_enabled"] is True
     assert captured["x_interval"] == 86400
-    assert captured["x_topic_limit"] == 3
+    assert captured["x_topic_limit"] == _X_TOPIC_LIMIT
     assert captured["x_limit"] == 10
     assert captured["force_x"] is True
 
@@ -1369,7 +1466,7 @@ def test_global_only_mode_runs_news_and_bounded_x_without_ticker_sources(
     assert captured["sources"] == []
     assert captured["x_enabled"] is True
     assert captured["x_interval"] == 86400
-    assert captured["x_topic_limit"] == 3
+    assert captured["x_topic_limit"] == _X_TOPIC_LIMIT
     assert captured["x_limit"] == 10
     assert captured["force_x"] is True
     assert len(poller._globalnews_query_slots(captured["macro_themes"])) == 10
@@ -1498,9 +1595,9 @@ def test_x_cycle_manifest_distinguishes_failed_trend_and_empty_search(
     )
     monkeypatch.setattr(poller, "fetch_x_topic", lambda *args, **kwargs: [])
 
-    poller.poll_x_topics_once(store, now=now, limit=10, max_topics=3)
+    poller.poll_x_topics_once(store, now=now, limit=10, max_topics=_X_TOPIC_LIMIT)
 
-    cycle_id = poller._x_collection_cycle_spec(now, 3)["collection_cycle_id"]
+    cycle_id = poller._x_collection_cycle_spec(now, _X_TOPIC_LIMIT)["collection_cycle_id"]
     cycle = store.collection_cycle(cycle_id)
     outcomes = {
         (row["provider"], row["query_key"]): row["status"]
@@ -1511,7 +1608,7 @@ def test_x_cycle_manifest_distinguishes_failed_trend_and_empty_search(
     assert outcomes[("xtrend", "woeid:23424977")] == "missing"
     assert outcomes[("trendnews", "ranked-global-discovery")] == "missing"
     assert all(provider != "x" for provider, _ in outcomes)
-    assert poller._x_daily_requirement_state(store, now, 3) == "incomplete"
+    assert poller._x_daily_requirement_state(store, now, _X_TOPIC_LIMIT) == "incomplete"
 
     alerts = []
     monkeypatch.setattr(
@@ -1559,9 +1656,9 @@ def test_discovery_feed_failure_never_starts_or_spends_paid_x_cycle(
         ),
     )
 
-    slots = poller.poll_x_topics_once(store, now=now, limit=10, max_topics=3)
+    slots = poller.poll_x_topics_once(store, now=now, limit=10, max_topics=_X_TOPIC_LIMIT)
 
-    cycle_id = poller._x_collection_cycle_spec(now, 3)["collection_cycle_id"]
+    cycle_id = poller._x_collection_cycle_spec(now, _X_TOPIC_LIMIT)["collection_cycle_id"]
     assert store.collection_cycle(cycle_id) is None
     assert store.fetch_runs(limit=100) == []
     day_start = datetime(2026, 8, 5, tzinfo=timezone.utc).timestamp()
@@ -1643,7 +1740,7 @@ def test_same_daily_x_cycle_cannot_retry_paid_requests(tmp_path, monkeypatch):
     )
     monkeypatch.setattr(poller, "fetch_x_topic", lambda *args, **kwargs: [])
 
-    poller.poll_x_topics_once(store, now=now, limit=10, max_topics=3)
+    poller.poll_x_topics_once(store, now=now, limit=10, max_topics=_X_TOPIC_LIMIT)
     first_receipts = store.fetch_runs(limit=100)
     monkeypatch.setattr(
         poller, "fetch_x_trends",
@@ -1660,7 +1757,7 @@ def test_same_daily_x_cycle_cannot_retry_paid_requests(tmp_path, monkeypatch):
         lambda *args, **kwargs: pytest.fail("terminal cycle reuse must not search"),
     )
     reused_slots = poller.poll_x_topics_once(
-        store, now=now, limit=10, max_topics=3
+        store, now=now, limit=10, max_topics=_X_TOPIC_LIMIT
     )
 
     assert len(store.fetch_runs(limit=100)) == len(first_receipts)
@@ -1716,9 +1813,9 @@ def test_duplicate_derived_queries_form_one_bound_request_with_all_labels(
         ) or [],
     )
 
-    poller.poll_x_topics_once(store, now=now, limit=10, max_topics=3)
+    poller.poll_x_topics_once(store, now=now, limit=10, max_topics=_X_TOPIC_LIMIT)
 
-    cycle_id = poller._x_collection_cycle_spec(now, 3)["collection_cycle_id"]
+    cycle_id = poller._x_collection_cycle_spec(now, _X_TOPIC_LIMIT)["collection_cycle_id"]
     cycle = store.collection_cycle(cycle_id)
     assert calls == [("trend_business", '"Shared event" reaction', now, 10)]
     assert cycle["status"] == "complete"
@@ -1757,7 +1854,7 @@ def test_restart_recovers_running_daily_cycle_without_an_external_retry(
     store = SqliteMediaStore(tmp_path / "x-recovery.db")
     clock = {"now": 101.0}
     monkeypatch.setattr(poller.time, "time", lambda: clock["now"])
-    spec = poller._x_collection_cycle_spec(100.0, 3)
+    spec = poller._x_collection_cycle_spec(100.0, _X_TOPIC_LIMIT)
     cycle_id = store.start_collection_cycle(spec, started_utc=-1000.0)
     orphan = store.start_budgeted_fetch(
         "xtrend",
@@ -1790,7 +1887,7 @@ def test_restart_recovers_running_daily_cycle_without_an_external_retry(
         ]
     ) + 1.0
 
-    slots = poller.poll_x_topics_once(store, now=100.0, limit=10, max_topics=3)
+    slots = poller.poll_x_topics_once(store, now=100.0, limit=10, max_topics=_X_TOPIC_LIMIT)
 
     cycle = store.collection_cycle(cycle_id)
     orphan_receipt = next(
@@ -1822,7 +1919,7 @@ def test_concurrent_contender_noops_while_daily_cycle_owner_is_fresh(
 ):
     store = SqliteMediaStore(tmp_path / "x-fresh-owner.db")
     monkeypatch.setattr(poller.time, "time", lambda: 101.0)
-    spec = poller._x_collection_cycle_spec(100.0, 3)
+    spec = poller._x_collection_cycle_spec(100.0, _X_TOPIC_LIMIT)
     cycle_id = store.start_collection_cycle(spec, started_utc=100.0)
     owner_receipt = store.start_budgeted_fetch(
         "xtrend",
@@ -1840,7 +1937,7 @@ def test_concurrent_contender_noops_while_daily_cycle_owner_is_fresh(
         ),
     )
 
-    slots = poller.poll_x_topics_once(store, now=100.0, limit=10, max_topics=3)
+    slots = poller.poll_x_topics_once(store, now=100.0, limit=10, max_topics=_X_TOPIC_LIMIT)
 
     cycle = store.collection_cycle(cycle_id)
     receipt = next(
@@ -1864,15 +1961,15 @@ def test_receiptless_x_period_is_incomplete_and_utc_date_keyed(tmp_path, monkeyp
     now = _X_WINDOW_OPEN_UTC
     store = SqliteMediaStore(tmp_path / "x-period.db")
     monkeypatch.setattr(poller.time, "time", lambda: now)
-    spec = poller._x_collection_cycle_spec(now, 3)
+    spec = poller._x_collection_cycle_spec(now, _X_TOPIC_LIMIT)
     cycle_id = store.start_collection_cycle(spec, started_utc=now)
     store.finish_collection_cycle(cycle_id, completed_utc=now + 1)
 
-    assert poller._x_daily_requirement_state(store, now, 3) == "incomplete"
+    assert poller._x_daily_requirement_state(store, now, _X_TOPIC_LIMIT) == "incomplete"
     next_midnight = datetime(2026, 8, 6, tzinfo=timezone.utc).timestamp()
-    assert poller._x_daily_requirement_state(store, next_midnight, 3) == "scheduled"
+    assert poller._x_daily_requirement_state(store, next_midnight, _X_TOPIC_LIMIT) == "scheduled"
     next_closed = datetime(2026, 8, 6, 23, 46, tzinfo=timezone.utc).timestamp()
-    assert poller._x_daily_requirement_state(store, next_closed, 3) == "missing"
+    assert poller._x_daily_requirement_state(store, next_closed, _X_TOPIC_LIMIT) == "missing"
     with pytest.raises(ValueError, match="frozen protocol"):
         poller.run_cycle(
             store,
@@ -1960,7 +2057,7 @@ def test_x_cycle_does_not_start_near_utc_midnight_and_reports_missing(
 
     assert store.fetch_runs() == []
     assert store.collection_cycle(
-        poller._x_collection_cycle_spec(now, 3)["collection_cycle_id"]
+        poller._x_collection_cycle_spec(now, _X_TOPIC_LIMIT)["collection_cycle_id"]
     ) is None
     assert coverage["periodic_requirements"] == {"x_daily": "missing"}
     assert coverage["missing_periodic_requirements"] == ["x_daily"]
@@ -2235,13 +2332,54 @@ def test_x_recent_counts_rejects_invalid_requests_before_provider(
 
 
 @pytest.mark.unit
+def test_x_cost_ceiling_matches_every_declared_resource_cap():
+    evidence = poller.GLOBAL_EVENT_V2_PROTOCOL["evidence"]
+    billing = evidence["x_billing_accounting"]
+    rates = billing["billing_rate_snapshot"]
+    resources = billing["nominal_max_resources_per_day"]
+
+    assert resources["trend_reads"] == (
+        evidence["max_x_trend_requests_per_utc_day"]
+        * media_sources.GLOBAL_X_ADAPTER_POLICY["trends"]["result_limit"]["default"]
+    )
+    assert resources["post_reads"] == (
+        evidence["max_x_search_requests_per_utc_day"]
+        * evidence["max_x_results_per_query"]
+    )
+    assert resources["expanded_user_reads"] == resources["post_reads"]
+    formal_usd = (
+        resources["trend_reads"] * rates["usd_per_trend_read"]
+        + resources["post_reads"] * rates["usd_per_post_read"]
+        + resources["expanded_user_reads"] * rates["usd_per_user_read"]
+    )
+    assert billing["nominal_max_usd_per_day_before_deduplication"] == (
+        pytest.approx(formal_usd)
+    )
+
+    shadow_rates = X_SHADOW_POLICY["billing_rate_snapshot"]
+    shadow_usd = (
+        X_SHADOW_POLICY["max_trend_requests_per_utc_day"]
+        * X_SHADOW_POLICY["max_trends_per_request"]
+        * shadow_rates["usd_per_trend_read"]
+        + X_SHADOW_POLICY["max_count_requests_per_utc_day"]
+        * shadow_rates["usd_per_recent_count_request"]
+    )
+    assert shadow_rates["maximum_shadow_usd_per_day"] == pytest.approx(
+        shadow_usd
+    )
+    assert shadow_rates["maximum_current_plus_shadow_usd_per_day"] == (
+        pytest.approx(formal_usd + shadow_usd)
+    )
+
+
+@pytest.mark.unit
 def test_x_shadow_is_bounded_idempotent_and_accounted_from_terminal_facts(
     tmp_path, monkeypatch,
 ):
     now = _X_WINDOW_OPEN_UTC
     store = SqliteMediaStore(tmp_path / "x-shadow.db")
     topics, decision = _complete_formal_x_cycle(
-        store, monkeypatch, now, topic_count=3
+        store, monkeypatch, now, topic_count=_X_TOPIC_LIMIT
     )
     delayed = now + 5 * 3600
     clock = {"now": delayed}
@@ -2266,7 +2404,7 @@ def test_x_shadow_is_bounded_idempotent_and_accounted_from_terminal_facts(
 
     monkeypatch.setattr(poller, "fetch_x_trends", shadow_trends)
     monkeypatch.setattr(poller, "fetch_x_recent_counts", shadow_counts)
-    slots = poller.poll_x_shadow_once(store, now, max_topics=3)
+    slots = poller.poll_x_shadow_once(store, now, max_topics=_X_TOPIC_LIMIT)
 
     spec = poller._x_shadow_collection_cycle_spec(now)
     cycle = store.collection_cycle(spec["collection_cycle_id"])
@@ -2276,12 +2414,12 @@ def test_x_shadow_is_bounded_idempotent_and_accounted_from_terminal_facts(
     ]
     assert cycle["status"] == "complete"
     assert trend_calls == [(23424975, 5), (23424848, 5)]
-    assert len(count_calls) == len(topics) == 3
-    assert len(slots) == 5
+    assert len(count_calls) == len(topics) == _X_TOPIC_LIMIT
+    assert len(slots) == 7
     assert {row["provider"] for row in receipts} == {"xtrend", "xcount"}
     assert all(row["cost_units"] == 1.0 for row in receipts)
-    assert sum(x_shadow_receipt_usd(row) for row in receipts) == pytest.approx(0.115)
-    assert sum(row["cost_units"] for row in receipts) == 5.0
+    assert sum(x_shadow_receipt_usd(row) for row in receipts) == pytest.approx(0.125)
+    assert sum(row["cost_units"] for row in receipts) == 7.0
     for receipt in receipts:
         metadata = json.loads(receipt["metadata_json"])
         assert metadata["protocol_id"] == X_SHADOW_PROTOCOL_ID
@@ -2290,7 +2428,7 @@ def test_x_shadow_is_bounded_idempotent_and_accounted_from_terminal_facts(
         assert metadata["cost_units_semantics"] == X_SHADOW_POLICY[
             "receipt_accounting"
         ]["cost_units_semantics"]
-    assert poller._x_daily_requirement_state(store, now, 3) == "complete"
+    assert poller._x_daily_requirement_state(store, now, _X_TOPIC_LIMIT) == "complete"
 
     receipt_ids = {row["fetch_run_id"] for row in receipts}
     monkeypatch.setattr(
@@ -2301,7 +2439,7 @@ def test_x_shadow_is_bounded_idempotent_and_accounted_from_terminal_facts(
         "fetch_x_recent_counts",
         lambda *_args, **_kwargs: pytest.fail("retried count"),
     )
-    poller.poll_x_shadow_once(store, now, max_topics=3)
+    poller.poll_x_shadow_once(store, now, max_topics=_X_TOPIC_LIMIT)
     assert receipt_ids == {
         row["fetch_run_id"] for row in store.fetch_runs(limit=100)
         if row["collection_cycle_id"] == spec["collection_cycle_id"]
@@ -2334,9 +2472,9 @@ def test_unknown_same_day_x_shadow_identity_skips_without_touching_formal_health
         poller, "fetch_x_recent_counts", lambda *_args, **_kwargs: pytest.fail("called X")
     )
 
-    assert poller.poll_x_shadow_once(store, now, max_topics=3) == []
+    assert poller.poll_x_shadow_once(store, now, max_topics=_X_TOPIC_LIMIT) == []
     assert len(store.fetch_runs(limit=100)) == before
-    assert poller._x_daily_requirement_state(store, now, 3) == "complete"
+    assert poller._x_daily_requirement_state(store, now, _X_TOPIC_LIMIT) == "complete"
     assert store.collection_cycle(
         poller._x_shadow_collection_cycle_spec(now)["collection_cycle_id"]
     ) is None
@@ -2402,11 +2540,11 @@ def test_x_shadow_provider_failures_do_not_change_formal_readiness(
         ),
     )
 
-    poller.poll_x_shadow_once(store, now, max_topics=3)
+    poller.poll_x_shadow_once(store, now, max_topics=_X_TOPIC_LIMIT)
 
     spec = poller._x_shadow_collection_cycle_spec(now)
     assert store.collection_cycle(spec["collection_cycle_id"])["status"] == "incomplete"
-    assert poller._x_daily_requirement_state(store, now, 3) == "complete"
+    assert poller._x_daily_requirement_state(store, now, _X_TOPIC_LIMIT) == "complete"
     receipts = [
         row for row in store.fetch_runs(limit=100)
         if row["collection_cycle_id"] == spec["collection_cycle_id"]

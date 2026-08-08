@@ -37,27 +37,50 @@ _CUTOFF = datetime(2026, 1, 10, tzinfo=timezone.utc)
 _BUILD_ID = "build_" + "b" * 24
 _FETCH_ID = "ffffffff-ffff-4fff-bfff-ffffffffffff"
 _DISCOVERY_TITLE = "Bordeaux Wildfires Force Evacuations - Reuters"
+_X_TOPIC_LIMIT = int(
+    GLOBAL_EVENT_V2_PROTOCOL["evidence"][
+        "max_x_search_requests_per_utc_day"
+    ]
+)
 
 
-def _discovery_fixture(started: float) -> tuple[dict, list[dict], list[dict]]:
-    headline = {
-        "external_id": "discovery-headline",
-        "title": _DISCOVERY_TITLE,
-        "created_utc": started - 60,
-        "publisher": "Reuters",
-        "category": "world",
-        "region": "US",
-        "rank": 0,
-        "metadata": {"publisher_domain": "reuters.com"},
-    }
+def _discovery_fixture(
+    started: float, *, topic_index: int = 1,
+) -> tuple[list[dict], list[dict], list[dict]]:
+    specs = [
+        ("us", "Federal courts issue a national election ruling - Reuters", "us"),
+        ("ceasefire", "Countries agree a ceasefire after regional conflict - Reuters", "world"),
+        ("rates", "Central banks cut interest rates as inflation falls - Reuters", "world"),
+        ("energy", "Governments negotiate global oil and gas policy - Reuters", "world"),
+        ("climate", "Wildfires force evacuations as governments respond - Reuters", "world"),
+    ]
+    if topic_index == 1:
+        specs = [("discovery-headline", _DISCOVERY_TITLE, "world")]
+    elif topic_index != 5:
+        raise ValueError("availability fixture supports topic slots one and five")
+    headlines = [
+        {
+            "external_id": external_id,
+            "title": title,
+            "created_utc": started - 60 - rank,
+            "publisher": "Reuters",
+            "category": category,
+            "region": "US",
+            "rank": rank,
+            "metadata": {"publisher_domain": "reuters.com"},
+        }
+        for rank, (external_id, title, category) in enumerate(specs)
+    ]
     topics = poller._formally_grounded_discovery_topics(
-        poller.discover_x_topics(max_topics=3, headlines=[headline], trends=[]),
+        poller.discover_x_topics(
+            max_topics=_X_TOPIC_LIMIT, headlines=headlines, trends=[]
+        ),
         started,
     )
     requests = poller._group_x_search_topics(topics)
-    if len(requests) != 1:
-        raise AssertionError("availability fixture requires one discovery request")
-    return headline, topics, requests
+    if len(requests) != topic_index:
+        raise AssertionError("availability fixture did not fill the requested slot")
+    return headlines, topics, requests
 
 
 def _spec() -> dict:
@@ -97,19 +120,23 @@ def test_formal_cycle_specs_exclude_operational_prior_identities():
     )
 
 
-def _x_row(external_id: str, *, age_seconds: int = 900) -> dict:
-    _headline, _topics, requests = _discovery_fixture(
-        _CUTOFF.timestamp() - 1800
+def _x_row(
+    external_id: str, *, age_seconds: int = 900, topic_index: int = 1,
+) -> dict:
+    _headlines, _topics, requests = _discovery_fixture(
+        _CUTOFF.timestamp() - 1800, topic_index=topic_index,
     )
+    label = f"@TREND_SLOT_{topic_index}"
+    request = next(request for request in requests if label in request["labels"])
     return {
         "source": "x",
         "external_id": external_id,
-        "ticker": "@TREND_SLOT_1",
-        "labels": ["@TREND_SLOT_1"],
+        "ticker": label,
+        "labels": [label],
         "created_utc": _CUTOFF.timestamp() - age_seconds,
         "fetched_utc": _CUTOFF.timestamp() - age_seconds + 10,
         "author": f"public-{external_id}",
-        "title": requests[0]["query_key"],
+        "title": request["query_key"],
         "body": f"A sufficiently detailed public reaction about {external_id}",
         "metadata": {
             "evidence_role": "unverified_public_reaction",
@@ -154,20 +181,26 @@ def _news_row() -> dict:
     }
 
 
-def _cycle(*, status: str, lineage: list[dict], spec: dict | None = None) -> dict:
+def _cycle(
+    *, status: str, lineage: list[dict], spec: dict | None = None,
+    topic_index: int = 1,
+) -> dict:
     spec = spec or _spec()
     started = _CUTOFF.timestamp() - 1800
     terminal = _CUTOFF.timestamp() - 60
     raw_ids = sorted({item["raw_content_id"] for item in lineage})
     decision_item = None
+    requests = None
     dynamic_slots = [{"provider": "x", "query_key": "ranked-topic"}]
     if spec["identity"]["protocol_id"] == GLOBAL_EVENT_V2_COLLECTION_PROTOCOL_ID:
-        headline, topics, requests = _discovery_fixture(started)
+        headlines, topics, requests = _discovery_fixture(
+            started, topic_index=topic_index,
+        )
         decision = poller._x_discovery_decision_manifest(
             collection_cycle_id=spec["collection_cycle_id"],
             captured_utc=started,
-            max_topics=3,
-            headlines=[headline],
+            max_topics=_X_TOPIC_LIMIT,
+            headlines=headlines,
             trends=[],
             topics=topics,
             search_requests=requests,
@@ -204,14 +237,24 @@ def _cycle(*, status: str, lineage: list[dict], spec: dict | None = None) -> dic
                 if is_decision and not failed else []
             ),
         })
-    slot_receipts.append({
-        "slot_kind": "dynamic",
-        **dynamic_slots[0],
-        "fetch_run_id": _FETCH_ID,
-        "status": "success" if raw_ids else "empty",
-        "item_count": len(raw_ids),
-        "raw_content_ids": raw_ids,
-    })
+    if requests is None:
+        requests = [{"labels": [f"@TREND_SLOT_{topic_index}"]}]
+    target_label = f"@TREND_SLOT_{topic_index}"
+    for index, (slot, request) in enumerate(
+        zip(dynamic_slots, requests, strict=True), start=1,
+    ):
+        is_target = target_label in request["labels"]
+        selected_raw_ids = raw_ids if is_target else []
+        slot_receipts.append({
+            "slot_kind": "dynamic",
+            **slot,
+            "fetch_run_id": (
+                _FETCH_ID if is_target else f"10000000-0000-4000-8000-{index:012x}"
+            ),
+            "status": "success" if selected_raw_ids else "empty",
+            "item_count": len(selected_raw_ids),
+            "raw_content_ids": selected_raw_ids,
+        })
     manifest = {
         "schema_version": 2,
         "collection_cycle_id": spec["collection_cycle_id"],
@@ -554,6 +597,38 @@ def test_complete_x_cycle_content_binds_authorized_rows_into_selection():
     assert selection["x_cycle_availability"]["availability_id"] == availability[
         "availability_id"
     ]
+
+
+@pytest.mark.unit
+def test_fifth_topic_slot_is_formally_replayed_and_selected():
+    current = _x_row("slot-five", topic_index=5)
+    lineage = [_lineage(current)]
+    store = _Store(
+        _cycle(
+            status="complete",
+            lineage=lineage,
+            topic_index=5,
+        ),
+        lineage,
+        rows=[current],
+    )
+
+    availability, rows = project_x_cycle_availability(
+        store,
+        cutoff=_CUTOFF,
+        candidate_rows=[_news_row(), current],
+    )
+    selection = bind_x_availability_to_selection(
+        evidence_selection_manifest(rows, as_of_utc=_CUTOFF.timestamp()),
+        availability,
+    )
+
+    assert availability["state"] == "complete_with_eligible"
+    assert availability["eligible_lineage"][0]["labels"] == ["@TREND_SLOT_5"]
+    assert evidence_id(current) in selection["ordered_selected_evidence_ids"][
+        "champion"
+    ]
+    validate_bound_x_selection(selection, tuple(rows))
 
 
 @pytest.mark.unit

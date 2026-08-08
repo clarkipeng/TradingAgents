@@ -18,6 +18,12 @@ from tradingagents.research_protocol import (
     global_news_query_slot_label,
 )
 
+_X_TOPIC_LIMIT = int(
+    poller.GLOBAL_EVENT_V2_PROTOCOL["evidence"][
+        "max_x_search_requests_per_utc_day"
+    ]
+)
+
 
 @pytest.mark.unit
 def test_poll_once_stores_older_items_first_discovered_now(tmp_path, monkeypatch):
@@ -1925,7 +1931,7 @@ def test_x_search_budget_stops_paid_cycle_without_a_redundant_alert(
         },
     ]
     topics = poller._formally_grounded_discovery_topics(
-        poller.discover_x_topics(max_topics=3, headlines=headlines, trends=[]), now
+        poller.discover_x_topics(max_topics=_X_TOPIC_LIMIT, headlines=headlines, trends=[]), now
     )
     cycle_id = "cycle_" + "1" * 24
     attempted_searches = []
@@ -1962,7 +1968,7 @@ def test_x_search_budget_stops_paid_cycle_without_a_redundant_alert(
             store,
             now=now,
             limit=10,
-            max_topics=3,
+            max_topics=_X_TOPIC_LIMIT,
             collection_cycle_id=cycle_id,
             expected_slots=[],
             discovery_headlines=headlines,
@@ -1989,13 +1995,13 @@ def test_complete_compatible_x_cycle_handoffs_without_duplicate_paid_work(
     compatible_spec = _finish_compatible_x_cycle(
         store, instant, with_receipts=True
     )
-    current_spec = poller._x_collection_cycle_spec(instant, 3)
+    current_spec = poller._x_collection_cycle_spec(instant, _X_TOPIC_LIMIT)
     initial_receipts = store.fetch_runs(limit=100)
 
     _forbid_x_provider_calls(monkeypatch)
 
-    assert poller._x_daily_requirement_state(store, instant, 3) == "complete"
-    assert set(poller.poll_x_topics_once(store, instant, 10, 3)) == {
+    assert poller._x_daily_requirement_state(store, instant, _X_TOPIC_LIMIT) == "complete"
+    assert set(poller.poll_x_topics_once(store, instant, 10, _X_TOPIC_LIMIT)) == {
         (slot["provider"], slot["query_key"])
         for slot in compatible_spec["identity"]["expected_static_slots"]
     }
@@ -2027,7 +2033,7 @@ def test_fresh_running_prior_x_cycle_handoff_is_scheduled_without_provider_calls
     prior_cycle_id = store.start_collection_cycle(
         prior_spec, started_utc=instant
     )
-    current_spec = poller._x_collection_cycle_spec(instant, 3)
+    current_spec = poller._x_collection_cycle_spec(instant, _X_TOPIC_LIMIT)
     calls = []
     poll_x = poller.poll_x_topics_once
     monkeypatch.setattr(
@@ -2084,7 +2090,7 @@ def test_stale_running_prior_x_cycle_handoff_recovers_without_provider_calls(
     )
     monkeypatch.setattr(poller.time, "time", lambda: instant)
     monkeypatch.setattr(store, "server_observed_utc", lambda: instant)
-    current_spec = poller._x_collection_cycle_spec(instant, 3)
+    current_spec = poller._x_collection_cycle_spec(instant, _X_TOPIC_LIMIT)
     recover = store.recover_collection_cycle
     recoveries = []
 
@@ -2178,7 +2184,7 @@ def test_checkpointed_compatible_cycle_is_operational_but_not_replay_validated(
     compatible_spec = _finish_compatible_x_cycle(
         store, instant, with_receipts=True
     )
-    current_spec = poller._x_collection_cycle_spec(instant, 3)
+    current_spec = poller._x_collection_cycle_spec(instant, _X_TOPIC_LIMIT)
     receipt = store.fetch_runs(provider="xtrend")[0]
     item = store.fetch_items(receipt["fetch_run_id"])[0]
     store.conn.execute(
@@ -2190,13 +2196,13 @@ def test_checkpointed_compatible_cycle_is_operational_but_not_replay_validated(
     initial_receipts = store.fetch_runs(limit=100)
     _forbid_x_provider_calls(monkeypatch)
 
-    resolution = poller._x_daily_cycle_resolution(store, instant, 3)
+    resolution = poller._x_daily_cycle_resolution(store, instant, _X_TOPIC_LIMIT)
 
     assert resolution["origin"] == "compatible"
     assert resolution["state"] == "checkpointed"
     assert resolution["checkpoint_only"] is True
     assert resolution["cycle"]["raw_content_replay_validated"] is False
-    assert set(poller.poll_x_topics_once(store, instant, 10, 3)) == {
+    assert set(poller.poll_x_topics_once(store, instant, 10, _X_TOPIC_LIMIT)) == {
         (slot["provider"], slot["query_key"])
         for slot in compatible_spec["identity"]["expected_static_slots"]
     }
@@ -2234,7 +2240,7 @@ def test_first_present_compatible_x_cycle_wins_with_multiple_prior_cycles(
     initial_receipts = store.fetch_runs(limit=100)
     _forbid_x_provider_calls(monkeypatch)
 
-    resolution = poller._x_daily_cycle_resolution(store, instant, 3)
+    resolution = poller._x_daily_cycle_resolution(store, instant, _X_TOPIC_LIMIT)
 
     assert resolution["origin"] == "compatible"
     assert resolution["spec"] == first_spec
@@ -2243,7 +2249,7 @@ def test_first_present_compatible_x_cycle_wins_with_multiple_prior_cycles(
         == first_spec["collection_cycle_id"]
     assert second_spec["collection_cycle_id"] \
         != first_spec["collection_cycle_id"]
-    assert set(poller.poll_x_topics_once(store, instant, 10, 3)) == {
+    assert set(poller.poll_x_topics_once(store, instant, 10, _X_TOPIC_LIMIT)) == {
         (slot["provider"], slot["query_key"])
         for slot in first_spec["identity"]["expected_static_slots"]
     }
@@ -2279,7 +2285,7 @@ def test_compatible_precedence_never_falls_through_based_on_outcome(
     initial_receipts = store.fetch_runs(limit=100)
     _forbid_x_provider_calls(monkeypatch)
 
-    resolution = poller._x_daily_cycle_resolution(store, instant, 3)
+    resolution = poller._x_daily_cycle_resolution(store, instant, _X_TOPIC_LIMIT)
 
     assert resolution["origin"] == "compatible"
     assert resolution["spec"] == first_spec
@@ -2289,7 +2295,7 @@ def test_compatible_precedence_never_falls_through_based_on_outcome(
     assert second_spec["collection_cycle_id"] \
         != first_spec["collection_cycle_id"]
     with pytest.raises(ValueError, match="not uniquely complete"):
-        poller.poll_x_topics_once(store, instant, 10, 3)
+        poller.poll_x_topics_once(store, instant, 10, _X_TOPIC_LIMIT)
     coverage = poller.run_cycle(
         store,
         tickers=[],
@@ -2316,7 +2322,7 @@ def test_current_x_cycle_precedes_a_complete_compatible_cycle(
     compatible_spec = _finish_compatible_x_cycle(
         store, instant, with_receipts=True
     )
-    current_spec = poller._x_collection_cycle_spec(instant, 3)
+    current_spec = poller._x_collection_cycle_spec(instant, _X_TOPIC_LIMIT)
     current_cycle_id = store.start_collection_cycle(
         current_spec, started_utc=instant
     )
@@ -2324,7 +2330,7 @@ def test_current_x_cycle_precedes_a_complete_compatible_cycle(
     initial_receipts = store.fetch_runs(limit=100)
     _forbid_x_provider_calls(monkeypatch)
 
-    resolution = poller._x_daily_cycle_resolution(store, instant, 3)
+    resolution = poller._x_daily_cycle_resolution(store, instant, _X_TOPIC_LIMIT)
 
     assert resolution["origin"] == "current"
     assert resolution["spec"] == current_spec
@@ -2355,7 +2361,7 @@ def test_incomplete_compatible_x_cycle_blocks_force_but_stays_unhealthy(
     store = SqliteMediaStore(tmp_path / "incomplete-compatible-x.db")
     monkeypatch.setattr(store, "server_observed_utc", lambda: instant)
     _finish_compatible_x_cycle(store, instant, with_receipts=False)
-    current_spec = poller._x_collection_cycle_spec(instant, 3)
+    current_spec = poller._x_collection_cycle_spec(instant, _X_TOPIC_LIMIT)
     monkeypatch.setattr(
         poller,
         "fetch_top_news_headlines",
@@ -2364,9 +2370,9 @@ def test_incomplete_compatible_x_cycle_blocks_force_but_stays_unhealthy(
         ),
     )
 
-    assert poller._x_daily_requirement_state(store, instant, 3) == "incomplete"
+    assert poller._x_daily_requirement_state(store, instant, _X_TOPIC_LIMIT) == "incomplete"
     with pytest.raises(ValueError, match="not uniquely complete"):
-        poller.poll_x_topics_once(store, instant, 10, 3)
+        poller.poll_x_topics_once(store, instant, 10, _X_TOPIC_LIMIT)
     coverage = poller.run_cycle(
         store,
         tickers=[],
@@ -2404,14 +2410,14 @@ def test_replay_checkpoint_preserves_an_incomplete_compatible_attempt(
     monkeypatch.setattr(store, "collection_cycle", fail_strict_replay)
     _forbid_x_provider_calls(monkeypatch)
 
-    resolution = poller._x_daily_cycle_resolution(store, instant, 3)
+    resolution = poller._x_daily_cycle_resolution(store, instant, _X_TOPIC_LIMIT)
 
     assert resolution["origin"] == "compatible"
     assert resolution["state"] == "incomplete"
     assert resolution["checkpoint_only"] is True
     assert resolution["cycle"]["raw_content_replay_validated"] is False
     with pytest.raises(ValueError, match="not uniquely complete"):
-        poller.poll_x_topics_once(store, instant, 10, 3)
+        poller.poll_x_topics_once(store, instant, 10, _X_TOPIC_LIMIT)
     store.close()
 
 
@@ -2419,7 +2425,7 @@ def test_replay_checkpoint_preserves_an_incomplete_compatible_attempt(
 def test_invalid_compatible_x_cycle_is_blocked_and_never_accepted(monkeypatch):
     instant = 1_786_080_000.0
     compatible_spec = _compatible_x_cycle_spec(instant)
-    current_spec = poller._x_collection_cycle_spec(instant, 3)
+    current_spec = poller._x_collection_cycle_spec(instant, _X_TOPIC_LIMIT)
 
     class Store:
         def collection_cycle(self, cycle_id):
@@ -2444,9 +2450,9 @@ def test_invalid_compatible_x_cycle_is_blocked_and_never_accepted(monkeypatch):
     )
     store = Store()
 
-    assert poller._x_daily_requirement_state(store, instant, 3) == "invalid"
+    assert poller._x_daily_requirement_state(store, instant, _X_TOPIC_LIMIT) == "invalid"
     with pytest.raises(ValueError, match="not uniquely complete"):
-        poller.poll_x_topics_once(store, instant, 10, 3)
+        poller.poll_x_topics_once(store, instant, 10, _X_TOPIC_LIMIT)
 
 
 @pytest.mark.unit
@@ -2454,7 +2460,7 @@ def test_current_cycle_replay_mismatch_never_uses_compatibility_checkpoint(
     monkeypatch,
 ):
     instant = 1_786_080_000.0
-    current_spec = poller._x_collection_cycle_spec(instant, 3)
+    current_spec = poller._x_collection_cycle_spec(instant, _X_TOPIC_LIMIT)
 
     class Store:
         def collection_cycle(self, cycle_id):
@@ -2472,7 +2478,7 @@ def test_current_cycle_replay_mismatch_never_uses_compatibility_checkpoint(
         lambda **_kwargs: pytest.fail("an invalid current cycle must block paid work"),
     )
 
-    resolution = poller._x_daily_cycle_resolution(Store(), instant, 3)
+    resolution = poller._x_daily_cycle_resolution(Store(), instant, _X_TOPIC_LIMIT)
 
     assert resolution["origin"] == "current"
     assert resolution["state"] == "invalid"
@@ -2515,16 +2521,16 @@ def test_unlisted_x_cycle_is_not_considered_daily_completion():
 
     store = Store()
 
-    assert poller._x_daily_requirement_state(store, instant, 3) == "invalid"
+    assert poller._x_daily_requirement_state(store, instant, _X_TOPIC_LIMIT) == "invalid"
     with pytest.raises(ValueError, match="not recognized"):
-        poller.poll_x_topics_once(store, instant, 10, 3)
+        poller.poll_x_topics_once(store, instant, 10, _X_TOPIC_LIMIT)
     assert unlisted["collection_cycle_id"] not in queried
 
 
 @pytest.mark.unit
 def test_running_x_cycle_age_uses_database_clock(monkeypatch):
     instant = 1_786_080_000.0
-    spec = poller._x_collection_cycle_spec(instant, 3)
+    spec = poller._x_collection_cycle_spec(instant, _X_TOPIC_LIMIT)
     expected_slots = spec["identity"]["expected_static_slots"]
 
     class Store:
@@ -2544,7 +2550,7 @@ def test_running_x_cycle_age_uses_database_clock(monkeypatch):
 
     monkeypatch.setattr(poller.time, "time", lambda: instant + 100_000.0)
 
-    assert poller.poll_x_topics_once(Store(), instant, 10, 3) == [
+    assert poller.poll_x_topics_once(Store(), instant, 10, _X_TOPIC_LIMIT) == [
         (slot["provider"], slot["query_key"]) for slot in expected_slots
     ]
 
@@ -2555,7 +2561,7 @@ def test_collector_x_audit_reports_exact_cycle_request_counts():
 
     period = date(2026, 8, 5)
     instant = datetime(2026, 8, 5, tzinfo=timezone.utc).timestamp()
-    spec = poller._x_collection_cycle_spec(instant, 3)
+    spec = poller._x_collection_cycle_spec(instant, _X_TOPIC_LIMIT)
     terminal = instant + 100.0
     build_id = "build_" + "b" * 24
     static_slots = spec["identity"]["expected_static_slots"]
@@ -3015,7 +3021,7 @@ def test_preflight_rejects_accepted_pair_with_wrong_frozen_shape_before_probe(
     accepted = poller.GLOBAL_EVENT_V2_OPERATIONAL_PRIOR_COLLECTOR_IDENTITIES[0]
     wrong_shape = poller.media_store.collection_cycle_spec(
         cycle_kind="x-daily",
-        period_key=poller._x_collection_cycle_spec(server_now, 3)["identity"][
+        period_key=poller._x_collection_cycle_spec(server_now, _X_TOPIC_LIMIT)["identity"][
             "period_key"
         ],
         protocol_id=accepted["protocol_id"],
@@ -3126,7 +3132,7 @@ def test_preflight_never_checkpoints_a_current_cycle_replay_mismatch(
 ):
     secret_db = "postgresql+psycopg://collector:secret@db.internal/evidence"
     server_now = 1_786_080_000.0
-    spec = poller._x_collection_cycle_spec(server_now, 3)
+    spec = poller._x_collection_cycle_spec(server_now, _X_TOPIC_LIMIT)
     calls = []
 
     class Store:

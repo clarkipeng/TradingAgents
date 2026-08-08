@@ -53,9 +53,9 @@ def test_shadow_policy_is_separate_bounded_and_non_formal() -> None:
 
 @pytest.mark.unit
 def test_formal_experiment_identities_remain_frozen() -> None:
-    assert GLOBAL_EVENT_V2_COLLECTION_PROTOCOL_ID == "protocol_438764472436ad07e26a2ade"
+    assert GLOBAL_EVENT_V2_COLLECTION_PROTOCOL_ID == "protocol_b1f2c6f59e6290947cb5be0d"
     assert GLOBAL_EVENT_V2_COLLECTOR_SEMANTICS_ID == "collector_077b2fea4605a8cdb260dd4b"
-    assert GLOBAL_EVENT_V2_PROTOCOL_ID == "protocol_b348fa8c6bac9226e8ac3042"
+    assert GLOBAL_EVENT_V2_PROTOCOL_ID == "protocol_282645475c60166a70209c6f"
     assert shadow_sources.SOURCE_SHADOW_V1_PROTOCOL_ID != (GLOBAL_EVENT_V2_COLLECTION_PROTOCOL_ID)
     assert shadow_sources.SOURCE_SHADOW_V1_COLLECTOR_SEMANTICS_ID != (
         GLOBAL_EVENT_V2_COLLECTOR_SEMANTICS_ID

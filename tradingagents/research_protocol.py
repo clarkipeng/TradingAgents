@@ -352,7 +352,7 @@ GLOBAL_EVENT_V2_PROTOCOL: dict[str, Any] = {
         "x_cycle_start_minimum_remaining_utc_seconds": 900,
         "x_trend_woeids": [1, 23424977],
         "max_x_trend_requests_per_utc_day": 2,
-        "max_x_search_requests_per_utc_day": 3,
+        "max_x_search_requests_per_utc_day": 5,
         "max_x_results_per_query": int(
             GLOBAL_X_ADAPTER_POLICY["recent_search"]["result_limit"]["default"]
         ),
@@ -371,13 +371,13 @@ GLOBAL_EVENT_V2_PROTOCOL: dict[str, Any] = {
             },
             "nominal_max_resources_per_day": {
                 "trend_reads": 60,
-                "post_reads": 30,
-                "expanded_user_reads": 30,
+                "post_reads": 50,
+                "expanded_user_reads": 50,
             },
-            "nominal_max_usd_per_day_before_deduplication": 1.05,
+            "nominal_max_usd_per_day_before_deduplication": 1.35,
         },
         "x_formal_policy": {
-            "version": "topic-diverse-public-reaction-v7-receipt-context",
+            "version": "topic-diverse-public-reaction-v8-five-topic-context",
             "required_evidence_role": "unverified_public_reaction",
             "required_topic_context": (
                 "exact-cycle-title-equals-selected-receipt-query-v2"
@@ -404,6 +404,7 @@ GLOBAL_EVENT_V2_PROTOCOL: dict[str, Any] = {
             ),
             "topic_labels": [
                 "@TREND_SLOT_1", "@TREND_SLOT_2", "@TREND_SLOT_3",
+                "@TREND_SLOT_4", "@TREND_SLOT_5",
             ],
             "topic_assignment": (
                 "lexicographically-smallest-sha256-source-nul-external-id-nul-topic"
@@ -906,6 +907,7 @@ _GLOBAL_EVENT_V2_HISTORICAL_X_DAILY_STATIC_SLOTS = (
     ("trendnews", "ranked-global-discovery"),
 )
 _GLOBAL_EVENT_V2_HISTORICAL_X_DAILY_MAX_DYNAMIC_SLOTS = 3
+_GLOBAL_EVENT_V2_FIVE_SLOT_X_DAILY_MAX_DYNAMIC_SLOTS = 5
 GLOBAL_EVENT_V2_COLLECTOR_IDENTITY_HISTORY = validated_collector_identity_history(
     [
         {
@@ -994,9 +996,21 @@ GLOBAL_EVENT_V2_COLLECTOR_IDENTITY_HISTORY = validated_collector_identity_histor
                 _GLOBAL_EVENT_V2_HISTORICAL_X_DAILY_MAX_DYNAMIC_SLOTS
             ),
             "reason": (
-                "current strategic-technology-first discovery with independent "
+                "deployed strategic-technology-first discovery with independent "
                 "structural sampling slots, receipt-bound query context, and a "
                 "fresh formal baseline"
+            ),
+        },
+        {
+            "protocol_id": "protocol_b1f2c6f59e6290947cb5be0d",
+            "collector_semantics_id": "collector_077b2fea4605a8cdb260dd4b",
+            "x_daily_static_slots": _GLOBAL_EVENT_V2_HISTORICAL_X_DAILY_STATIC_SLOTS,
+            "x_daily_max_dynamic_slots": (
+                _GLOBAL_EVENT_V2_FIVE_SLOT_X_DAILY_MAX_DYNAMIC_SLOTS
+            ),
+            "reason": (
+                "current five-slot discovery with two strategic-technology "
+                "stories, one US-major slot, and two unrestricted global slots"
             ),
         },
     ],

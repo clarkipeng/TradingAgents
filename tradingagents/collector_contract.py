@@ -40,10 +40,10 @@ _DISCOVERY_GENERIC_CAPITALIZED_TERMS = tuple(sorted({
 # are immutable, while ``discovery_policy_manifest`` returns a plain JSON-ready
 # projection for the collection identity.
 DISCOVERY_POLICY = MappingProxyType({
-    "version": "ranked-strategic-technology-topic-discovery-v7-explicit-domain",
+    "version": "ranked-strategic-technology-topic-discovery-v8-five-slots",
     "inputs": MappingProxyType({
         "ranked_feed_limit": 20,
-        "categories": ("world", "business", "technology", "general"),
+        "categories": ("world", "business", "technology", "general", "us"),
         "exclude_low_information": True,
         "exclude_company_authored": True,
         "low_information_pattern": (
@@ -135,7 +135,9 @@ DISCOVERY_POLICY = MappingProxyType({
         ),
     }),
     "prioritization": MappingProxyType({
-        "version": "strategic-technology-two-plus-global-v3-explicit-domain",
+        "version": (
+            "strategic-technology-two-plus-us-and-two-global-v4-explicit-domain"
+        ),
         "classification_text": "each-grouped-lineage-title",
         "strategic_domain_patterns": (
             (
@@ -251,16 +253,15 @@ DISCOVERY_POLICY = MappingProxyType({
         "target_roles": (
             "strategic_technology",
             "strategic_technology",
+            "major_us",
+            "major_global",
             "major_global",
         ),
-        "fallback_role": "general_fallback",
-        "major_global_categories": ("world", "general"),
+        "fallback_role": "major_global_fallback",
+        "major_global_categories": ("world", "business", "general", "us"),
         "general_category_requires_major_global_impact": True,
         "major_global_excludes_strategic_technology": True,
-        "exclude_consumer_only_from_fallback": True,
-        "fallback_categories": ("world", "business"),
-        "fallback_allows_strategic_technology": True,
-        "fallback_allows_major_global_general": True,
+        "major_us_category": "us",
         "require_distinct_queries": True,
         "slot_topic_prefix": "trend_slot_",
         "strategic_candidate_order": (
@@ -283,15 +284,6 @@ DISCOVERY_POLICY = MappingProxyType({
             "topic-key-asc",
             "query-asc",
         ),
-        "fallback_candidate_order": (
-            "independent-publisher-count-desc",
-            "cross-region-count-desc",
-            "trend-match-desc",
-            "best-rank-asc",
-            "created-utc-desc",
-            "topic-key-asc",
-            "query-asc",
-        ),
         "search_request_grouping": "exact-query-with-sorted-label-union-v1",
         "search_request_order": "query-asc",
     }),
@@ -306,7 +298,8 @@ DISCOVERY_POLICY = MappingProxyType({
         "selected_topic_fields": (
             "topic", "category", "query", "external_id", "title",
             "selection_role", "strategic_technology", "strategic_subdomains",
-            "strategic_context", "major_global_impact", "consumer_only",
+            "strategic_context", "major_global_impact", "us_ranked_story",
+            "consumer_only",
         ),
     }),
 })

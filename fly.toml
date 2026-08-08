@@ -44,11 +44,11 @@ kill_timeout = "300s"
   # trends, never a ticker/entity watchlist or first-party company feed.
   MEDIA_POLLER_SOURCES = "x"
   # Explicit versioned cadence: ten broad-news slots hourly, while paid X trend
-  # discovery/search runs once per UTC day and caps post reads at 30/day.
+  # discovery/search runs once per UTC day and caps post reads at 50/day.
   MEDIA_POLLER_INTERVAL = "3600"
   MEDIA_POLLER_TRADING_HOURS = "false"
   MEDIA_POLLER_X_INTERVAL = "86400"
-  MEDIA_POLLER_X_TOPICS = "3"
+  MEDIA_POLLER_X_TOPICS = "5"
   MEDIA_POLLER_X_LIMIT = "10"
   # Private Fly health listener. There is deliberately no services/http_service
   # section, so this port is not published on the app's public hostname.
