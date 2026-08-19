@@ -19,6 +19,7 @@ dependencies = [
     "langgraph-checkpoint-sqlite>=2.0.0",
     "pandas>=2.3.0",
     "parsel>=1.10.0",
+    "pydantic>=2.10,<3",
     "python-dotenv>=1.0.0",
     "pytz>=2025.2",
     "questionary>=2.1.0",
@@ -44,9 +45,19 @@ dev = [
 bedrock = [
     "langchain-aws>=1.5.0",
 ]
+# Networked media store and NYSE calendar for the cloud poller.
+poller = [
+    "sqlalchemy>=2.0",
+    "psycopg[binary]>=3.1",
+    "exchange-calendars>=4.5",
+]
 
 [project.scripts]
-tradingagents = "cli.main:app"
+tradingagents = "cli.entrypoints:interactive"
+tradingagents-poller = "cli.entrypoints:poller"
+tradingagents-backtest = "cli.entrypoints:backtest"
+tradingagents-walkforward = "cli.entrypoints:walkforward"
+tradingagents-research = "cli.entrypoints:research"
 
 [tool.setuptools.packages.find]
 include = ["tradingagents*", "cli*"]
@@ -62,8 +73,10 @@ markers = [
     "integration: tests requiring external services",
     "smoke: quick sanity-check tests",
 ]
+# Warning-producing behavior tests carry narrow message/category filters locally.
+# Everything else is a regression, including dependency deprecations and leaks.
 filterwarnings = [
-    "ignore::DeprecationWarning",
+    "error",
 ]
 
 [tool.ruff]

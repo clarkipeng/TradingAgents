@@ -5,6 +5,11 @@ on:
     branches: [main]
   pull_request:
 
+# Every job is read-only. Keep the automatically issued token from inheriting
+# broader repository defaults if an action or future build step is compromised.
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -18,44 +23,207 @@ jobs:
       matrix:
         python-version: ["3.10", "3.11", "3.12", "3.13"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Install (with dev extras)
+      - name: Install locked dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -e ".[dev]"
+          python -m pip install uv==0.10.11
+          # Exercise the same SQLAlchemy/PostgreSQL import surface shipped by
+          # the collector instead of silently skipping poller-only paths.
+          uv sync --locked --extra dev --extra poller
       - name: Run test suite
-        run: pytest -q
+        run: uv run --locked --extra dev --extra poller pytest -q
 
   smoke-install:
     name: clean-install smoke
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
-      - name: Fresh install (no dev extras) and import
+      - name: Fresh locked install (no extras) and import
         run: |
-          python -m pip install --upgrade pip
-          pip install .
+          python -m pip install uv==0.10.11
+          uv sync --locked
           # Catches undeclared runtime deps (e.g. #994 python-dotenv): a bare
           # install must import the package and the CLI module.
-          python -c "import tradingagents, cli.main; print('clean-install import OK')"
+          uv run --locked python -c "import tradingagents, cli.main; print('clean-install import OK')"
+
+  poller-image:
+    name: production poller image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Validate deploy wrapper syntax
+        run: >-
+          bash -n scripts/build_collector_image.sh scripts/deploy_collector.sh
+          scripts/unlock_collector_deploy.sh
+      - name: Build the exact production Dockerfile
+        run: GIT_REVISION="$GITHUB_SHA" scripts/build_collector_image.sh tradingagents-poller-ci
+      - name: Verify installed CLI and revision provenance
+        run: |
+          set -euo pipefail
+          docker run --rm tradingagents-poller-ci --help | grep -F -- '--preflight'
+          test "$(docker inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' tradingagents-poller-ci)" = "${GITHUB_SHA}"
+          docker run --rm --entrypoint /bin/sh \
+            --env "EXPECTED_REVISION=${GITHUB_SHA}" \
+            --env "EXPECTED_DEPLOYMENT_NONCE=${COLLECTOR_DEPLOYMENT_NONCE}" \
+            tradingagents-poller-ci -c \
+            'test "$GIT_REVISION" = "$EXPECTED_REVISION" &&
+             test "$GIT_REVISION" = "$(cat /opt/tradingagents/REVISION)" &&
+             test "$COLLECTOR_DEPLOYMENT_NONCE" = "$EXPECTED_DEPLOYMENT_NONCE"'
 
   lint:
     name: ruff (strict, full repo)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
-      - name: Install ruff
-        run: pip install "ruff>=0.15"
+      - name: Install locked lint dependencies
+        run: |
+          python -m pip install uv==0.10.11
+          uv sync --locked --extra dev
       - name: Lint the repository
         # The repo is fully clean under the strict select, so we lint everything
         # (results/ and worklog/ are excluded via pyproject extend-exclude).
-        run: ruff check .
+        run: uv run --locked --extra dev ruff check .
+
+  postgres-collector:
+    name: PostgreSQL 16 collector contracts
+    # PgBouncer is installed from this runner image; pin the OS so its major
+    # pooler behavior cannot change merely because `ubuntu-latest` advances.
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Install PostgreSQL, PgBouncer, and test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client pgbouncer
+          # The package may start its stock service. The contract test owns one
+          # isolated, unprivileged instance with an explicit transaction-pool
+          # configuration instead.
+          sudo systemctl stop pgbouncer
+          python -m pip install uv==0.10.11
+          uv sync --locked --extra dev --extra poller
+      - name: Build collector schema and run PostgreSQL contracts
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: "5432"
+          PG_SUPERUSER: postgres
+          MEDIA_AUTO_MIGRATE: "false"
+        run: |
+          set -euo pipefail
+          uv run --locked --extra dev --extra poller \
+            bash scripts/prepare_collector_postgres.sh ta_collector
+          # Exercise the primary connection through PgBouncer transaction mode,
+          # while the singleton advisory lease uses PostgreSQL directly. This
+          # mirrors Fly MPG and catches startup/session assumptions that a direct
+          # PostgreSQL-only test cannot expose.
+          pgbouncer_dir="${RUNNER_TEMP}/tradingagents-pgbouncer"
+          mkdir -p "$pgbouncer_dir"
+          printf '%s\n' '"tradingagents-ingest-v2" ""' \
+            > "$pgbouncer_dir/userlist.txt"
+          printf '%s\n' \
+            '[databases]' \
+            'ta_collector = host=127.0.0.1 port=5432 dbname=ta_collector' \
+            '' \
+            '[pgbouncer]' \
+            'listen_addr = 127.0.0.1' \
+            'listen_port = 6432' \
+            'unix_socket_dir =' \
+            'auth_type = trust' \
+            "auth_file = $pgbouncer_dir/userlist.txt" \
+            'pool_mode = transaction' \
+            'default_pool_size = 1' \
+            'max_prepared_statements = 0' \
+            'ignore_startup_parameters = extra_float_digits' \
+            'log_connections = 0' \
+            'log_disconnections = 0' \
+            'log_stats = 0' \
+            > "$pgbouncer_dir/pgbouncer.ini"
+          pgbouncer "$pgbouncer_dir/pgbouncer.ini" \
+            > "$pgbouncer_dir/pgbouncer.log" 2>&1 &
+          pgbouncer_pid=$!
+          cleanup_pgbouncer() {
+            exit_code=$?
+            trap - EXIT
+            if kill -0 "$pgbouncer_pid" 2>/dev/null; then
+              kill "$pgbouncer_pid" 2>/dev/null || true
+              wait "$pgbouncer_pid" 2>/dev/null || true
+            elif (( exit_code == 0 )); then
+              echo "PgBouncer exited before the contract step completed" >&2
+              exit_code=1
+            fi
+            if (( exit_code != 0 )); then
+              sed -n '1,200p' "$pgbouncer_dir/pgbouncer.log" >&2
+            fi
+            exit "$exit_code"
+          }
+          trap cleanup_pgbouncer EXIT
+          for attempt in {1..20}; do
+            if ! kill -0 "$pgbouncer_pid" 2>/dev/null; then
+              echo "PgBouncer exited during startup" >&2
+              exit 1
+            fi
+            if [[ "$(psql -XAt -v ON_ERROR_STOP=1 \
+              -h 127.0.0.1 -p 6432 -U tradingagents-ingest-v2 \
+              -d ta_collector -c 'SELECT 1' 2>/dev/null)" == "1" ]]; then
+              break
+            fi
+            if (( attempt == 20 )); then
+              echo "PgBouncer did not become ready" >&2
+              exit 1
+            fi
+            sleep 1
+          done
+
+          # Two independent Psycopg clients repeatedly transact against one
+          # backend. This fails deterministically if named prepare is re-enabled.
+          TRADINGAGENTS_TEST_POSTGRES_URL="postgresql+psycopg://tradingagents-ingest-v2@${PGHOST}:${PGPORT}/ta_collector" \
+          TRADINGAGENTS_TEST_POSTGRES_POOL_URL="postgresql+psycopg://tradingagents-ingest-v2@127.0.0.1:6432/ta_collector" \
+            uv run --locked --extra dev --extra poller pytest -q -m integration \
+              tests/test_server_observed_evidence_migration.py \
+              tests/test_collection_cycles.py
+
+          # Exercise preflight through the exact packaged image, not the host's
+          # editable install. Linux host networking reaches both local ports
+          # without putting credentials in the image.
+          GIT_REVISION="$GITHUB_SHA" \
+            scripts/build_collector_image.sh tradingagents-poller-postgres-ci
+          docker run --rm --network host \
+            --env MEDIA_DB_URL="postgresql+psycopg://tradingagents-ingest-v2@127.0.0.1:6432/ta_collector" \
+            --env MEDIA_DB_DIRECT_URL="postgresql+psycopg://tradingagents-ingest-v2@127.0.0.1:5432/ta_collector" \
+            --env MEDIA_AUTO_MIGRATE=false \
+            --env MEDIA_COLLECTION_ENABLED=true \
+            --env MEDIA_REQUIRE_ALERT_WEBHOOK=false \
+            --env MEDIA_POLLER_SOURCES=x \
+            --env MEDIA_POLLER_INTERVAL=3600 \
+            --env MEDIA_POLLER_TRADING_HOURS=false \
+            --env MEDIA_POLLER_X_INTERVAL=86400 \
+            --env MEDIA_POLLER_X_TOPICS=3 \
+            --env MEDIA_POLLER_X_LIMIT=10 \
+            --env MEDIA_HEALTH_PORT=5500 \
+            --env X_BEARER_TOKEN=ci-non-network-placeholder \
+            tradingagents-poller-postgres-ci --global-only --preflight \
+            > /tmp/collector-preflight.json
+          python -c 'import json; assert json.load(open("/tmp/collector-preflight.json"))["status"] == "ok"'

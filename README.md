@@ -59,6 +59,22 @@ TradingAgents is a multi-agent trading framework that mirrors the dynamics of re
 
 > TradingAgents framework is designed for research purposes. Trading performance may vary based on many factors, including the chosen backbone language models, model temperature, trading periods, the quality of data, and other non-deterministic factors. [It is not intended as financial, investment, or trading advice.](https://tauric.ai/disclaimer/)
 
+### Global-event research path in this branch
+
+This branch also contains a separate, deliberately simpler experiment. Instead
+of running an LLM committee once for each named ticker, it collects a small set
+of broad world, business, technology, political, and economic trends; freezes
+the exact evidence visible at a cutoff; asks for one cross-sectional forecast
+per experimental arm; and lets deterministic code allocate and evaluate a
+portfolio.
+
+The differentiator is the end-to-end point-in-time experiment—global discovery,
+immutable evidence lineage, outcome-blind decisions, synchronized portfolios,
+costed controls, and later labels—not a claim that portfolio constraints or
+statistical tests are new. No result currently demonstrates alpha. See
+[`docs/global-event-v2.md`](docs/global-event-v2.md) for the exact claims and
+limitations.
+
 Our framework decomposes complex trading tasks into specialized roles.
 
 ### Analyst Team
@@ -261,13 +277,93 @@ ta = TradingAgentsGraph(config=config)
 _, decision = ta.propagate("NVDA", "2026-01-15")
 ```
 
+## Research workflows
+
+### Existing ticker-level backtests
+
+`tradingagents-backtest` and `tradingagents-walkforward` remain available for
+exploratory tests of the original per-ticker graph against captured media. Use a
+dry run to inspect LLM call counts before spending provider credits:
+
+```bash
+export MEDIA_DB_URL='postgresql+psycopg://...'
+tradingagents-backtest \
+  --tickers NVDA,MSFT,AMZN,META \
+  --start 2026-07-01 \
+  --end 2026-07-01 \
+  --max-runs 4 \
+  --portfolio-mode long-only \
+  --cost-bps 5 \
+  --slippage-bps 5 \
+  --output results/ticker-study.jsonl \
+  --dry-run
+```
+
+These tools filter captured rows by publication and receipt time, synchronize
+the cross-section, model costs, and support embargoed walk-forward folds. They
+still make one graph call per ticker and are distinct from the global-event
+experiment below.
+
+### Global-event offline experiment
+
+The deployed system has one responsibility: collect broad evidence continuously
+and alert when collection is unhealthy. It has no model or broker key. Install
+the collector dependencies with `pip install '.[poller]'`; Fly setup and health
+checks are in [`docs/production-runbook.md`](docs/production-runbook.md).
+
+Research proceeds through committed artifacts:
+
+```text
+collector -> immutable snapshot -> offline decide -> offline label -> evaluate
+```
+
+The offline command exposes one subcommand per boundary:
+
+```bash
+tradingagents-research snapshot --help
+tradingagents-research decide --help
+tradingagents-research label --help
+tradingagents-research evaluate --help
+```
+
+The current thin runner makes the capability boundary concrete. `snapshot`
+freezes the exact eligible evidence, exact prior-day X availability, and
+coverage manifest at each cutoff.
+`decide` reads that artifact, makes one structured cross-sectional call per
+arm/session, and applies deterministic portfolio constraints. `label` accepts
+only a committed decision ID. `evaluate` verifies its exact label binding and
+reports the first costed portfolio-versus-benchmark path with missingness,
+drawdown, turnover, and a Newey-West mean diagnostic.
+
+Two limitations matter immediately. The default labeler records the yfinance
+adjusted-open response obtained at label time, not a price vintage captured at
+the historical session, and Yahoo's adjusted history can later revise. The
+checkpoint JSON validates declared dates and the
+returned model name, but does not prove the weights or training corpus behind a
+hosted model. The English-language, predominantly Western source mix is not
+global population sentiment, and its diversity/novelty ranking is heuristic—not
+mathematical information-gain maximization. The full protocol still needs
+captured price vintages, independent model-artifact verification, all declared
+baselines and ablations, embargoed walk-forward folds,
+bootstrap/multiplicity analysis, and a one-time holdout.
+The filesystem CLI also lacks a durable first-attempt registry and an OS-level
+sandbox between phases, so preserve every artifact, do not choose among reruns,
+and treat its current outputs as exploratory rather than confirmatory.
+
+This controls data-side look-ahead but cannot erase future facts already encoded
+in model weights. A hosted model alias and a LangGraph crash-resume checkpoint
+are not frozen model artifacts. Treat historical results as exploratory until an
+exact model checkpoint with a pre-period training cutoff and a point-in-time
+universe are available. The compact future adapter and open-source plan is in
+[`docs/future-platform-architecture.md`](docs/future-platform-architecture.md).
+
 ## Reproducibility
 
 TradingAgents is LLM-driven, so two runs of the same ticker and date can differ. This is expected for a research tool built on language models, not a defect. The variation comes from a few distinct sources, and it helps to separate them.
 
 Language model sampling is non-deterministic. Even at a fixed temperature, providers do not guarantee byte-identical output across calls, and reasoning models (the default GPT-5.x family, and any thinking-mode model) vary the most because their internal reasoning is itself sampled.
 
-Live data moves. News, StockTwits, and Reddit return different content as time passes, so a run today sees different inputs than a run last week even for the same historical trade date. Pin the analysis date to hold the price and indicator window fixed, but the social and news sources still reflect "now".
+Live data moves. News, StockTwits, and Reddit return different content as time passes, so an ordinary run today sees different inputs than a run last week even for the same historical trade date. Use the captured-media backtest mode above when a reproducible point-in-time social/news window is required.
 
 To reduce variation you can lower the sampling temperature. Set `temperature` in your config (or `TRADINGAGENTS_TEMPERATURE` in `.env`); lower values make models that honor it more repeatable. The current curated models are reasoning-first and largely ignore temperature, so for tighter reproducibility use a non-reasoning model, which you can set explicitly via the Custom model ID option.
 

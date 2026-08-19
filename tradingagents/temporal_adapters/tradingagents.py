@@ -141,7 +141,10 @@ def capture_daily_market_research(
                 try:
                     capture()
                 except Exception as error:
-                    failures.append(f"{ticker}:{name}:{type(error).__name__}")
+                    # Preserve the source failure in the operator summary even
+                    # when the normal vendor router wraps it in VendorError.
+                    root_error = error.__cause__ or error
+                    failures.append(f"{ticker}:{name}:{type(root_error).__name__}")
                 else:
                     completed += 1
     return DailyCaptureResult(

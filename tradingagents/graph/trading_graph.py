@@ -34,6 +34,7 @@ from tradingagents.dataflows.config import set_config
 from tradingagents.dataflows.utils import safe_ticker_component
 from tradingagents.default_config import DEFAULT_CONFIG
 from tradingagents.llm_clients import create_llm_client
+from tradingagents.logging_utils import safe_exception_type
 from tradingagents.reporting import write_report_tree
 from tradingagents.temporal import (
     TemporalContext,
@@ -91,8 +92,6 @@ class TradingAgentsGraph:
             debug: Whether to run in debug mode
             config: Configuration dictionary. If None, uses default config
             callbacks: Optional list of callback handlers (e.g., for tracking LLM/tool stats)
-            quick_thinking_llm: Optional prebuilt model, used by full-trace replay.
-            deep_thinking_llm: Optional prebuilt model, used by full-trace replay.
         """
         self.debug = debug
         self.config = config or DEFAULT_CONFIG
@@ -113,11 +112,8 @@ class TradingAgentsGraph:
         else:
             # Initialize LLMs with provider-specific thinking configuration.
             llm_kwargs = self._get_provider_kwargs()
-
-            # Add callbacks to kwargs if provided (passed to LLM constructor).
             if self.callbacks:
                 llm_kwargs["callbacks"] = self.callbacks
-
             deep_client = create_llm_client(
                 provider=self.config["llm_provider"],
                 model=self.config["deep_think_llm"],
@@ -130,14 +126,11 @@ class TradingAgentsGraph:
                 base_url=self.config.get("backend_url"),
                 **llm_kwargs,
             )
-
             self.deep_thinking_llm = deep_client.get_llm()
             self.quick_thinking_llm = quick_client.get_llm()
 
         self.memory_log = TradingMemoryLog(self.config)
 
-        # The owned corpus search is opt-in because it changes the tools an
-        # analyst can choose. Existing graphs retain their current tool sets.
         self.analyst_extra_tools = self._configured_analyst_extra_tools()
 
         # Create tool nodes
@@ -257,7 +250,7 @@ class TradingAgentsGraph:
         }
 
     def _configured_analyst_extra_tools(self) -> tuple[Any, ...]:
-        """Return optional tools that must be registered before graph compilation."""
+        """Register owned temporal search before the LangGraph tool nodes compile."""
         settings = self.config.get("temporal")
         if not isinstance(settings, Mapping) or not settings.get("search_enabled", False):
             return ()
@@ -328,8 +321,8 @@ class TradingAgentsGraph:
             return raw, alpha, actual_days
         except Exception as e:
             logger.warning(
-                "Could not resolve outcome for %s on %s vs %s (will retry next run): %s",
-                ticker, trade_date, benchmark, e,
+                "Could not resolve outcome for %s on %s vs %s (%s); will retry next run",
+                ticker, trade_date, benchmark, safe_exception_type(e),
             )
             return None, None, None
 
@@ -415,18 +408,25 @@ class TradingAgentsGraph:
         a per-ticker SqliteSaver so a crashed run can resume from the last
         successful node on a subsequent invocation with the same ticker+date.
         """
-        # An explicit context always wins. The config path is intentionally a
-        # convenience layer, not a second temporal implementation: both feed
-        # the same run-scoped context to every existing tool call.
         active_temporal = temporal or self._temporal_context_from_config()
         run_context = temporal_context(active_temporal) if active_temporal is not None else nullcontext()
         with run_context:
             self.ticker = company_name
 
-            # Pending-memory reflection is a mutable side effect of prior runs.
-            # A temporal replay must not generate a new LLM call from that state;
-            # a later scenario-memory snapshot can supply it explicitly instead.
-            if active_temporal is None or active_temporal.mode is not TemporalMode.REPLAY:
+            # A scenario capture must have the same historical boundary as its
+            # replay. Otherwise the recorded LLM prompt can contain mutable
+            # profile or memory state that the replay correctly excludes.
+            is_scenario_capture = (
+                active_temporal is not None
+                and active_temporal.mode is TemporalMode.LIVE_CAPTURE
+                and active_temporal.scenario_id is not None
+            )
+            is_historical = (
+                self.config.get("backtest_mode")
+                or (active_temporal is not None and active_temporal.mode is TemporalMode.REPLAY)
+                or is_scenario_capture
+            )
+            if not is_historical:
                 self._resolve_pending_entries(company_name)
 
             # Recompile with a checkpointer if the user opted in.
@@ -457,11 +457,7 @@ class TradingAgentsGraph:
                     self.graph = self.workflow.compile()
 
     def _temporal_context_from_config(self) -> TemporalContext | None:
-        """Build the optional temporal context declared in the normal config.
-
-        Keeping this at the graph boundary makes configuration ergonomic while
-        retaining the core's explicit context API for other frameworks.
-        """
+        """Build the optional temporal context declared in the normal config."""
         settings = self.config.get("temporal")
         if settings is None:
             return None
@@ -475,7 +471,6 @@ class TradingAgentsGraph:
             raise ValueError(f"temporal mode must be one of: {allowed}") from error
         if mode is TemporalMode.LIVE:
             return None
-
         store_path = settings.get("store")
         if not isinstance(store_path, (str, os.PathLike)) or not store_path:
             raise ValueError("temporal capture or replay requires config['temporal']['store']")
@@ -489,7 +484,6 @@ class TradingAgentsGraph:
         use_capture_tape = settings.get("use_capture_tape", False)
         if not isinstance(use_capture_tape, bool):
             raise TypeError("config['temporal']['use_capture_tape'] must be a boolean")
-
         if mode is TemporalMode.REPLAY and scenario_id is not None:
             return TemporalContext.from_scenario(
                 mode,
@@ -498,7 +492,6 @@ class TradingAgentsGraph:
                 source_run_id=source_run_id,
                 use_capture_tape=use_capture_tape,
             )
-
         as_of = settings.get("as_of")
         if as_of is None:
             if mode is TemporalMode.REPLAY:
@@ -528,14 +521,17 @@ class TradingAgentsGraph:
         return write_report_tree(final_state, ticker, save_path)
 
     def _run_graph(self, company_name, trade_date, asset_type: str = "stock"):
-        """Execute the graph and persist ordinary-run state without mutating a replay."""
+        """Execute the graph without leaking host-memory state into replay."""
         # Initialize state — inject memory log context for PM and the
         # deterministically resolved instrument identity for all agents.
         temporal = current_context()
         is_replay = temporal is not None and temporal.mode is TemporalMode.REPLAY
-        # Ambient decision memory is not evidence in a replay tape. A future
-        # sealed scenario snapshot supplies that history instead; replay never
-        # reads or appends the host log.
+        is_scenario_capture = (
+            temporal is not None
+            and temporal.mode is TemporalMode.LIVE_CAPTURE
+            and temporal.scenario_id is not None
+        )
+        historical = is_replay or is_scenario_capture or self.config.get("backtest_mode")
         snapshot_name = "tradingagents.memory_context"
         if is_replay:
             snapshot = (
@@ -546,6 +542,8 @@ class TradingAgentsGraph:
             if snapshot is not None and not isinstance(snapshot.state, str):
                 raise TypeError("tradingagents memory snapshot must contain a string")
             past_context = snapshot.state if snapshot is not None else ""
+        elif self.config.get("backtest_mode"):
+            past_context = ""
         else:
             past_context = self.memory_log.get_past_context(company_name)
             if (
@@ -560,7 +558,17 @@ class TradingAgentsGraph:
                     past_context,
                     captured_at=temporal.clock.as_of,
                 )
-        instrument_context = self.resolve_instrument_context(company_name, asset_type)
+        if historical:
+            # Current profile metadata (name, sector, description) can encode
+            # mergers/reclassifications that happened after the simulated date.
+            # Keep only the user-supplied symbol/type in historical mode.
+            instrument_context = build_instrument_context(company_name, asset_type, {})
+            instrument_context += (
+                " Historical simulation: use only evidence returned by the supplied "
+                "point-in-time tools. Do not use latent knowledge of events after the trade date."
+            )
+        else:
+            instrument_context = self.resolve_instrument_context(company_name, asset_type)
         init_agent_state = self.propagator.create_initial_state(
             company_name,
             trade_date,
@@ -605,7 +613,10 @@ class TradingAgentsGraph:
         self._log_state(trade_date, final_state)
 
         # Store decision for deferred reflection on the next same-ticker run.
-        if not is_replay:
+        # Capture is the one historical-shaped run that intentionally records
+        # its decision: it preserves the normal live-run side effect while
+        # replay itself remains read-only.
+        if not historical or is_scenario_capture:
             self.memory_log.store_decision(
                 ticker=company_name,
                 trade_date=trade_date,
