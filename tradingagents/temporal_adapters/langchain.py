@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
@@ -43,6 +43,22 @@ def create_contextual_temporal_search_tool() -> StructuredTool:
     return _build_temporal_search_tool()
 
 
+# A matched document can be a full SEC filing (tens of MB); tool results feed
+# straight into an LLM request, so each result carries a bounded snippet and a
+# citation id instead of the whole document.
+_SNIPPET_CHARS = 1_500
+
+
+def _snippet(response: Any) -> dict[str, Any]:
+    if isinstance(response, Mapping) and isinstance(response.get("text"), str):
+        text = response["text"]
+    else:
+        text = canonical_json(response)
+    if len(text) <= _SNIPPET_CHARS:
+        return {"snippet": text, "truncated": False}
+    return {"snippet": text[:_SNIPPET_CHARS], "truncated": True}
+
+
 def _build_temporal_search_tool(expected_store: TemporalStore | None = None) -> StructuredTool:
     def search(query: str, limit: int = 10) -> str:
         context = current_context()
@@ -68,7 +84,7 @@ def _build_temporal_search_tool(expected_store: TemporalStore | None = None) -> 
                         "source": result.evidence.source,
                         "available_at": result.evidence.available_at,
                         "fidelity": result.evidence.fidelity,
-                        "content": result.evidence.response,
+                        **_snippet(result.evidence.response),
                     }
                     for result in response.results
                 ],

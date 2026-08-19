@@ -172,6 +172,32 @@ def test_temporal_search_tool_uses_context_time_and_returns_citations(tmp_path):
     )
 
 
+def test_temporal_search_tool_returns_bounded_snippets_for_huge_documents(tmp_path):
+    # A matched SEC filing can be tens of MB; shipping full documents as a
+    # tool result blows the provider's request limit. The tool must return a
+    # citation plus a bounded snippet, never the whole document.
+    store = TemporalStore(tmp_path)
+    store.record(
+        "corpus.document",
+        {"url": "filing"},
+        {"text": "NVDA quarterly filing " + "supply demand risk " * 200_000},
+        available_at=datetime(2025, 1, 2, 9, tzinfo=UTC),
+        source="https://sec.example/filing",
+    )
+    tool = create_temporal_search_tool(store)
+    context = TemporalContext.at(TemporalMode.REPLAY, datetime(2025, 1, 2, 10, tzinfo=UTC), store=store)
+
+    with temporal_context(context):
+        raw = tool.invoke({"query": "NVDA quarterly filing"})
+
+    assert len(raw) < 50_000
+    result = json.loads(raw)
+    item = result["results"][0]
+    assert item["evidence_id"]
+    assert "NVDA quarterly filing" in item["snippet"]
+    assert item["truncated"] is True
+
+
 def test_contextual_temporal_search_resolves_the_run_store_at_call_time(tmp_path):
     store = TemporalStore(tmp_path)
     store.record(
