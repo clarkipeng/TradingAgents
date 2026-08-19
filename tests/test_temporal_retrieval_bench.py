@@ -25,13 +25,15 @@ def test_real_store_benchmark_does_not_mutate_database(tmp_path):
 
     connection = sqlite3.connect(database)
     connection.executescript(
-        "CREATE TABLE evidence (evidence_id TEXT PRIMARY KEY, available_at TEXT NOT NULL);"
+        "CREATE TABLE evidence (evidence_id TEXT PRIMARY KEY, tool TEXT NOT NULL, available_at TEXT NOT NULL);"
         "CREATE VIRTUAL TABLE evidence_fts USING fts5(evidence_id UNINDEXED, content);"
-        "CREATE TABLE search_traces (trace_id TEXT, query TEXT, as_of TEXT, evidence_ids_json TEXT);"
+        "CREATE TABLE search_traces (trace_id TEXT, scenario_id TEXT, query TEXT, as_of TEXT, evidence_ids_json TEXT);"
+        "CREATE TABLE scenario_rubrics (scenario_id TEXT, material_evidence_ids_json TEXT);"
     )
-    connection.execute("INSERT INTO evidence VALUES ('doc-a', '2025-01-02T09:00:00.000000Z')")
+    connection.execute("INSERT INTO evidence VALUES ('doc-a', 'corpus.document', '2025-01-02T09:00:00.000000Z')")
     connection.execute("INSERT INTO evidence_fts VALUES ('doc-a', 'alpha signal')")
-    connection.execute("INSERT INTO search_traces VALUES ('t', 'alpha', '2025-01-02T12:00:00Z', '[\"doc-a\"]')")
+    connection.execute("INSERT INTO scenario_rubrics VALUES ('s', '[\"doc-a\", \"tool-a\"]')")
+    connection.execute("INSERT INTO search_traces VALUES ('t', 's', 'alpha', '2025-01-02T12:00:00Z', '[\"wrong-self-labeled-target\"]')")
     connection.commit()
     connection.close()
     before = database.read_bytes()

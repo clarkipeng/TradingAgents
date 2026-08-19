@@ -83,9 +83,22 @@ def _read_connection(store: Path) -> sqlite3.Connection:
 
 def _trace_cases(connection: sqlite3.Connection) -> list[tuple[str, str, list[str]]]:
     rows = connection.execute(
-        "SELECT query, as_of, evidence_ids_json FROM search_traces ORDER BY trace_id"
+        """SELECT t.query, t.as_of, r.material_evidence_ids_json
+           FROM search_traces AS t
+           JOIN scenario_rubrics AS r ON r.scenario_id = t.scenario_id
+           WHERE t.scenario_id IS NOT NULL
+           ORDER BY t.trace_id"""
     ).fetchall()
-    return [(query, as_of, json.loads(ids)) for query, as_of, ids in rows]
+    document_keys = {
+        row[0]
+        for row in connection.execute(
+            "SELECT evidence_id FROM evidence WHERE tool = 'corpus.document'"
+        )
+    }
+    return [
+        (query, as_of, [key for key in json.loads(ids) if key in document_keys])
+        for query, as_of, ids in rows
+    ]
 
 
 def _search(connection: sqlite3.Connection, case: Case, limit: int) -> list[str]:
