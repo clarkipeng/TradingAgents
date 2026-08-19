@@ -38,8 +38,26 @@
 - **Scheduler package complete:** the checked-in universe, capture runner, and
   opt-in per-user launchd installer are ready for local installation; no system
   scheduler has been installed from this workspace.
-- **Still pending:** run the scheduler for a week and execute the first paired
-  experiment against the accumulated scenarios.
+- **Rollout executed (2026-08-18):** canonical corpus at
+  `/Users/clarkpeng/.tradingagents/temporal`; launchd job
+  `com.tradingagents.temporal-capture` installed (weekdays 17:15, full surface,
+  30-symbol universe); corpus seeded with a forward-captured NVDA graph run
+  plus HN/Reddit/GDELT/SEC backfill; scenario `nvda-2026-08-18-v2` sealed with
+  a 10-material/25-useful rubric.
+- **First paired experiment executed** (baseline vs `search_enabled`, pinned
+  gpt-5.4/gpt-5.4-mini, 2 repetitions per arm). Running it E2E surfaced and
+  fixed four real defects: replay misses crashed runs (now degrade to
+  `NO_DATA_AVAILABLE`), the search tool was never advertised in analyst
+  prompts, AND-joined FTS matched nothing for realistic queries (now OR +
+  bm25, ranker `sqlite-fts5-or-bm25-v2`), and full documents in tool results
+  blew the provider request limit (now bounded snippets).
+- **First experimental finding:** naive FTS search adds retrieval volume, not
+  value - evidence coverage and decisions unchanged, retrieval efficiency
+  drops. The harness attributes this cleanly, which is the point.
+- **Still pending:** propagate `[evidence:<id>]` citations into the final
+  trade decision so citation grounding stops reading null; improve retrieval
+  ranking or rubric-corpus alignment before rerunning the search arm; let the
+  scheduler accumulate a week of scenarios.
   They remain separate waves because none should fork the canonical corpus.
 
 ## Historical starting state
