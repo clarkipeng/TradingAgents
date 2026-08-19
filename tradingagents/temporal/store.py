@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from .clock import format_timestamp, parse_timestamp
+from .documents import chunks, extract_document, stable_chunk_id, stable_doc_key, title_similarity
 from .models import (
     EvidenceRecord,
     LLMCallRecord,
@@ -22,6 +23,7 @@ from .models import (
     ScenarioSnapshot,
     SearchManifest,
     SearchTraceRecord,
+    TemporalDocument,
     TemporalSearchResponse,
     TemporalSearchResult,
     ToolTraceRecord,
@@ -57,7 +59,6 @@ class TemporalStore:
         with self._connect() as connection:
             connection.executescript(
                 """
-                PRAGMA journal_mode = WAL;
                 CREATE TABLE IF NOT EXISTS artifacts (
                     content_hash TEXT PRIMARY KEY,
                     media_type TEXT NOT NULL,
@@ -137,6 +138,34 @@ class TemporalStore:
                     evidence_id UNINDEXED,
                     content
                 );
+                CREATE TABLE IF NOT EXISTS documents (
+                    doc_key TEXT PRIMARY KEY,
+                    parent_evidence_id TEXT NOT NULL REFERENCES evidence(evidence_id),
+                    logical_position INTEGER NOT NULL,
+                    title TEXT NOT NULL,
+                    body TEXT NOT NULL,
+                    source_domain TEXT NOT NULL,
+                    canonical_url TEXT,
+                    published_at TEXT,
+                    available_at TEXT NOT NULL,
+                    doc_kind TEXT NOT NULL,
+                    extractor_version TEXT NOT NULL,
+                    cluster_key TEXT NOT NULL,
+                    UNIQUE(parent_evidence_id, logical_position)
+                );
+                CREATE INDEX IF NOT EXISTS documents_available ON documents(available_at, doc_key);
+                CREATE TABLE IF NOT EXISTS document_chunks (
+                    chunk_id TEXT PRIMARY KEY,
+                    doc_key TEXT NOT NULL REFERENCES documents(doc_key),
+                    chunk_index INTEGER NOT NULL,
+                    token_start INTEGER NOT NULL,
+                    token_end INTEGER NOT NULL,
+                    body TEXT NOT NULL,
+                    UNIQUE(doc_key, chunk_index)
+                );
+                CREATE VIRTUAL TABLE IF NOT EXISTS document_chunks_fts USING fts5(
+                    body, content='document_chunks', content_rowid='rowid'
+                );
                 CREATE TABLE IF NOT EXISTS tool_traces (
                     trace_id TEXT PRIMARY KEY,
                     run_id TEXT NOT NULL,
@@ -183,6 +212,11 @@ class TemporalStore:
                 connection.execute("ALTER TABLE scenarios ADD COLUMN corpus_hash TEXT NOT NULL DEFAULT ''")
             if "capture_run_id" not in scenario_columns:
                 connection.execute("ALTER TABLE scenarios ADD COLUMN capture_run_id TEXT")
+            rubric_columns = {row["name"] for row in connection.execute("PRAGMA table_info(scenario_rubrics)")}
+            if "material_document_keys_json" not in rubric_columns:
+                connection.execute("ALTER TABLE scenario_rubrics ADD COLUMN material_document_keys_json TEXT NOT NULL DEFAULT '[]'")
+            if "useful_document_keys_json" not in rubric_columns:
+                connection.execute("ALTER TABLE scenario_rubrics ADD COLUMN useful_document_keys_json TEXT NOT NULL DEFAULT '[]'")
             llm_columns = {row["name"] for row in connection.execute("PRAGMA table_info(llm_calls)")}
             if "temporal_run_id" not in llm_columns:
                 connection.execute("ALTER TABLE llm_calls ADD COLUMN temporal_run_id TEXT")
@@ -196,14 +230,6 @@ class TemporalStore:
                 "CREATE UNIQUE INDEX IF NOT EXISTS llm_calls_temporal_sequence "
                 "ON llm_calls(temporal_run_id, temporal_sequence) "
                 "WHERE temporal_run_id IS NOT NULL"
-            )
-            connection.execute("DELETE FROM evidence_fts")
-            connection.execute(
-                """
-                INSERT INTO evidence_fts(evidence_id, content)
-                SELECT evidence_id, response_json FROM evidence
-                WHERE tool = 'corpus.document' AND is_error = 0
-                """
             )
 
     def put_artifact(self, content: bytes, media_type: str = "application/json") -> str:
@@ -326,7 +352,85 @@ class TemporalStore:
                     "INSERT INTO evidence_fts(evidence_id, content) VALUES (?, ?)",
                     (record.evidence_id, response_json),
                 )
+                self._maintain_document(connection, record)
+                self._refresh_document_clusters(connection)
         return record
+
+    @staticmethod
+    def _maintain_document(connection: sqlite3.Connection, record: EvidenceRecord) -> None:
+        extracted = extract_document({
+            "tool": record.tool, "request": record.request, "response": record.response,
+            "source": record.source, "available_at": format_timestamp(record.available_at),
+            "event_at": format_timestamp(record.event_at) if record.event_at else None,
+            "source_published_at": format_timestamp(record.source_published_at) if record.source_published_at else None,
+            "is_error": record.is_error,
+        })
+        if extracted is None:
+            return
+        doc_key = stable_doc_key(record.evidence_id, 0)
+        connection.execute("""INSERT OR IGNORE INTO documents
+            (doc_key,parent_evidence_id,logical_position,title,body,source_domain,canonical_url,published_at,
+             available_at,doc_kind,extractor_version,cluster_key)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""", (
+            doc_key, record.evidence_id, 0, extracted["title"], extracted["body"], extracted["source_domain"],
+            extracted["canonical_url"], extracted["published_at"], extracted["available_at"], extracted["doc_kind"],
+            extracted["extractor_version"], doc_key))
+        for index, (start, end, body) in enumerate(chunks(extracted["body"])):
+            chunk_id = stable_chunk_id(doc_key, index)
+            inserted = connection.execute("""INSERT OR IGNORE INTO document_chunks
+                (chunk_id,doc_key,chunk_index,token_start,token_end,body) VALUES (?,?,?,?,?,?)""",
+                (chunk_id, doc_key, index, start, end, body)).rowcount
+            if inserted:
+                rowid = connection.execute("SELECT rowid FROM document_chunks WHERE chunk_id = ?", (chunk_id,)).fetchone()[0]
+                connection.execute("INSERT INTO document_chunks_fts(rowid, body) VALUES (?, ?)", (rowid, body))
+
+    def reindex_documents(self) -> int:
+        """Idempotently rebuild only the derivative document layer."""
+        with self._connect() as connection:
+            connection.execute("DELETE FROM document_chunks_fts")
+            connection.execute("DELETE FROM document_chunks")
+            connection.execute("DELETE FROM documents")
+            for row in connection.execute("SELECT * FROM evidence WHERE tool='corpus.document' AND is_error=0 ORDER BY evidence_id"):
+                self._maintain_document(connection, self._record_from_row(row))
+            self._refresh_document_clusters(connection)
+            self._migrate_rubric_document_keys(connection)
+            return connection.execute("SELECT COUNT(*) FROM documents").fetchone()[0]
+
+    @staticmethod
+    def _migrate_rubric_document_keys(connection: sqlite3.Connection) -> None:
+        """Backfill document-key labels for R1 rubrics during an explicit reindex."""
+        rows = connection.execute("SELECT * FROM scenario_rubrics").fetchall()
+        for row in rows:
+            material = tuple(json.loads(row["material_evidence_ids_json"]))
+            useful = tuple(json.loads(row["useful_evidence_ids_json"]))
+            mapping = {
+                r["parent_evidence_id"]: r["doc_key"]
+                for r in connection.execute(
+                    "SELECT parent_evidence_id, doc_key FROM documents WHERE parent_evidence_id IN ({})".format(",".join("?" for _ in useful)),
+                    useful,
+                ).fetchall()
+            } if useful else {}
+            if set(mapping) == set(useful):
+                connection.execute(
+                    "UPDATE scenario_rubrics SET material_document_keys_json=?, useful_document_keys_json=? WHERE scenario_id=?",
+                    (canonical_json(tuple(mapping[key] for key in material)), canonical_json(tuple(mapping[key] for key in useful)), row["scenario_id"]),
+                )
+
+    @staticmethod
+    def _refresh_document_clusters(connection: sqlite3.Connection) -> None:
+        rows = connection.execute("SELECT doc_key, title, canonical_url, source_domain FROM documents ORDER BY doc_key").fetchall()
+        clusters: dict[str, str] = {}
+        for row in rows:
+            cluster = row["doc_key"]
+            for other in rows:
+                if other["doc_key"] == row["doc_key"]:
+                    continue
+                same_url = row["canonical_url"] and row["canonical_url"] == other["canonical_url"]
+                similar = row["source_domain"] == other["source_domain"] and title_similarity(row["title"], other["title"]) >= 0.92
+                if same_url or similar:
+                    cluster = min(cluster, clusters.get(other["doc_key"], other["doc_key"]))
+            clusters[row["doc_key"]] = cluster
+        connection.executemany("UPDATE documents SET cluster_key=? WHERE doc_key=?", [(cluster, key) for key, cluster in clusters.items()])
 
     def record_error(
         self,
@@ -544,6 +648,17 @@ class TemporalStore:
             missing = sorted(set(useful) - known)
             if missing:
                 raise KeyError(f"unknown rubric evidence: {missing[0]}")
+            document_keys = {
+                row["evidence_id"]: row["doc_key"]
+                for row in connection.execute(
+                    f"SELECT parent_evidence_id AS evidence_id, doc_key FROM documents WHERE parent_evidence_id IN ({','.join('?' for _ in useful)})",
+                    useful,
+                ).fetchall()
+            }
+            if set(document_keys) != set(useful):
+                raise ValueError("document layer must be reindexed before sealing a rubric")
+            material_documents = tuple(document_keys[key] for key in material)
+            useful_documents = tuple(document_keys[key] for key in useful)
             existing = connection.execute(
                 "SELECT * FROM scenario_rubrics WHERE scenario_id = ?", (scenario_id,)
             ).fetchone()
@@ -554,15 +669,17 @@ class TemporalStore:
                     """
                     INSERT INTO scenario_rubrics(
                         scenario_id, material_evidence_ids_json, useful_evidence_ids_json,
-                        artifact_hash, created_at
-                    ) VALUES (?, ?, ?, ?, ?)
+                        material_document_keys_json, useful_document_keys_json, artifact_hash, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (scenario_id, material_json, useful_json, artifact_hash, format_timestamp(created)),
+                    (scenario_id, material_json, useful_json, canonical_json(material_documents), canonical_json(useful_documents), artifact_hash, format_timestamp(created)),
                 )
                 return ScenarioRubricRecord(scenario_id, material, useful, artifact_hash, created)
             if (
                 existing["material_evidence_ids_json"] != material_json
                 or existing["useful_evidence_ids_json"] != useful_json
+                or existing["material_document_keys_json"] != canonical_json(material_documents)
+                or existing["useful_document_keys_json"] != canonical_json(useful_documents)
             ):
                 raise ValueError(f"scenario rubric already sealed: {scenario_id}")
         return self._rubric_from_row(existing)
@@ -758,7 +875,7 @@ class TemporalStore:
         as_of: datetime,
         limit: int = 10,
     ) -> TemporalSearchResponse:
-        """Search only evidence that was available at the virtual-time boundary."""
+        """Search eligible normalized chunks and aggregate to one result per document cluster."""
         if limit < 1:
             raise ValueError("limit must be positive")
         fts_query = _fts_query(query)
@@ -769,7 +886,7 @@ class TemporalStore:
                 manifest=SearchManifest(
                     query=query,
                     as_of=parse_timestamp(as_of),
-                    ranker_version="sqlite-fts5-or-bm25-v2",
+                    ranker_version="temporal-document-v1",
                     corpus_hash=self.corpus_hash(as_of=as_of),
                     evidence_ids=(),
                 ),
@@ -777,28 +894,66 @@ class TemporalStore:
         with self._connect() as connection:
             rows = connection.execute(
                 """
-                SELECT evidence.*, bm25(evidence_fts) AS rank
-                FROM evidence_fts
-                JOIN evidence ON evidence.evidence_id = evidence_fts.evidence_id
-                WHERE evidence_fts MATCH ? AND evidence.available_at <= ?
-                ORDER BY rank ASC, evidence.evidence_id ASC
-                LIMIT ?
+                SELECT d.*, e.*, json_extract(e.response_json, '$.metadata') AS metadata_json,
+                       bm25(document_chunks_fts) AS rank
+                FROM document_chunks_fts f
+                JOIN document_chunks c ON c.rowid = f.rowid
+                JOIN documents d ON d.doc_key = c.doc_key
+                JOIN evidence e ON e.evidence_id = d.parent_evidence_id
+                WHERE document_chunks_fts MATCH ? AND d.available_at <= ?
+                ORDER BY rank ASC, d.doc_key ASC
                 """,
-                (fts_query, cutoff, limit),
+                (fts_query, cutoff),
             ).fetchall()
-        results = tuple(
-            TemporalSearchResult(evidence=self._record_from_row(row), rank=float(row["rank"]))
-            for row in rows
-        )
+        best: dict[str, sqlite3.Row] = {}
+        for row in rows:
+            cluster = row["cluster_key"]
+            if cluster not in best or (float(row["rank"]), row["doc_key"]) < (float(best[cluster]["rank"]), best[cluster]["doc_key"]):
+                best[cluster] = row
+        selected = sorted(best.values(), key=lambda row: (float(row["rank"]), row["doc_key"]))[:limit]
+        with self._connect() as connection:
+            siblings = {
+                row["cluster_key"]: tuple(r["doc_key"] for r in connection.execute(
+                    "SELECT doc_key FROM documents WHERE cluster_key=? AND doc_key<>? ORDER BY doc_key",
+                    (row["cluster_key"], row["doc_key"])).fetchall())
+                for row in selected
+            }
+        results = tuple(TemporalSearchResult(
+            evidence=self._search_evidence_from_row(row),
+            rank=float(row["rank"]),
+            document=TemporalDocument(
+                doc_key=row["doc_key"], parent_evidence_id=row["parent_evidence_id"], title=row["title"],
+                body=row["body"], source_domain=row["source_domain"], canonical_url=row["canonical_url"],
+                published_at=parse_timestamp(row["published_at"]) if row["published_at"] else None,
+                available_at=parse_timestamp(row["available_at"]), doc_kind=row["doc_kind"],
+                siblings=siblings[row["cluster_key"]],
+            ),
+        ) for row in selected)
         return TemporalSearchResponse(
             results=results,
             manifest=SearchManifest(
                 query=query,
                 as_of=parse_timestamp(as_of),
-                ranker_version="sqlite-fts5-or-bm25-v2",
+                ranker_version="temporal-document-v1",
                 corpus_hash=self.corpus_hash(as_of=as_of),
                 evidence_ids=tuple(result.evidence.evidence_id for result in results),
             ),
+        )
+
+    @staticmethod
+    def _search_evidence_from_row(row: sqlite3.Row) -> EvidenceRecord:
+        """Build the compatibility evidence view from normalized columns only."""
+        return EvidenceRecord(
+            evidence_id=row["evidence_id"], tool=row["tool"], request_key=row["request_key"],
+            request=json.loads(row["request_json"]), response={
+                "title": row["title"], "text": row["body"],
+                "metadata": json.loads(row["metadata_json"]) if row["metadata_json"] else {},
+            },
+            artifact_hash=row["artifact_hash"], available_at=parse_timestamp(row["available_at"]),
+            observed_at=parse_timestamp(row["observed_at"]), ingested_at=parse_timestamp(row["ingested_at"]),
+            fidelity=row["fidelity"], event_at=parse_timestamp(row["event_at"]) if row["event_at"] else None,
+            source_published_at=parse_timestamp(row["source_published_at"]) if row["source_published_at"] else None,
+            source=row["source"], is_error=bool(row["is_error"]),
         )
 
     def record_tool_trace(
@@ -1010,6 +1165,8 @@ class TemporalStore:
             useful_evidence_ids=tuple(json.loads(row["useful_evidence_ids_json"])),
             artifact_hash=row["artifact_hash"],
             created_at=parse_timestamp(row["created_at"]),
+            material_document_keys=tuple(json.loads(row["material_document_keys_json"])) if "material_document_keys_json" in row else (),
+            useful_document_keys=tuple(json.loads(row["useful_document_keys_json"])) if "useful_document_keys_json" in row else (),
         )
 
     @staticmethod

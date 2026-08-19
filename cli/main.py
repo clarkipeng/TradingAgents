@@ -1304,6 +1304,17 @@ def temporal_import(
     typer.echo(f"Imported {summary.imported} archive records into {store}")
 
 
+@app.command("temporal-reindex")
+def temporal_reindex(
+    store: Path = typer.Option(Path(".tradingagents/temporal"), "--store", help="Temporal evidence-store directory."),  # noqa: B008
+):
+    """Rebuild normalized documents and external-content chunks idempotently."""
+    from tradingagents.temporal import TemporalStore
+
+    count = TemporalStore(store).reindex_documents()
+    typer.echo(f"Reindexed {count} documents in {store}")
+
+
 @app.command("temporal-capture")
 def temporal_capture(
     tickers: str = typer.Option(  # noqa: B008

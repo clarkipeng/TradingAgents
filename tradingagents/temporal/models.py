@@ -127,6 +127,8 @@ class ScenarioRubricRecord:
     useful_evidence_ids: tuple[str, ...]
     artifact_hash: str
     created_at: datetime
+    material_document_keys: tuple[str, ...] = ()
+    useful_document_keys: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -141,11 +143,30 @@ class ResearchRunRecord:
 
 
 @dataclass(frozen=True)
+class TemporalDocument:
+    doc_key: str
+    parent_evidence_id: str
+    title: str
+    body: str
+    source_domain: str
+    canonical_url: str | None
+    published_at: datetime | None
+    available_at: datetime
+    doc_kind: str
+    siblings: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class TemporalSearchResult:
     """One evidence item returned by the owned temporal full-text index."""
 
     evidence: EvidenceRecord
     rank: float
+    document: TemporalDocument | None = None
+
+    @property
+    def doc_key(self) -> str:
+        return self.document.doc_key if self.document else self.evidence.evidence_id
 
 
 @dataclass(frozen=True)

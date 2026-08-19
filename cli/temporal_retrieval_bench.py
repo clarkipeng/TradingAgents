@@ -89,14 +89,17 @@ def _trace_cases(connection: sqlite3.Connection) -> list[tuple[str, str, list[st
            WHERE t.scenario_id IS NOT NULL
            ORDER BY t.trace_id"""
     ).fetchall()
-    document_keys = {
-        row[0]
-        for row in connection.execute(
-            "SELECT evidence_id FROM evidence WHERE tool = 'corpus.document'"
-        )
-    }
+    has_documents = connection.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='documents'"
+    ).fetchone()
+    if has_documents:
+        evidence_to_document = dict(connection.execute("SELECT parent_evidence_id, doc_key FROM documents"))
+        document_keys = set(evidence_to_document.values())
+    else:
+        evidence_to_document = {}
+        document_keys = {row[0] for row in connection.execute("SELECT evidence_id FROM evidence WHERE tool = 'corpus.document'")}
     return [
-        (query, as_of, [key for key in json.loads(ids) if key in document_keys])
+        (query, as_of, [evidence_to_document.get(key, key) for key in json.loads(ids) if key in evidence_to_document or key in document_keys])
         for query, as_of, ids in rows
     ]
 
@@ -105,6 +108,21 @@ def _search(connection: sqlite3.Connection, case: Case, limit: int) -> list[str]
     query = _fts_query(case.query)
     if not query:
         return []
+    has_documents = connection.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='documents'"
+    ).fetchone()
+    if has_documents:
+        rows = connection.execute(
+        """SELECT doc_key, -COUNT(*) AS rank FROM (
+             SELECT d.doc_key
+             FROM document_chunks_fts
+             JOIN document_chunks c ON c.rowid = document_chunks_fts.rowid
+             JOIN documents d ON d.doc_key = c.doc_key
+             WHERE document_chunks_fts MATCH ? AND d.available_at <= ?
+           ) GROUP BY doc_key ORDER BY rank ASC, doc_key ASC LIMIT ?""",
+        (query, case.as_of, limit),
+        ).fetchall()
+        return [row[0] for row in rows]
     return [row[0] for row in connection.execute(
         """SELECT f.evidence_id FROM evidence_fts AS f
            JOIN evidence AS e ON e.evidence_id = f.evidence_id
@@ -138,6 +156,9 @@ def run_benchmark(bench: str | Path, store: str | Path | None = None, k: int = 1
     try:
         traces = _trace_cases(connection) if "topic_from_search_traces" in spec else []
         cases = _cases(spec, traces)
+        if "documents" not in spec:
+            mapping = dict(connection.execute("SELECT parent_evidence_id, doc_key FROM documents")) if connection.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='documents'").fetchone() else {}
+            cases = [Case(case.query, tuple(mapping.get(key, key) for key in case.expected), case.kind, case.as_of) for case in cases]
         rows = []
         for case in cases:
             evaluated_k = max(k, 2 * len(case.expected))

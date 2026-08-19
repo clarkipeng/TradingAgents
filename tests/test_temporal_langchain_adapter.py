@@ -165,7 +165,7 @@ def test_temporal_search_tool_uses_context_time_and_returns_citations(tmp_path):
         result = json.loads(tool.invoke({"query": "NVDA supply"}))
 
     assert [item["source"] for item in result["results"]] == ["https://example.com/early"]
-    assert result["manifest"]["ranker_version"] == "sqlite-fts5-or-bm25-v2"
+    assert result["manifest"]["ranker_version"] == "temporal-document-v1"
     assert result["manifest"]["corpus_hash"]
     assert store.list_search_traces(context.run_id)[0].manifest.evidence_ids == (
         result["results"][0]["evidence_id"],
