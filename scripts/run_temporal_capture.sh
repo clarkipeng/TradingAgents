@@ -16,9 +16,14 @@ case "$(date +%u)" in
     6|7) exit 0 ;;
 esac
 
+if ! command -v "$command_name" >/dev/null 2>&1; then
+    echo "Temporal command is not executable: $command_name" >&2
+    exit 1
+fi
+
 tickers=$(awk '
     /^[[:space:]]*#/ || /^[[:space:]]*$/ { next }
-    { gsub(/[[:space:]]/, ""); print }
+    { gsub(/[[:space:]]/, ""); if ($0 != "" && !seen[$0]++) print }
 ' "$universe_file" | paste -sd, -)
 
 if [ -z "$tickers" ]; then

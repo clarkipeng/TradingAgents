@@ -9,9 +9,24 @@ fi
 
 project_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 temporal_store=${1:?Usage: scripts/install_temporal_launchd.sh /absolute/temporal/store}
+command_name=${TRADINGAGENTS_COMMAND:-$(command -v tradingagents || true)}
 launch_agents_dir="$HOME/Library/LaunchAgents"
 plist_path="$launch_agents_dir/com.tradingagents.temporal-capture.plist"
 log_dir="$project_dir/.tradingagents"
+
+case "$temporal_store" in
+    /*) ;;
+    *)
+        echo "Temporal store path must be absolute: $temporal_store" >&2
+        exit 1
+        ;;
+esac
+
+if [ -z "$command_name" ] || ! command -v "$command_name" >/dev/null 2>&1; then
+    echo "Set TRADINGAGENTS_COMMAND to an executable tradingagents command before installing." >&2
+    exit 1
+fi
+command_name=$(command -v "$command_name")
 
 mkdir -p "$launch_agents_dir" "$log_dir"
 cat > "$plist_path" <<EOF
@@ -23,7 +38,7 @@ cat > "$plist_path" <<EOF
   <key>StartCalendarInterval</key><dict><key>Hour</key><integer>17</integer><key>Minute</key><integer>15</integer></dict>
   <key>EnvironmentVariables</key><dict>
     <key>TRADINGAGENTS_TEMPORAL_STORE</key><string>$temporal_store</string>
-    <key>TRADINGAGENTS_COMMAND</key><string>tradingagents</string>
+    <key>TRADINGAGENTS_COMMAND</key><string>$command_name</string>
   </dict>
   <key>StandardOutPath</key><string>$log_dir/temporal-capture.log</string>
   <key>StandardErrorPath</key><string>$log_dir/temporal-capture.error.log</string>

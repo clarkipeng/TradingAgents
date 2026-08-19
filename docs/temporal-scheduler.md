@@ -23,6 +23,10 @@ TRADINGAGENTS_TEMPORAL_STORE=/absolute/path/to/temporal-corpus \
 scripts/run_temporal_capture.sh
 ```
 
+The installer resolves `tradingagents` to an absolute executable for launchd.
+If it is not on your shell `PATH`, set `TRADINGAGENTS_COMMAND` to its absolute
+path while running the installer.
+
 ## cron or another scheduler
 
 Set `TRADINGAGENTS_TEMPORAL_STORE` and invoke
