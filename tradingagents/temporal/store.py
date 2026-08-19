@@ -769,7 +769,7 @@ class TemporalStore:
                 manifest=SearchManifest(
                     query=query,
                     as_of=parse_timestamp(as_of),
-                    ranker_version="sqlite-fts5-v1",
+                    ranker_version="sqlite-fts5-or-bm25-v2",
                     corpus_hash=self.corpus_hash(as_of=as_of),
                     evidence_ids=(),
                 ),
@@ -795,7 +795,7 @@ class TemporalStore:
             manifest=SearchManifest(
                 query=query,
                 as_of=parse_timestamp(as_of),
-                ranker_version="sqlite-fts5-v1",
+                ranker_version="sqlite-fts5-or-bm25-v2",
                 corpus_hash=self.corpus_hash(as_of=as_of),
                 evidence_ids=tuple(result.evidence.evidence_id for result in results),
             ),
@@ -1057,8 +1057,14 @@ class TemporalStore:
 
 
 def _fts_query(query: str) -> str:
-    """Turn user text into a conservative FTS5 query without FTS syntax injection."""
-    return " AND ".join(f'"{token}"' for token in re.findall(r"[\w]+", query, flags=re.UNICODE))
+    """Turn user text into a conservative FTS5 query without FTS syntax injection.
+
+    Terms combine with OR because agents write long natural-language queries;
+    requiring every term (AND) silently matched nothing. bm25 ranking still
+    puts documents matching more terms first, and the caller's evidence-id
+    tie-break keeps results deterministic.
+    """
+    return " OR ".join(f'"{token}"' for token in re.findall(r"[\w]+", query, flags=re.UNICODE))
 
 
 def _normalized_evidence_ids(values: Iterable[str], name: str) -> tuple[str, ...]:
