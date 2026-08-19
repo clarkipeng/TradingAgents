@@ -10,6 +10,7 @@ from typing import Any
 
 from tradingagents.temporal import (
     FactualClaim,
+    ReplayMissError,
     Fill,
     MarketQuote,
     Order,
@@ -70,12 +71,23 @@ def invoke_tool(tool: str, request: Mapping[str, Any], live_call: Callable[[], A
     if context.store is None:
         raise RuntimeError("temporal capture and replay require a TemporalStore")
 
-    outcome = TemporalGateway(context.store).invoke(
-        tool,
-        request,
-        context,
-        live_call,
-    )
+    try:
+        outcome = TemporalGateway(context.store).invoke(
+            tool,
+            request,
+            context,
+            live_call,
+        )
+    except ReplayMissError:
+        # Evidence replay degrades like live vendor exhaustion: the agent sees
+        # the repo-wide NO_DATA_AVAILABLE sentinel and adapts, instead of one
+        # improvised tool argument aborting the whole run. Full-tape replay
+        # keeps its strict tape-mismatch failure.
+        return (
+            f"NO_DATA_AVAILABLE: no evidence for {tool} was captured at or "
+            f"before {context.clock.as_of.isoformat()}. This source cannot "
+            "answer this exact request in replay; rely on other evidence."
+        )
     return outcome.value
 
 

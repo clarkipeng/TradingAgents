@@ -58,8 +58,27 @@ def test_router_replay_miss_never_calls_a_vendor(tmp_path, monkeypatch):
     )
     context = TemporalContext.at(TemporalMode.REPLAY, datetime.now(UTC), store=TemporalStore(tmp_path))
 
-    with temporal_context(context), pytest.raises(LookupError, match="no eligible evidence"):
-        interface.route_to_vendor("get_news", "NVDA", "2025-01-01", "2025-01-02")
+    with temporal_context(context):
+        result = interface.route_to_vendor("get_news", "NVDA", "2025-01-01", "2025-01-02")
+
+    # A replay miss degrades exactly like live vendor exhaustion: the agent
+    # receives the NO_DATA_AVAILABLE sentinel instead of the run crashing.
+    assert "NO_DATA_AVAILABLE" in result
+    assert "dataflow.get_news" in result
+
+
+def test_direct_source_replay_miss_returns_no_data_sentinel(tmp_path):
+    context = TemporalContext.at(TemporalMode.REPLAY, datetime.now(UTC), store=TemporalStore(tmp_path))
+
+    with temporal_context(context):
+        result = invoke_tool(
+            "social.stocktwits",
+            {"ticker": "NVDA", "limit": 30},
+            lambda: pytest.fail("replay must not call the live source"),
+        )
+
+    assert "NO_DATA_AVAILABLE" in result
+    assert "social.stocktwits" in result
 
 
 def test_direct_source_capture_and_replay_never_call_live_source(tmp_path):
