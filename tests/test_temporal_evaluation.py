@@ -10,6 +10,7 @@ from tradingagents.temporal import (
     TemporalStore,
     cited_claims_from_markdown,
     compare_pair,
+    compare_recorded_run_sets,
     compare_recorded_runs,
     decision_stability,
     run_paired_evaluation,
@@ -223,6 +224,51 @@ def test_sealed_rubric_scores_a_persisted_trace(tmp_path):
     assert metrics.evidence_coverage == metrics.retrieval_efficiency == 1.0
 
 
+def test_recorded_run_reuses_its_sealed_decision_and_citations(tmp_path):
+    store = TemporalStore(tmp_path)
+    evidence = store.record(
+        "corpus.document",
+        {"url": "https://example.com"},
+        {"text": "NVDA earnings"},
+        available_at="2025-01-02T09:00:00Z",
+    )
+    store.seal_scenario(
+        "scenario-decision",
+        as_of="2025-01-02T10:00:00Z",
+        basis="archive-reconstructed",
+    )
+    store.seal_scenario_rubric(
+        "scenario-decision",
+        material_evidence_ids=(evidence.evidence_id,),
+        useful_evidence_ids=(evidence.evidence_id,),
+    )
+    store.record_tool_trace(
+        run_id="run-decision",
+        scenario_id="scenario-decision",
+        mode="replay",
+        tool="temporal_search",
+        request={"query": "NVDA"},
+        evidence_id=evidence.evidence_id,
+    )
+    stored = store.record_research_run(
+        "run-decision",
+        "scenario-decision",
+        decision=f"BUY because earnings improved [evidence:{evidence.evidence_id}]",
+        report=f"BUY because earnings improved [evidence:{evidence.evidence_id}]",
+    )
+
+    trace, metrics = score_recorded_run(
+        store,
+        run_id="run-decision",
+        scenario_id="scenario-decision",
+    )
+
+    assert stored.report_artifact_hash is not None
+    assert trace.decision == stored.decision
+    assert trace.claims == (FactualClaim("final-decision:1", (evidence.evidence_id,)),)
+    assert metrics.citation_grounding == 1.0
+
+
 def test_sealed_rubric_compares_two_persisted_runs(tmp_path):
     store = TemporalStore(tmp_path)
     evidence = store.record(
@@ -262,6 +308,55 @@ def test_sealed_rubric_compares_two_persisted_runs(tmp_path):
     assert comparison.evidence_coverage_delta == -1.0
 
 
+def test_repeated_persisted_runs_include_decision_stability(tmp_path):
+    store = TemporalStore(tmp_path)
+    evidence = store.record(
+        "corpus.document",
+        {"url": "https://example.com"},
+        {"text": "NVDA earnings"},
+        available_at="2025-01-02T09:00:00Z",
+    )
+    store.seal_scenario(
+        "scenario-repeated",
+        as_of="2025-01-02T10:00:00Z",
+        basis="archive-reconstructed",
+    )
+    store.seal_scenario_rubric(
+        "scenario-repeated",
+        material_evidence_ids=(evidence.evidence_id,),
+        useful_evidence_ids=(evidence.evidence_id,),
+    )
+    for run_id, decision, include_evidence in (
+        ("left-1", "BUY", True),
+        ("left-2", "HOLD", True),
+        ("right-1", "HOLD", False),
+        ("right-2", "HOLD", False),
+    ):
+        if include_evidence:
+            store.record_tool_trace(
+                run_id=run_id,
+                scenario_id="scenario-repeated",
+                mode="replay",
+                tool="temporal_search",
+                request={"query": "NVDA"},
+                evidence_id=evidence.evidence_id,
+            )
+        store.record_research_run(run_id, "scenario-repeated", decision=decision)
+
+    result = compare_recorded_run_sets(
+        store,
+        left_run_ids=("left-1", "left-2"),
+        right_run_ids=("right-1", "right-2"),
+        scenario_id="scenario-repeated",
+    )
+
+    assert result.left.evidence_coverage == 1.0
+    assert result.right.evidence_coverage == 0.0
+    assert result.left.decision_stability == 0.5
+    assert result.right.decision_stability == 1.0
+    assert result.decision_stability_delta == 0.5
+
+
 def test_tradingagents_adapter_replays_a_sealed_scenario_into_a_trace(tmp_path):
     store = TemporalStore(tmp_path)
     evidence = store.record(
@@ -295,6 +390,7 @@ def test_tradingagents_adapter_replays_a_sealed_scenario_into_a_trace(tmp_path):
     assert trace.decision == f"**Rating**: Buy [evidence:{evidence.evidence_id}]"
     assert trace.evidence_ids == (evidence.evidence_id,)
     assert trace.claims == (FactualClaim("final-decision:1", (evidence.evidence_id,)),)
+    assert store.get_research_run(trace.run_id).decision == trace.decision
 
 
 def test_tradingagents_replay_refuses_a_scenario_with_corpus_drift(tmp_path):

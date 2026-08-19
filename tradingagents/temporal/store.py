@@ -16,6 +16,7 @@ from .clock import format_timestamp, parse_timestamp
 from .models import (
     EvidenceRecord,
     LLMCallRecord,
+    ResearchRunRecord,
     ScenarioDefinition,
     ScenarioRubricRecord,
     ScenarioSnapshot,
@@ -123,6 +124,15 @@ class TemporalStore:
                     artifact_hash TEXT NOT NULL REFERENCES artifacts(content_hash),
                     created_at TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS research_runs (
+                    run_id TEXT PRIMARY KEY,
+                    scenario_id TEXT NOT NULL,
+                    decision TEXT,
+                    report_artifact_hash TEXT REFERENCES artifacts(content_hash),
+                    completed_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS research_runs_scenario
+                ON research_runs(scenario_id, completed_at, run_id);
                 CREATE VIRTUAL TABLE IF NOT EXISTS evidence_fts USING fts5(
                     evidence_id UNINDEXED,
                     content
@@ -564,6 +574,66 @@ class TemporalStore:
             ).fetchone()
         return self._rubric_from_row(row) if row is not None else None
 
+    def record_research_run(
+        self,
+        run_id: str,
+        scenario_id: str,
+        *,
+        decision: str | None,
+        report: str | None = None,
+        completed_at: datetime | None = None,
+    ) -> ResearchRunRecord:
+        """Seal the final output of an evidence-replay run exactly once."""
+        if not run_id or not scenario_id:
+            raise ValueError("run_id and scenario_id are required")
+        if decision is not None and not isinstance(decision, str):
+            raise TypeError("decision must be a string or None")
+        if report is not None and not isinstance(report, str):
+            raise TypeError("report must be a string or None")
+        completed = parse_timestamp(completed_at or datetime.now(timezone.utc))
+        report_artifact_hash = (
+            self.put_artifact(report.encode("utf-8"), media_type="text/markdown")
+            if report is not None
+            else None
+        )
+        with self._connect() as connection:
+            existing = connection.execute(
+                "SELECT * FROM research_runs WHERE run_id = ?", (run_id,)
+            ).fetchone()
+            if existing is None:
+                connection.execute(
+                    """
+                    INSERT INTO research_runs(
+                        run_id, scenario_id, decision, report_artifact_hash, completed_at
+                    ) VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (
+                        run_id,
+                        scenario_id,
+                        decision,
+                        report_artifact_hash,
+                        format_timestamp(completed),
+                    ),
+                )
+                return ResearchRunRecord(
+                    run_id, scenario_id, decision, report_artifact_hash, completed
+                )
+            if (
+                existing["scenario_id"] != scenario_id
+                or existing["decision"] != decision
+                or existing["report_artifact_hash"] != report_artifact_hash
+            ):
+                raise ValueError(f"research run already sealed: {run_id}")
+        return self._research_run_from_row(existing)
+
+    def get_research_run(self, run_id: str) -> ResearchRunRecord | None:
+        """Return the persisted final output for one agent run, if it completed."""
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM research_runs WHERE run_id = ?", (run_id,)
+            ).fetchone()
+        return self._research_run_from_row(row) if row is not None else None
+
     def get_scenario_snapshot(self, scenario_id: str, name: str) -> ScenarioSnapshot | None:
         with self._connect() as connection:
             row = connection.execute(
@@ -940,6 +1010,16 @@ class TemporalStore:
             useful_evidence_ids=tuple(json.loads(row["useful_evidence_ids_json"])),
             artifact_hash=row["artifact_hash"],
             created_at=parse_timestamp(row["created_at"]),
+        )
+
+    @staticmethod
+    def _research_run_from_row(row: sqlite3.Row) -> ResearchRunRecord:
+        return ResearchRunRecord(
+            run_id=row["run_id"],
+            scenario_id=row["scenario_id"],
+            decision=row["decision"],
+            report_artifact_hash=row["report_artifact_hash"],
+            completed_at=parse_timestamp(row["completed_at"]),
         )
 
     @staticmethod

@@ -169,13 +169,16 @@ tradingagents temporal-scenario --id nvda-q4 --as-of 2024-02-21T17:02:03Z --basi
 tradingagents temporal-rubric --id nvda-q4 --material evidence-id-1 --useful evidence-id-1,evidence-id-2 --store .tradingagents/temporal
 tradingagents temporal-score-run --run-id replay-run-id --id nvda-q4 --store .tradingagents/temporal
 tradingagents temporal-compare-runs --left-run-id baseline-run-id --right-run-id changed-run-id --id nvda-q4 --store .tradingagents/temporal
+tradingagents temporal-compare-repeated-runs --left-run-ids baseline-1,baseline-2 --right-run-ids changed-1,changed-2 --id nvda-q4 --store .tradingagents/temporal
 ```
 
 For a running poller, set `TRADINGAGENTS_POLLER_TEMPORAL_STORE` to the same
 store directory. It projects media rows only after their poller terminal receipt
 commits, preserving the poller's existing request-budget and failure semantics.
 Rubrics are immutable scenario labels: both experimental arms are scored against
-the exact same material/useful evidence set.
+the exact same material/useful evidence set. Completed replay runs persist their
+final decision/report pointer, so repeated-arm comparison derives both citation
+grounding and modal-decision stability without ad hoc report files.
 
 ## Smallest architecture that works
 

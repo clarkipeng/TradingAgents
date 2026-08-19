@@ -1773,6 +1773,44 @@ def temporal_compare_runs(
     )
 
 
+@app.command("temporal-compare-repeated-runs")
+def temporal_compare_repeated_runs(
+    left_run_ids: str = typer.Option(  # noqa: B008
+        ..., "--left-run-ids", help="Comma-separated baseline temporal run IDs."
+    ),
+    right_run_ids: str = typer.Option(  # noqa: B008
+        ..., "--right-run-ids", help="Comma-separated changed-arm temporal run IDs."
+    ),
+    scenario_id: str = typer.Option(..., "--id", help="Sealed scenario ID."),  # noqa: B008
+    store: Path = typer.Option(  # noqa: B008
+        Path(".tradingagents/temporal"), "--store", help="Temporal evidence-store directory."
+    ),
+):
+    """Compare repeated persisted arms, including modal decision stability."""
+    from tradingagents.temporal import TemporalStore, compare_recorded_run_sets
+
+    result = compare_recorded_run_sets(
+        TemporalStore(store),
+        left_run_ids=tuple(item.strip() for item in left_run_ids.split(",") if item.strip()),
+        right_run_ids=tuple(item.strip() for item in right_run_ids.split(",") if item.strip()),
+        scenario_id=scenario_id,
+    )
+    typer.echo(
+        json.dumps(
+            {
+                "scenario_id": result.scenario_id,
+                "left": result.left.__dict__,
+                "right": result.right.__dict__,
+                "evidence_coverage_delta": result.evidence_coverage_delta,
+                "citation_grounding_delta": result.citation_grounding_delta,
+                "retrieval_efficiency_delta": result.retrieval_efficiency_delta,
+                "decision_stability_delta": result.decision_stability_delta,
+            },
+            sort_keys=True,
+        )
+    )
+
+
 @app.command()
 def analyze(
     checkpoint: bool | None = typer.Option(

@@ -163,6 +163,13 @@ def trace_from_tool_run(
     decision: str | None = None,
 ) -> ResearchTrace:
     """Build a framework-neutral research trace from the persisted tool tape."""
+    provided_claims = tuple(claims)
+    stored_run = store.get_research_run(run_id)
+    if stored_run is not None:
+        if stored_run.scenario_id != scenario_id:
+            raise ValueError("research run belongs to a different scenario")
+        if decision is None:
+            decision = stored_run.decision
     tool_traces = store.list_tool_traces(run_id)
     search_traces = store.list_search_traces(run_id)
     evidence_ids = [trace.evidence_id for trace in tool_traces if trace.evidence_id is not None]
@@ -172,7 +179,11 @@ def trace_from_tool_run(
         run_id=run_id,
         scenario_id=scenario_id,
         evidence_ids=tuple(dict.fromkeys(evidence_ids)),
-        claims=tuple(claims),
+        claims=(
+            provided_claims
+            if provided_claims or not decision
+            else cited_claims_from_markdown(decision, claim_prefix="final-decision")
+        ),
         decision=decision,
     )
 
@@ -218,14 +229,14 @@ def compare_recorded_runs(
     rubric = store.get_scenario_rubric(scenario_id)
     if rubric is None:
         raise KeyError(f"scenario has no sealed rubric: {scenario_id}")
-    left = trace_from_tool_run(
+    left, _left_metrics = score_recorded_run(
         store,
         run_id=left_run_id,
         scenario_id=scenario_id,
         claims=left_claims,
         decision=left_decision,
     )
-    right = trace_from_tool_run(
+    right, _right_metrics = score_recorded_run(
         store,
         run_id=right_run_id,
         scenario_id=scenario_id,
@@ -238,6 +249,44 @@ def compare_recorded_runs(
         material_evidence_ids=rubric.material_evidence_ids,
         useful_evidence_ids=rubric.useful_evidence_ids,
     )
+
+
+def compare_recorded_run_sets(
+    store: TemporalStore,
+    *,
+    left_run_ids: Iterable[str],
+    right_run_ids: Iterable[str],
+    scenario_id: str,
+) -> RepeatedPairedScenarioResult:
+    """Summarize repeated persisted A/B runs, including decision stability."""
+    left_ids = tuple(left_run_ids)
+    right_ids = tuple(right_run_ids)
+    if not left_ids or len(left_ids) != len(right_ids):
+        raise ValueError("left_run_ids and right_run_ids must be non-empty and equally sized")
+    rubric = store.get_scenario_rubric(scenario_id)
+    if rubric is None:
+        raise KeyError(f"scenario has no sealed rubric: {scenario_id}")
+    results = run_repeated_paired_evaluation(
+        [
+            ScenarioRubric(
+                scenario_id,
+                rubric.material_evidence_ids,
+                rubric.useful_evidence_ids,
+            )
+        ],
+        repetitions=len(left_ids),
+        left_runner=lambda _scenario_id, repetition: trace_from_tool_run(
+            store,
+            run_id=left_ids[repetition],
+            scenario_id=scenario_id,
+        ),
+        right_runner=lambda _scenario_id, repetition: trace_from_tool_run(
+            store,
+            run_id=right_ids[repetition],
+            scenario_id=scenario_id,
+        ),
+    )
+    return results[0]
 
 
 def run_paired_evaluation(

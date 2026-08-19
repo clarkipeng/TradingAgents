@@ -31,8 +31,10 @@
   later migration, not a prerequisite for usable temporal search.
 - **Scenario evaluation complete:** `temporal-rubric` seals material/useful
   evidence IDs against a scenario; `temporal-score-run` scores one persisted
-  replay trace and `temporal-compare-runs` compares two arms against that exact
-  same immutable rubric.
+  replay trace, `temporal-compare-runs` compares two arms, and
+  `temporal-compare-repeated-runs` adds modal-decision stability against that
+  exact same immutable rubric. Completed replay decisions/reports are sealed
+  with the run rather than supplied later as ad hoc files.
 - **Scheduler package complete:** the checked-in universe, capture runner, and
   opt-in per-user launchd installer are ready for local installation; no system
   scheduler has been installed from this workspace.

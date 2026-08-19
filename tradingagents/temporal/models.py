@@ -130,6 +130,17 @@ class ScenarioRubricRecord:
 
 
 @dataclass(frozen=True)
+class ResearchRunRecord:
+    """Immutable final decision/report pointer for one completed agent run."""
+
+    run_id: str
+    scenario_id: str
+    decision: str | None
+    report_artifact_hash: str | None
+    completed_at: datetime
+
+
+@dataclass(frozen=True)
 class TemporalSearchResult:
     """One evidence item returned by the owned temporal full-text index."""
 

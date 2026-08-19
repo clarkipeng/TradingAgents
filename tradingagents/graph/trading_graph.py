@@ -451,7 +451,24 @@ class TradingAgentsGraph:
                     logger.info("Starting fresh for %s on %s", company_name, trade_date)
 
             try:
-                return self._run_graph(company_name, trade_date, asset_type=asset_type)
+                result = self._run_graph(company_name, trade_date, asset_type=asset_type)
+                if (
+                    active_temporal is not None
+                    and active_temporal.store is not None
+                    and active_temporal.scenario_id is not None
+                    and active_temporal.run_id is not None
+                    and isinstance(result, tuple)
+                    and len(result) == 2
+                    and isinstance(result[0], Mapping)
+                ):
+                    decision = result[0].get("final_trade_decision")
+                    active_temporal.store.record_research_run(
+                        active_temporal.run_id,
+                        active_temporal.scenario_id,
+                        decision=decision,
+                        report=decision,
+                    )
+                return result
             finally:
                 if self._checkpointer_ctx is not None:
                     self._checkpointer_ctx.__exit__(None, None, None)

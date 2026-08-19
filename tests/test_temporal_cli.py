@@ -5,7 +5,7 @@ import requests
 from typer.testing import CliRunner
 
 import cli.main as cli
-from tradingagents.temporal import TemporalStore
+from tradingagents.temporal import RepeatedArmMetrics, RepeatedPairedScenarioResult, TemporalStore
 from tradingagents.temporal_adapters.tradingagents import DailyCaptureResult
 from tradingagents.temporal_collectors import (
     GdeltImportResult,
@@ -521,3 +521,47 @@ def test_temporal_compare_runs_uses_the_same_sealed_rubric(tmp_path):
 
     assert result.exit_code == 0, result.output
     assert json.loads(result.output)["evidence_coverage_delta"] == -1.0
+
+
+def test_temporal_compare_repeated_runs_passes_persisted_run_sets(tmp_path, monkeypatch):
+    captured = {}
+
+    def fake_compare(store, **kwargs):
+        captured.update({"store": store, **kwargs})
+        arm = RepeatedArmMetrics(
+            repetitions=2,
+            evidence_coverage=1.0,
+            citation_grounding=1.0,
+            retrieval_efficiency=1.0,
+            decision_stability=1.0,
+        )
+        return RepeatedPairedScenarioResult(
+            scenario_id="nvda-repeated",
+            left=arm,
+            right=arm,
+            evidence_coverage_delta=0.0,
+            citation_grounding_delta=0.0,
+            retrieval_efficiency_delta=0.0,
+            decision_stability_delta=0.0,
+        )
+
+    monkeypatch.setattr("tradingagents.temporal.compare_recorded_run_sets", fake_compare)
+    result = CliRunner().invoke(
+        cli.app,
+        [
+            "temporal-compare-repeated-runs",
+            "--left-run-ids",
+            "baseline-1, baseline-2",
+            "--right-run-ids",
+            "changed-1,changed-2",
+            "--id",
+            "nvda-repeated",
+            "--store",
+            str(tmp_path),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert captured["left_run_ids"] == ("baseline-1", "baseline-2")
+    assert captured["right_run_ids"] == ("changed-1", "changed-2")
+    assert json.loads(result.output)["decision_stability_delta"] == 0.0

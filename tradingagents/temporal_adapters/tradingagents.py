@@ -340,6 +340,12 @@ def replay_scenario(
         temporal=context,
     )
     decision = final_state.get("final_trade_decision")
+    store.record_research_run(
+        context.run_id or "",
+        scenario_id,
+        decision=decision,
+        report=decision,
+    )
     return trace_from_tool_run(
         store,
         run_id=context.run_id,

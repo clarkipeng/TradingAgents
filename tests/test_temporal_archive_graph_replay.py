@@ -86,3 +86,4 @@ def test_sealed_archive_scenario_replays_through_the_real_graph_owned_search(tmp
     assert trace.scenario_id == "nvda-archive"
     assert trace.evidence_ids == (early.evidence_id,)
     assert len(store.list_search_traces(trace.run_id)) == 1
+    assert store.get_research_run(trace.run_id).decision == trace.decision
