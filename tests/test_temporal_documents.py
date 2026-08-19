@@ -1,0 +1,104 @@
+import json
+import sqlite3
+from datetime import datetime, timezone
+
+import pytest
+
+from cli.temporal_retrieval_bench import run_benchmark
+from tradingagents.temporal import TemporalStore
+from tradingagents.temporal.documents import extract_document, stable_chunk_id, stable_doc_key
+
+UTC = timezone.utc
+
+
+def at(hour: int) -> datetime:
+    return datetime(2025, 1, 2, hour, tzinfo=UTC)
+
+
+@pytest.mark.parametrize(
+    ("metadata", "response", "kind"),
+    [
+        ({"article": {"title": "GDELT title", "url": "https://news.example/a"}}, {"text": "ignored"}, "gdelt"),
+        ({"story": {"title": "HN title"}}, {"text": "HN title\n\nHN body"}, "hacker-news"),
+        ({"form": "10-Q"}, {"text": "<SEC-HEADER>hidden</SEC-HEADER><DOCUMENT><TEXT>Revenue</TEXT></DOCUMENT>"}, "sec"),
+        ({"wayback_url": "https://web.archive.org/x"}, {"text": "Wayback body"}, "wayback"),
+    ],
+)
+def test_source_extractors_normalize_documents(metadata, response, kind):
+    document = extract_document({
+        "tool": "corpus.document", "request": {}, "response": {**response, "metadata": metadata},
+        "source": "https://example.com", "available_at": at(9).isoformat(), "is_error": False,
+    })
+    assert document["doc_kind"] == kind
+    if kind == "sec":
+        assert document["body"] == "Revenue"
+
+
+def test_stable_document_and_chunk_keys_are_versioned():
+    doc_key = stable_doc_key("evidence-a", 0)
+    assert doc_key == stable_doc_key("evidence-a", 0)
+    assert doc_key != stable_doc_key("evidence-a", 1)
+    assert stable_chunk_id(doc_key, 0) != stable_chunk_id(doc_key, 1)
+
+
+def test_incremental_documents_deduplicate_and_reindex_idempotently(tmp_path):
+    store = TemporalStore(tmp_path)
+    first = store.record("corpus.document", {"url": "https://www.example.com/a?utm_source=x"}, {"text": "Same headline", "metadata": {}}, available_at=at(9), source="https://www.example.com/a")
+    second = store.record("corpus.document", {"url": "https://example.com/a"}, {"text": "Same headline", "metadata": {}}, available_at=at(9), source="https://example.com/a")
+    connection = sqlite3.connect(tmp_path / "temporal.sqlite3")
+    try:
+        assert connection.execute("select count(*) from documents").fetchone()[0] == 2
+        assert connection.execute("select count(*) from document_chunks").fetchone()[0] == 2
+    finally:
+        connection.close()
+    result = store.search("Same headline", as_of=at(10))
+    assert len(result.results) == 1
+    assert set(result.results[0].document.siblings) == {
+        stable_doc_key(first.evidence_id, 0), stable_doc_key(second.evidence_id, 0)
+    } - {result.results[0].doc_key}
+    before = (tmp_path / "temporal.sqlite3").read_bytes()
+    store.reindex_documents()
+    after = (tmp_path / "temporal.sqlite3").read_bytes()
+    assert before != after  # rebuild is an explicit derivative write
+    connection = sqlite3.connect(tmp_path / "temporal.sqlite3")
+    try:
+        counts = tuple(connection.execute("select count(*) from " + table).fetchone()[0] for table in ("documents", "document_chunks"))
+    finally:
+        connection.close()
+    store.reindex_documents()
+    connection = sqlite3.connect(tmp_path / "temporal.sqlite3")
+    try:
+        assert counts == tuple(connection.execute("select count(*) from " + table).fetchone()[0] for table in ("documents", "document_chunks"))
+    finally:
+        connection.close()
+
+
+def test_store_open_does_not_write_existing_database(tmp_path):
+    store = TemporalStore(tmp_path)
+    store.record("corpus.document", {"url": "https://example.com"}, {"text": "body", "metadata": {}}, available_at=at(9))
+    before = (tmp_path / "temporal.sqlite3").read_bytes()
+    TemporalStore(tmp_path)
+    assert (tmp_path / "temporal.sqlite3").read_bytes() == before
+
+
+def test_benchmark_maps_evidence_targets_to_document_keys_and_rejects_unknown(tmp_path):
+    database = tmp_path / "temporal.sqlite3"
+    connection = sqlite3.connect(database)
+    connection.executescript("""
+        CREATE TABLE evidence (evidence_id TEXT PRIMARY KEY, tool TEXT, available_at TEXT);
+        CREATE TABLE documents (doc_key TEXT PRIMARY KEY, parent_evidence_id TEXT, available_at TEXT);
+        CREATE TABLE document_chunks (rowid INTEGER PRIMARY KEY, doc_key TEXT, body TEXT);
+        CREATE VIRTUAL TABLE document_chunks_fts USING fts5(body, content='document_chunks', content_rowid='rowid');
+    """)
+    connection.execute("insert into evidence values ('evidence-a','corpus.document','2025-01-02T09:00:00.000000Z')")
+    connection.execute("insert into documents values ('document-a','evidence-a','2025-01-02T09:00:00.000000Z')")
+    connection.execute("insert into document_chunks values (1,'document-a','alpha signal')")
+    connection.execute("insert into document_chunks_fts(rowid,body) values (1,'alpha signal')")
+    connection.commit()
+    connection.close()
+    bench = tmp_path / "bench.json"
+    bench.write_text(json.dumps({"as_of": "2025-01-02T12:00:00Z", "queries": [{"query": "alpha", "expected_document_keys": ["evidence-a"]}]}))
+    assert run_benchmark(bench, tmp_path)["queries"][0]["recall"] == 1
+    bench.write_text(json.dumps({"queries": [{"query": "alpha", "expected_document_keys": ["missing"]}]}))
+    with pytest.raises(ValueError, match="neither an evidence ID nor document key"):
+        run_benchmark(bench, tmp_path)

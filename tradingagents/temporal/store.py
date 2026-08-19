@@ -886,7 +886,7 @@ class TemporalStore:
                 manifest=SearchManifest(
                     query=query,
                     as_of=parse_timestamp(as_of),
-                    ranker_version="temporal-document-v1",
+                    ranker_version="temporal-document-v2",
                     corpus_hash=self.corpus_hash(as_of=as_of),
                     evidence_ids=(),
                 ),
@@ -934,7 +934,7 @@ class TemporalStore:
             manifest=SearchManifest(
                 query=query,
                 as_of=parse_timestamp(as_of),
-                ranker_version="temporal-document-v1",
+                ranker_version="temporal-document-v2",
                 corpus_hash=self.corpus_hash(as_of=as_of),
                 evidence_ids=tuple(result.evidence.evidence_id for result in results),
             ),

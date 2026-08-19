@@ -20,7 +20,7 @@ def test_temporal_search_excludes_future_evidence(tmp_path):
     assert len(early.results) == 1
     assert len(later.results) == 2
     assert early.results[0].evidence.response["text"] == "NVDA supply constraints"
-    assert early.manifest.ranker_version == "temporal-document-v1"
+    assert early.manifest.ranker_version == "temporal-document-v2"
     assert early.manifest.corpus_hash != later.manifest.corpus_hash
 
 

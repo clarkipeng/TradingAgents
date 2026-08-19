@@ -113,16 +113,18 @@ def _search(connection: sqlite3.Connection, case: Case, limit: int) -> list[str]
     ).fetchone()
     if has_documents:
         rows = connection.execute(
-        """SELECT doc_key, -COUNT(*) AS rank FROM (
-             SELECT d.doc_key
+        """SELECT d.doc_key, bm25(document_chunks_fts) AS rank
              FROM document_chunks_fts
              JOIN document_chunks c ON c.rowid = document_chunks_fts.rowid
              JOIN documents d ON d.doc_key = c.doc_key
              WHERE document_chunks_fts MATCH ? AND d.available_at <= ?
-           ) GROUP BY doc_key ORDER BY rank ASC, doc_key ASC LIMIT ?""",
-        (query, case.as_of, limit),
+           ORDER BY rank ASC, d.doc_key ASC""",
+        (query, case.as_of),
         ).fetchall()
-        return [row[0] for row in rows]
+        best: dict[str, float] = {}
+        for doc_key, rank in rows:
+            best[doc_key] = min(best.get(doc_key, float("inf")), float(rank))
+        return [key for key, _rank in sorted(best.items(), key=lambda item: (item[1], item[0]))[:limit]]
     return [row[0] for row in connection.execute(
         """SELECT f.evidence_id FROM evidence_fts AS f
            JOIN evidence AS e ON e.evidence_id = f.evidence_id
@@ -157,8 +159,22 @@ def run_benchmark(bench: str | Path, store: str | Path | None = None, k: int = 1
         traces = _trace_cases(connection) if "topic_from_search_traces" in spec else []
         cases = _cases(spec, traces)
         if "documents" not in spec:
-            mapping = dict(connection.execute("SELECT parent_evidence_id, doc_key FROM documents")) if connection.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='documents'").fetchone() else {}
-            cases = [Case(case.query, tuple(mapping.get(key, key) for key in case.expected), case.kind, case.as_of) for case in cases]
+            has_documents = connection.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='documents'"
+            ).fetchone()
+            if has_documents:
+                mapping = dict(connection.execute("SELECT parent_evidence_id, doc_key FROM documents"))
+                document_keys = set(mapping.values())
+                evidence_keys = set(mapping)
+                normalized_cases = []
+                for case in cases:
+                    unknown = sorted(set(case.expected) - evidence_keys - document_keys)
+                    if unknown:
+                        raise ValueError(f"benchmark target is neither an evidence ID nor document key: {unknown[0]}")
+                    normalized_cases.append(
+                        Case(case.query, tuple(mapping.get(key, key) for key in case.expected), case.kind, case.as_of)
+                    )
+                cases = normalized_cases
         rows = []
         for case in cases:
             evaluated_k = max(k, 2 * len(case.expected))
