@@ -19,6 +19,7 @@ from tradingagents.agents.utils.agent_utils import (
     get_cashflow,
     get_fundamentals,
     get_global_news,
+    get_hacker_news,
     get_income_statement,
     get_indicators,
     get_insider_transactions,
@@ -234,6 +235,7 @@ class TradingAgentsGraph:
                     get_insider_transactions,
                     get_macro_indicators,
                     get_prediction_markets,
+                    get_hacker_news,
                     *analyst_extra_tools,
                 ]
             ),

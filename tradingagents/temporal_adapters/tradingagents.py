@@ -102,6 +102,7 @@ def capture_daily_market_research(
     attempted = completed = 0
     failures: list[str] = []
 
+    from tradingagents.dataflows.hacker_news import fetch_hacker_news_stories
     from tradingagents.dataflows.interface import route_to_vendor
     from tradingagents.dataflows.reddit import fetch_reddit_posts
     from tradingagents.dataflows.stocktwits import fetch_stocktwits_messages
@@ -147,6 +148,29 @@ def capture_daily_market_research(
                     failures.append(f"{ticker}:{name}:{type(root_error).__name__}")
                 else:
                     completed += 1
+        # Hacker News is a global feed, so collect it once per capture run rather
+        # than redundantly once per ticker. Its immutable tape entry remains
+        # available to every scenario created from this run.
+        attempted += 1
+        try:
+            hacker_news_request = {"feed": "top", "limit": 8}
+            hacker_news_rows = invoke_tool(
+                "social.hackernews",
+                hacker_news_request,
+                lambda: fetch_hacker_news_stories(
+                    "top", captured_at.timestamp(), limit=8
+                ),
+            )
+            _record_hacker_news_documents(
+                store,
+                rows=hacker_news_rows,
+                request=hacker_news_request,
+                captured_at=captured_at,
+            )
+        except Exception as error:
+            failures.append(f"global:hacker_news:{type(error).__name__}")
+        else:
+            completed += 1
     return DailyCaptureResult(
         attempted=attempted,
         completed=completed,
@@ -156,6 +180,67 @@ def capture_daily_market_research(
         start_date=start_date,
         end_date=end_date,
     )
+
+
+def _record_hacker_news_documents(
+    store: TemporalStore,
+    *,
+    rows: Any,
+    request: Mapping[str, Any],
+    captured_at: datetime,
+) -> None:
+    """Derive searchable HN story documents from one replay-tape response.
+
+    The complete feed response remains the exact tool-replay unit. Each valid
+    story is additionally a small ``corpus.document`` record with its own
+    publication clock and the parent artifact hash in metadata, so FTS can rank
+    posts rather than a whole feed blob.
+    """
+    parent = store.latest_eligible("social.hackernews", request, as_of=captured_at)
+    if parent is None or not isinstance(rows, list):
+        return
+    for row in rows:
+        if not isinstance(row, Mapping):
+            continue
+        external_id = row.get("external_id")
+        title = row.get("title")
+        published_epoch = row.get("created_utc")
+        metadata = row.get("metadata")
+        if (
+            not isinstance(external_id, str)
+            or not isinstance(title, str)
+            or isinstance(published_epoch, bool)
+            or not isinstance(published_epoch, (int, float))
+        ):
+            continue
+        published_at = datetime.fromtimestamp(published_epoch, timezone.utc)
+        source = (
+            metadata.get("discussion_url")
+            if isinstance(metadata, Mapping) and isinstance(metadata.get("discussion_url"), str)
+            else f"https://news.ycombinator.com/item?id={external_id}"
+        )
+        store.record(
+            "corpus.document",
+            {
+                "source": "hacker-news-forward",
+                "external_id": external_id,
+                "parent_artifact_hash": parent.artifact_hash,
+            },
+            {
+                "text": f"{title}\n\n{row.get('body', '')}".strip(),
+                "metadata": {
+                    "source_record": dict(row),
+                    "parent_artifact_hash": parent.artifact_hash,
+                    "availability_basis": "hn-story-created_utc",
+                },
+            },
+            available_at=published_at,
+            observed_at=captured_at,
+            event_at=published_at,
+            source_published_at=published_at,
+            fidelity="forward-captured",
+            source=source,
+        )
 
 
 def execute_final_decision(

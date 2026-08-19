@@ -101,6 +101,7 @@ DEFAULT_CONFIG = _apply_env_overrides({
         "source_run_id": None,  # exact tool tape; normally supplied by a scenario
         "use_capture_tape": False,
         "search_enabled": False,  # add owned temporal_search to analyst tool sets
+        "hacker_news_enabled": False,  # expose the bounded HN feed to news/sentiment
     },
     # LLM settings
     "llm_provider": "openai",

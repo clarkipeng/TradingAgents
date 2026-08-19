@@ -2,6 +2,7 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 from tradingagents.agents.utils.agent_utils import (
     get_global_news,
+    get_hacker_news,
     get_insider_transactions,
     get_instrument_context_from_state,
     get_language_instruction,
@@ -13,7 +14,11 @@ from tradingagents.dataflows.config import get_config
 from tradingagents.dataflows.media_history import collected_media_enabled
 
 
-def _tools_for_mode(historical_media: bool, global_topics_only: bool = False):
+def _tools_for_mode(
+    historical_media: bool,
+    global_topics_only: bool = False,
+    hacker_news_enabled: bool = False,
+):
     """Only point-in-time-safe tools are exposed to historical simulations."""
     tools = [get_global_news] if global_topics_only else [get_news, get_global_news]
     if not historical_media:
@@ -22,6 +27,8 @@ def _tools_for_mode(historical_media: bool, global_topics_only: bool = False):
             get_insider_transactions,
             get_prediction_markets,
         ])
+    if hacker_news_enabled:
+        tools.append(get_hacker_news)
     return tools
 
 
@@ -34,7 +41,12 @@ def create_news_analyst(llm, *, extra_tools=()):
 
         historical_media = collected_media_enabled()
         global_topics_only = bool(get_config().get("global_topics_only", False))
-        tools = [*_tools_for_mode(historical_media, global_topics_only), *extra_tools]
+        temporal = get_config().get("temporal", {})
+        hacker_news_enabled = isinstance(temporal, dict) and temporal.get("hacker_news_enabled", False)
+        tools = [
+            *_tools_for_mode(historical_media, global_topics_only, hacker_news_enabled),
+            *extra_tools,
+        ]
 
         source_guidance = (
             "This experiment intentionally permits only broad global narratives and public "
@@ -58,6 +70,8 @@ def create_news_analyst(llm, *, extra_tools=()):
             "and get_global_news(curr_date, look_back_days, limit) for broader news and "
             "public trend discussion."
         )
+        if hacker_news_enabled:
+            tool_guidance += " Use get_hacker_news() for the bounded public technology-community feed."
         system_message = (
             f"You are a news researcher tasked with analyzing recent news and trends over the past week. Please write a comprehensive report of the current state of the world that is relevant for trading and macroeconomics. {tool_guidance} {source_guidance} Provide specific, actionable insights with supporting evidence to help traders make informed decisions."
             + """ Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."""

@@ -8,6 +8,7 @@ from tradingagents.temporal import TemporalStore
 from tradingagents.temporal_adapters.tradingagents import DailyCaptureResult
 from tradingagents.temporal_collectors import (
     GdeltImportResult,
+    HackerNewsImportResult,
     SecEdgarImportResult,
     WaybackImportResult,
 )
@@ -201,6 +202,48 @@ def test_temporal_gdelt_import_passes_a_historical_discovery_request(tmp_path, m
     assert captured["end"] == "2024-02-29"
     assert captured["max_records"] == 2
     assert "Imported 2/2 GDELT article records" in result.output
+
+
+def test_temporal_hn_import_passes_a_bounded_archive_request(tmp_path, monkeypatch):
+    captured = {}
+
+    def fake_import(store, **kwargs):
+        captured.update({"store": store, **kwargs})
+        return HackerNewsImportResult(
+            requested=2,
+            imported=2,
+            evidence_ids=("a", "b"),
+            failures=(),
+            response_artifact_hash="raw-response",
+        )
+
+    monkeypatch.setattr(
+        "tradingagents.temporal_collectors.import_hacker_news_stories",
+        fake_import,
+    )
+    result = CliRunner().invoke(
+        cli.app,
+        [
+            "temporal-hn-import",
+            "--query",
+            "NVIDIA",
+            "--from",
+            "2024-02-01",
+            "--to",
+            "2024-02-29",
+            "--max-records",
+            "2",
+            "--store",
+            str(tmp_path),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert captured["query"] == "NVIDIA"
+    assert captured["start"] == "2024-02-01"
+    assert captured["end"] == "2024-02-29"
+    assert captured["max_records"] == 2
+    assert "Imported 2/2 Hacker News stories" in result.output
 
 
 def test_temporal_scenario_command_seals_a_manifest(tmp_path):

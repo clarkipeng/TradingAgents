@@ -58,3 +58,10 @@ def test_historical_news_mode_exposes_no_revised_or_live_tools():
 def test_global_topics_only_exposes_no_ticker_news_tool():
     historical = {tool.name for tool in na._tools_for_mode(True, global_topics_only=True)}
     assert historical == {"get_global_news"}
+
+
+@pytest.mark.unit
+def test_hacker_news_is_an_explicit_opt_in_news_tool():
+    tool_names = {tool.name for tool in na._tools_for_mode(False, hacker_news_enabled=True)}
+
+    assert "get_hacker_news" in tool_names

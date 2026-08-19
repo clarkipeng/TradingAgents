@@ -1468,6 +1468,42 @@ def temporal_gdelt_import(
         raise typer.Exit(code=1)
 
 
+@app.command("temporal-hn-import")
+def temporal_hn_import(
+    query: str = typer.Option(..., "--query", help="Hacker News text query."),  # noqa: B008
+    start: str = typer.Option(..., "--from", help="Inclusive ISO date/time."),  # noqa: B008
+    end: str = typer.Option(..., "--to", help="Inclusive ISO date/time."),  # noqa: B008
+    store: Path = typer.Option(  # noqa: B008
+        Path(".tradingagents/temporal"), "--store", help="Temporal evidence-store directory."
+    ),
+    max_records: int = typer.Option(100, min=1, max=100, help="Maximum HN stories."),  # noqa: B008
+):
+    """Backfill public Hacker News stories as archive-reconstructed evidence."""
+    import requests
+
+    from tradingagents.temporal import TemporalStore
+    from tradingagents.temporal_collectors import (
+        HackerNewsArchiveResponseError,
+        import_hacker_news_stories,
+    )
+
+    try:
+        result = import_hacker_news_stories(
+            TemporalStore(store),
+            query=query,
+            start=start,
+            end=end,
+            max_records=max_records,
+        )
+    except (requests.RequestException, HackerNewsArchiveResponseError) as error:
+        typer.echo(f"Hacker News import request failed: {error}", err=True)
+        raise typer.Exit(code=1) from None
+    typer.echo(f"Imported {result.imported}/{result.requested} Hacker News stories into {store}")
+    if result.failures:
+        typer.echo("Failures: " + ", ".join(result.failures), err=True)
+        raise typer.Exit(code=1)
+
+
 @app.command("temporal-scenario")
 def temporal_scenario(
     scenario_id: str = typer.Option(..., "--id", help="Stable scenario identifier."),  # noqa: B008

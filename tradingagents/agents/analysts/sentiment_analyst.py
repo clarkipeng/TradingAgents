@@ -40,6 +40,7 @@ from tradingagents.agents.utils.structured import (
     bind_structured,
     invoke_structured_or_freetext,
 )
+from tradingagents.dataflows.config import get_config
 from tradingagents.dataflows.media_history import (
     collected_media_enabled,
     get_collected_sentiment_blocks,
@@ -89,6 +90,13 @@ def create_sentiment_analyst(llm):
                 {"ticker": ticker, "subreddits": "default", "limit_per_sub": 5},
                 lambda: fetch_reddit_posts(ticker),
             )
+        temporal = get_config().get("temporal", {})
+        hacker_news_enabled = isinstance(temporal, dict) and temporal.get("hacker_news_enabled", False)
+        hacker_news_block = ""
+        if hacker_news_enabled:
+            from tradingagents.agents.utils.news_data_tools import get_hacker_news
+
+            hacker_news_block = get_hacker_news.func()
 
         system_message = _build_system_message(
             ticker=ticker,
@@ -97,6 +105,7 @@ def create_sentiment_analyst(llm):
             news_block=news_block,
             stocktwits_block=stocktwits_block,
             reddit_block=reddit_block,
+            hacker_news_block=hacker_news_block,
         )
 
         prompt = ChatPromptTemplate.from_messages(
@@ -150,6 +159,7 @@ def _build_system_message(
     news_block: str,
     stocktwits_block: str,
     reddit_block: str,
+    hacker_news_block: str,
 ) -> str:
     """Assemble the sentiment-analyst system message with structured data blocks."""
     return f"""You are a financial market sentiment analyst. Your task is to produce a comprehensive sentiment report for {ticker} covering the period from {start_date} to {end_date}, drawing on three complementary data sources that have already been collected for you.
@@ -176,6 +186,8 @@ Community discussion. Engagement signal via upvote score and comment count. Subr
 <start_of_reddit>
 {reddit_block}
 <end_of_reddit>
+
+{hacker_news_block}
 
 ## How to analyze this data (best practices)
 

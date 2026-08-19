@@ -1,8 +1,25 @@
 # Merge and Launch Plan: Temporal Core + X Pipeline + Hacker News
 
-## Starting state
+## Current implementation status
 
-Two real lines of work exist; everything else is a stale duplicate.
+- **Local merge complete:** temporal core and `add-x-api-key` are combined in
+  `db5d594`; nothing has been pushed from this workspace.
+- **Phase 2 boundary:** the temporal SQLite/artifact store is the corpus used
+  by capture, replay, search, and trace evaluation. The existing Postgres media
+  store remains poller staging until its writer is ported; no temporal code
+  writes to it.
+- **HN vertical slice complete:** daily capture records one bounded
+  `social.hackernews` feed per run, derives per-story `corpus.document` records
+  linked to the feed artifact, and `temporal-hn-import` backfills Algolia HN
+  stories with their creation clock. `temporal.hacker_news_enabled` exposes the
+  fixed feed to news and sentiment analysis without changing the default graph.
+- **Still pending:** Reddit/X migration, broader daily surfaces, scheduler,
+  scenario labeling, and the first paired experiment. They remain separate
+  waves because none should fork the canonical temporal corpus.
+
+## Historical starting state
+
+Two real lines of work existed; everything else was a stale duplicate.
 
 | Worktree | Branch | State | Contains |
 |---|---|---|---|
