@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import re
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from html.parser import HTMLParser
@@ -65,13 +65,16 @@ def import_wayback_captures(
     request_delay_seconds: float = 1.0,
     session: Any | None = None,
     sleep: Callable[[float], None] = time.sleep,
+    lineage: Mapping[str, Any] | None = None,
 ) -> WaybackImportResult:
     """Fetch deduplicated archived HTML captures into the temporal corpus.
 
     ``url`` is passed to the CDX index and may be an exact URL or its supported
     wildcard form. Each page's original HTML bytes are stored as a separate
     content-addressed artifact; the searchable evidence holds a lightweight
-    text derivative plus the raw artifact address.
+    text derivative plus the raw artifact address. ``lineage`` lets a bounded
+    discovery-to-body bridge retain its upstream evidence identity without
+    changing standalone imports.
     """
     if not url.strip():
         raise ValueError("url must not be empty")
@@ -99,7 +102,11 @@ def import_wayback_captures(
         params["to"] = end_timestamp
     index_response = client.get(_CDX_URL, params=params, timeout=30)
     index_response.raise_for_status()
-    captures = _parse_cdx_rows(index_response.json())[:max_captures]
+    captures = [
+        capture
+        for capture in _parse_cdx_rows(index_response.json())
+        if _within_cdx_bounds(capture["timestamp"], start_timestamp, end_timestamp)
+    ][:max_captures]
 
     evidence_ids: list[str] = []
     failures: list[str] = []
@@ -124,6 +131,7 @@ def import_wayback_captures(
                     "original_url": original_url,
                     "capture_timestamp": timestamp,
                     "digest": capture.get("digest"),
+                    **({"lineage": dict(lineage)} if lineage else {}),
                 },
                 {
                     "text": text,
@@ -135,6 +143,7 @@ def import_wayback_captures(
                         "raw_artifact_hash": raw_artifact_hash,
                         "raw_media_type": media_type,
                         "availability_basis": "wayback-capture",
+                        **({"lineage": dict(lineage)} if lineage else {}),
                     },
                 },
                 available_at=captured_at,
@@ -177,6 +186,13 @@ def _parse_cdx_rows(payload: Any) -> list[dict[str, str]]:
         if _TIMESTAMP.fullmatch(item.get("timestamp", "")) and item.get("original"):
             captures.append(item)
     return captures
+
+
+def _within_cdx_bounds(timestamp: str, start: str | None, end: str | None) -> bool:
+    """Defend the temporal contract if a CDX response ignores its filters."""
+    lower = start.ljust(14, "0") if start is not None else None
+    upper = end.ljust(14, "9") if end is not None else None
+    return (lower is None or timestamp >= lower) and (upper is None or timestamp <= upper)
 
 
 def _extract_text(html: str) -> str:

@@ -1,6 +1,7 @@
 """Optional public-data collectors that write into the temporal evidence store."""
 
 from .gdelt import GdeltImportResult, GdeltResponseError, import_gdelt_articles
+from .gdelt_wayback import GdeltWaybackImportResult, import_gdelt_wayback_bodies
 from .hn_algolia import (
     HackerNewsArchiveResponseError,
     HackerNewsImportResult,
@@ -18,6 +19,7 @@ from .wayback import WaybackImportResult, import_wayback_captures
 __all__ = [
     "GdeltImportResult",
     "GdeltResponseError",
+    "GdeltWaybackImportResult",
     "HackerNewsArchiveResponseError",
     "HackerNewsImportResult",
     "MediaStoreImportResult",
@@ -26,6 +28,7 @@ __all__ = [
     "SecEdgarImportResult",
     "WaybackImportResult",
     "import_gdelt_articles",
+    "import_gdelt_wayback_bodies",
     "import_hacker_news_stories",
     "import_media_store_posts",
     "import_reddit_archive",

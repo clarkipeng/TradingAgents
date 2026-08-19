@@ -161,6 +161,7 @@ tradingagents temporal-capture --tickers NVDA,MSFT,AAPL --full-surface --store .
 tradingagents temporal-sec-import --cik 1045810 --user-agent "Research team contact@example.com" --store .tradingagents/temporal
 tradingagents temporal-wayback-import --url 'https://investor.example.com/*' --from 2024-01-01 --to 2024-03-31 --store .tradingagents/temporal
 tradingagents temporal-gdelt-import --query NVDA --from 2024-02-01 --to 2024-02-29 --store .tradingagents/temporal
+tradingagents temporal-gdelt-wayback-import --query NVDA --from 2024-02-01 --to 2024-02-29 --max-capture-lag-days 7 --store .tradingagents/temporal
 tradingagents temporal-hn-import --query NVDA --from 2024-02-01 --to 2024-02-29 --store .tradingagents/temporal
 tradingagents temporal-reddit-import --ticker NVDA --from 2024-02-01 --to 2024-02-29 --store .tradingagents/temporal
 tradingagents temporal-media-import --from 2024-02-01 --to 2024-02-29 --sources x,reddit --store .tradingagents/temporal

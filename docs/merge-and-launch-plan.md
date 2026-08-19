@@ -111,7 +111,7 @@ Gate: one daily capture run records every tool surface for the universe; a backf
 ## Phase 4: get it running
 
 1. **Scheduler:** implementation complete in `scripts/run_temporal_capture.sh`, `config/temporal-universe.txt`, and `scripts/install_temporal_launchd.sh`. The installer is explicit and has not been run; the Fly poller redeploy remains optional.
-2. **Backfill scenarios:** for a few historical windows (earnings, guidance, launches, macro shocks): SEC filings, Wayback IR/press pages, GDELT discovery, then the GDELT-to-Wayback body bridge so headlines have readable article text, plus Reddit/HN archive imports. Seal each as `archive-reconstructed`.
+2. **Backfill scenarios:** for a few historical windows (earnings, guidance, launches, macro shocks): SEC filings, Wayback IR/press pages, GDELT discovery, then the bounded `temporal-gdelt-wayback-import` body bridge so headlines have readable article text, plus Reddit/HN archive imports. Seal each as `archive-reconstructed`.
 3. **Label a small eval set:** tooling complete. `temporal-rubric` seals per-scenario material/useful evidence IDs, `temporal-score-run` reports one trace, and `temporal-compare-runs` reports A/B deltas; curate the initial 10-20 actual scenarios once the scheduler has accumulated forward capture.
 4. **Run the first paired experiment:** current TradingAgents vs one changed prompt/retrieval/graph arm, same scenarios, same pinned model; compare coverage, grounding, efficiency, stability.
 5. **Only after trace metrics show signal:** connect decisions to the simulator and add outcome metrics, using both `forward-captured` and non-event-window scenarios to avoid selection bias.

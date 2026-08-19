@@ -1472,6 +1472,49 @@ def temporal_gdelt_import(
         raise typer.Exit(code=1)
 
 
+@app.command("temporal-gdelt-wayback-import")
+def temporal_gdelt_wayback_import(
+    query: str = typer.Option(..., "--query", help="GDELT DOC query, e.g. NVDA or a Boolean expression."),  # noqa: B008
+    start: str = typer.Option(..., "--from", help="Inclusive ISO date/time."),  # noqa: B008
+    end: str = typer.Option(..., "--to", help="Inclusive ISO date/time."),  # noqa: B008
+    store: Path = typer.Option(  # noqa: B008
+        Path(".tradingagents/temporal"), "--store", help="Temporal evidence-store directory."
+    ),
+    max_records: int = typer.Option(25, min=1, max=250, help="Maximum GDELT records to bridge."),  # noqa: B008
+    max_capture_lag_days: int = typer.Option(  # noqa: B008
+        7, min=0, max=31, help="Maximum days after GDELT discovery to accept a Wayback capture."
+    ),
+):
+    """Recover bounded Wayback bodies for GDELT discovery records with lineage."""
+    import requests
+
+    from tradingagents.temporal import TemporalStore
+    from tradingagents.temporal_collectors import (
+        GdeltResponseError,
+        import_gdelt_wayback_bodies,
+    )
+
+    try:
+        result = import_gdelt_wayback_bodies(
+            TemporalStore(store),
+            query=query,
+            start=start,
+            end=end,
+            max_records=max_records,
+            max_capture_lag_days=max_capture_lag_days,
+        )
+    except (requests.RequestException, GdeltResponseError) as error:
+        typer.echo(f"GDELT/Wayback bridge request failed: {error}", err=True)
+        raise typer.Exit(code=1) from None
+    typer.echo(
+        f"Recovered {result.imported}/{result.attempted} Wayback bodies "
+        f"from {result.discovery.imported} GDELT discovery records into {store}"
+    )
+    if result.failures:
+        typer.echo("Failures: " + ", ".join(result.failures), err=True)
+        raise typer.Exit(code=1)
+
+
 @app.command("temporal-hn-import")
 def temporal_hn_import(
     query: str = typer.Option(..., "--query", help="Hacker News text query."),  # noqa: B008

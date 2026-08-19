@@ -78,3 +78,24 @@ def test_wayback_import_rejects_invalid_boundaries_and_overeager_pacing(tmp_path
         import_wayback_captures(store, url="https://example.com", start="2025", end="2024")
     with pytest.raises(ValueError, match="request_delay"):
         import_wayback_captures(store, url="https://example.com", request_delay_seconds=0)
+
+
+def test_wayback_import_rechecks_cdx_capture_bounds(tmp_path):
+    class Session:
+        def get(self, _url, **_kwargs):
+            return _Response(
+                payload=[
+                    ["timestamp", "original", "statuscode", "mimetype", "digest"],
+                    ["20240220100000", "https://example.com/nvda", "200", "text/html", "old"],
+                ]
+            )
+
+    result = import_wayback_captures(
+        TemporalStore(tmp_path),
+        url="https://example.com/nvda",
+        start="20240221170203",
+        end="20240228170203",
+        session=Session(),
+    )
+
+    assert result.requested == result.imported == 0

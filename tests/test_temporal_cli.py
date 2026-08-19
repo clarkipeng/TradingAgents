@@ -9,6 +9,7 @@ from tradingagents.temporal import TemporalStore
 from tradingagents.temporal_adapters.tradingagents import DailyCaptureResult
 from tradingagents.temporal_collectors import (
     GdeltImportResult,
+    GdeltWaybackImportResult,
     HackerNewsImportResult,
     MediaStoreImportResult,
     RedditArchiveImportResult,
@@ -233,6 +234,55 @@ def test_temporal_gdelt_import_passes_a_historical_discovery_request(tmp_path, m
     assert captured["end"] == "2024-02-29"
     assert captured["max_records"] == 2
     assert "Imported 2/2 GDELT article records" in result.output
+
+
+def test_temporal_gdelt_wayback_import_passes_a_bounded_bridge_request(tmp_path, monkeypatch):
+    captured = {}
+
+    def fake_import(store, **kwargs):
+        captured.update({"store": store, **kwargs})
+        return GdeltWaybackImportResult(
+            discovery=GdeltImportResult(
+                requested=2,
+                imported=2,
+                evidence_ids=("discovery-a", "discovery-b"),
+                failures=(),
+                response_artifact_hash="raw-response",
+            ),
+            attempted=2,
+            imported=1,
+            evidence_ids=("body-a",),
+            failures=(),
+        )
+
+    monkeypatch.setattr(
+        "tradingagents.temporal_collectors.import_gdelt_wayback_bodies",
+        fake_import,
+    )
+    result = CliRunner().invoke(
+        cli.app,
+        [
+            "temporal-gdelt-wayback-import",
+            "--query",
+            "NVDA",
+            "--from",
+            "2024-02-01",
+            "--to",
+            "2024-02-29",
+            "--max-records",
+            "2",
+            "--max-capture-lag-days",
+            "3",
+            "--store",
+            str(tmp_path),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert captured["query"] == "NVDA"
+    assert captured["max_records"] == 2
+    assert captured["max_capture_lag_days"] == 3
+    assert "Recovered 1/2 Wayback bodies" in result.output
 
 
 def test_temporal_hn_import_passes_a_bounded_archive_request(tmp_path, monkeypatch):
