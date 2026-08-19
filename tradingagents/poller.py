@@ -19,6 +19,8 @@ container can run with no CLI arguments. Env vars (CLI flags override them):
     MEDIA_DB_URL           store location; default ~/.tradingagents/cache/media.db
     X_BEARER_TOKEN         enables the 'x' source (paid)
     TRUTHSOCIAL_TOKEN      enables Truth Social
+    TRADINGAGENTS_POLLER_TEMPORAL_STORE optional temporal corpus directory;
+                              mirrors completed media receipts after commit
 
 Run modes:
     tradingagents-poller --tickers NVDA,AAPL          # hourly daemon
@@ -1078,6 +1080,29 @@ def _run_fetch(
             kind="odds" if odds else "media" if store_result else "request_receipt",
         )
         terminal_committed = True
+        if store_result and not odds and rows:
+            try:
+                from tradingagents.temporal_adapters.poller import mirror_poller_media_fetch
+
+                mirrored = mirror_poller_media_fetch(
+                    rows,
+                    provider=provider,
+                    query_key=query_key,
+                    fetch_run_id=fetch_run_id,
+                    received_utc=received,
+                )
+                if mirrored:
+                    logger.info(
+                        "%s fetch mirrored %d temporal documents",
+                        _safe_alert_provider(provider),
+                        mirrored,
+                    )
+            except Exception as exc:  # terminal media receipt is already durable
+                logger.error(
+                    "%s temporal mirror failed after receipt (%s)",
+                    _safe_alert_provider(provider),
+                    _exception_kind(exc),
+                )
         # The terminal receipt is authoritative. A watermark is only an
         # incremental-fetch optimization; failure after commit must never cause
         # a duplicate external request or a second success receipt.

@@ -24,8 +24,13 @@
 - **Extended daily capture complete:** `temporal-capture --full-surface` adds
   ticker fundamentals/statements/insiders plus global news, a small macro
   basket, and prediction markets while preserving the lightweight default.
-- **Still pending:** direct X writer migration, scheduler deployment, scenario
-  labeling, and the first paired experiment.
+- **Poller-to-corpus projection complete:** setting
+  `TRADINGAGENTS_POLLER_TEMPORAL_STORE` mirrors each terminal poller media
+  receipt (including X) into per-post temporal documents without altering its
+  budget or once-per-day controls. Retiring the poller staging store remains a
+  later migration, not a prerequisite for usable temporal search.
+- **Still pending:** scheduler deployment, scenario labeling, and the first
+  paired experiment.
   They remain separate waves because none should fork the canonical corpus.
 
 ## Historical starting state
@@ -88,7 +93,7 @@ Gate: exactly one canonical answer per row above is reflected in imports; no mod
 
 1. **Hacker News forward capture:** wire `dataflows/hacker_news.py` through `invoke_tool` as `social.hackernews`, add it to `capture_daily_market_research`, and expose it to the news/sentiment analysts as an opt-in tool.
 2. **Hacker News backfill:** new `temporal_collectors/hn_algolia.py` using the Algolia HN search API - the one social source with true historical search - writing per-story `corpus.document` evidence with `available_at` = story creation time, basis `archive-reconstructed`.
-3. **X capture:** port `x_cycle`/`poller` fetch loops to write temporal evidence through the gateway, keeping the budget policy (hard daily USD caps) and one-terminal-attempt-per-day discipline intact. Forward-only; there is no X backfill. Until then, `temporal-media-import` is the one-way bridge for captured X rows.
+3. **X capture:** the poller now mirrors terminal X media receipts to the temporal corpus when `TRADINGAGENTS_POLLER_TEMPORAL_STORE` is set, after (not inside) the existing paid-request commit boundary. This preserves the hard daily budget and one-terminal-attempt-per-day discipline. Forward-only; there is no X backfill. `temporal-media-import` remains available for previously staged rows.
 4. **Per-post social documents:** a derivative pass that explodes each captured Reddit/StockTwits/HN/X fetch blob into per-post `corpus.document` records (post clocks, linked to parent evidence by input hash). The fetch blob stays the replay-tape unit; the per-post docs are what FTS ranks and labels point at.
 5. **Reddit backfill:** complete. `temporal-reddit-import` uses Arctic Shift post/comment queries, filtered by subreddit + ticker mention, and writes per-record documents with `available_at` = `created_utc` and a retained raw-response artifact.
 6. **Full-surface daily capture:** implemented for fundamentals, statements, insiders, global news, macro/FRED, Polymarket, and HN via `temporal-capture --full-surface`. X remains supplied through the poller-media bridge until its writer migrates.

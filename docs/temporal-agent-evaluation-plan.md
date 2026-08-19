@@ -167,6 +167,10 @@ tradingagents temporal-media-import --from 2024-02-01 --to 2024-02-29 --sources 
 tradingagents temporal-scenario --id nvda-q4 --as-of 2024-02-21T17:02:03Z --basis archive-reconstructed --metadata '{"ticker":"NVDA"}'
 ```
 
+For a running poller, set `TRADINGAGENTS_POLLER_TEMPORAL_STORE` to the same
+store directory. It projects media rows only after their poller terminal receipt
+commits, preserving the poller's existing request-budget and failure semantics.
+
 ## Smallest architecture that works
 
 ```text
