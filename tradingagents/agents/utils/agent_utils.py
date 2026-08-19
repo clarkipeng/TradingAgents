@@ -68,6 +68,27 @@ def get_language_instruction() -> str:
     return f" Write your entire response in {lang}."
 
 
+def get_temporal_search_guidance() -> str:
+    """Return prompt guidance for the owned temporal search tool, or empty.
+
+    Binding the tool is not enough: analyst prompts prescribe a specific
+    tool workflow, so a model never reaches for an unadvertised auxiliary
+    tool. Returns empty string unless config enables temporal search, so
+    default prompts spend no extra tokens.
+    """
+    from tradingagents.dataflows.config import get_config
+    temporal = get_config().get("temporal")
+    if not isinstance(temporal, dict) or not temporal.get("search_enabled", False):
+        return ""
+    return (
+        " You also have temporal_search(query, limit): it searches an archived"
+        " corpus of news, filings, and public discussion restricted to what was"
+        " available at the analysis time. Use it to find evidence beyond the"
+        " fixed feeds, and cite each result you rely on inline as"
+        " [evidence:<id>] using the id it returns."
+    )
+
+
 def _clean_identity_value(value: Any) -> str | None:
     """Return a trimmed string, or None for empty / placeholder-ish values."""
     if not isinstance(value, str):
