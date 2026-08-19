@@ -1,0 +1,34 @@
+# Liquid US equities and broad ETFs for the local temporal daily capture.
+# One symbol per line; comments and blank lines are ignored.
+AAPL
+AMZN
+AVGO
+BRK.B
+COIN
+COST
+CRM
+GOOGL
+JPM
+LLY
+MA
+META
+MSFT
+NFLX
+NVDA
+ORCL
+PLTR
+TSLA
+UNH
+V
+XOM
+AMD
+AMAT
+AMZN
+BAC
+CRM
+GS
+INTC
+MCD
+MS
+QQQ
+SPY

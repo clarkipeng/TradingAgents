@@ -32,7 +32,11 @@
 - **Scenario labeling complete:** `temporal-rubric` seals material/useful
   evidence IDs against a scenario, and `temporal-score-run` scores a persisted
   replay trace with the same immutable rubric each arm uses.
-- **Still pending:** scheduler deployment and the first paired experiment.
+- **Scheduler package complete:** the checked-in universe, capture runner, and
+  opt-in per-user launchd installer are ready for local installation; no system
+  scheduler has been installed from this workspace.
+- **Still pending:** run the scheduler for a week and execute the first paired
+  experiment against the accumulated scenarios.
   They remain separate waves because none should fork the canonical corpus.
 
 ## Historical starting state
@@ -105,7 +109,7 @@ Gate: one daily capture run records every tool surface for the universe; a backf
 
 ## Phase 4: get it running
 
-1. **Scheduler:** local `launchd`/cron invoking `tradingagents temporal-capture` daily over the fixed universe (20-50 liquid US equities + SPY/QQQ). The Fly poller redeploy is optional later; local-first keeps the loop simple.
+1. **Scheduler:** implementation complete in `scripts/run_temporal_capture.sh`, `config/temporal-universe.txt`, and `scripts/install_temporal_launchd.sh`. The installer is explicit and has not been run; the Fly poller redeploy remains optional.
 2. **Backfill scenarios:** for a few historical windows (earnings, guidance, launches, macro shocks): SEC filings, Wayback IR/press pages, GDELT discovery, then the GDELT-to-Wayback body bridge so headlines have readable article text, plus Reddit/HN archive imports. Seal each as `archive-reconstructed`.
 3. **Label a small eval set:** tooling complete. `temporal-rubric` seals per-scenario material/useful evidence IDs and `temporal-score-run` reports trace metrics; curate the initial 10-20 actual scenarios once the scheduler has accumulated forward capture.
 4. **Run the first paired experiment:** current TradingAgents vs one changed prompt/retrieval/graph arm, same scenarios, same pinned model; compare coverage, grounding, efficiency, stability.
