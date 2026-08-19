@@ -1504,6 +1504,37 @@ def temporal_hn_import(
         raise typer.Exit(code=1)
 
 
+@app.command("temporal-media-import")
+def temporal_media_import(
+    start: str = typer.Option(..., "--from", help="Inclusive UTC date (YYYY-MM-DD)."),  # noqa: B008
+    end: str = typer.Option(..., "--to", help="Inclusive UTC date (YYYY-MM-DD)."),  # noqa: B008
+    store: Path = typer.Option(  # noqa: B008
+        Path(".tradingagents/temporal"), "--store", help="Temporal evidence-store directory."
+    ),
+    media_db_url: str | None = typer.Option(None, "--media-db-url", help="Poller media-store URL."),  # noqa: B008
+    sources: str = typer.Option("", "--sources", help="Optional comma-separated poller sources."),  # noqa: B008
+    tickers: str = typer.Option("", "--tickers", help="Optional comma-separated ticker labels."),  # noqa: B008
+    limit: int = typer.Option(1_000, min=1, max=10_000, help="Maximum posts to copy."),  # noqa: B008
+):
+    """Copy existing poller posts into canonical temporal evidence documents."""
+    from tradingagents.temporal import TemporalStore
+    from tradingagents.temporal_collectors import import_media_store_posts
+
+    result = import_media_store_posts(
+        TemporalStore(store),
+        start=start,
+        end=end,
+        media_db_url=media_db_url,
+        sources=tuple(item.strip() for item in sources.split(",") if item.strip()),
+        tickers=tuple(item.strip().upper() for item in tickers.split(",") if item.strip()),
+        limit=limit,
+    )
+    typer.echo(f"Imported {result.imported}/{result.requested} poller media posts into {store}")
+    if result.failures:
+        typer.echo("Failures: " + ", ".join(result.failures), err=True)
+        raise typer.Exit(code=1)
+
+
 @app.command("temporal-scenario")
 def temporal_scenario(
     scenario_id: str = typer.Option(..., "--id", help="Stable scenario identifier."),  # noqa: B008

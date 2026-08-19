@@ -9,6 +9,7 @@ from tradingagents.temporal_adapters.tradingagents import DailyCaptureResult
 from tradingagents.temporal_collectors import (
     GdeltImportResult,
     HackerNewsImportResult,
+    MediaStoreImportResult,
     SecEdgarImportResult,
     WaybackImportResult,
 )
@@ -244,6 +245,43 @@ def test_temporal_hn_import_passes_a_bounded_archive_request(tmp_path, monkeypat
     assert captured["end"] == "2024-02-29"
     assert captured["max_records"] == 2
     assert "Imported 2/2 Hacker News stories" in result.output
+
+
+def test_temporal_media_import_bridges_existing_poller_rows(tmp_path, monkeypatch):
+    captured = {}
+
+    def fake_import(store, **kwargs):
+        captured.update({"store": store, **kwargs})
+        return MediaStoreImportResult(requested=2, imported=2, evidence_ids=("a", "b"), failures=())
+
+    monkeypatch.setattr(
+        "tradingagents.temporal_collectors.import_media_store_posts",
+        fake_import,
+    )
+    result = CliRunner().invoke(
+        cli.app,
+        [
+            "temporal-media-import",
+            "--from",
+            "2024-02-01",
+            "--to",
+            "2024-02-29",
+            "--sources",
+            "x,reddit",
+            "--tickers",
+            "nvda,msft",
+            "--limit",
+            "2",
+            "--store",
+            str(tmp_path),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert captured["sources"] == ("x", "reddit")
+    assert captured["tickers"] == ("NVDA", "MSFT")
+    assert captured["limit"] == 2
+    assert "Imported 2/2 poller media posts" in result.output
 
 
 def test_temporal_scenario_command_seals_a_manifest(tmp_path):

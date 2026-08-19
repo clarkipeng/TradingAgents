@@ -6,8 +6,9 @@
   `db5d594`; nothing has been pushed from this workspace.
 - **Phase 2 boundary:** the temporal SQLite/artifact store is the corpus used
   by capture, replay, search, and trace evaluation. The existing Postgres media
-  store remains poller staging until its writer is ported; no temporal code
-  writes to it.
+  store remains poller staging until its writer is ported; `temporal-media-import`
+  is a one-way bridge for its existing X/Reddit/news rows, using each poller's
+  fetch receipt as the temporal availability clock.
 - **HN vertical slice complete:** daily capture records one bounded
   `social.hackernews` feed per run, derives per-story `corpus.document` records
   linked to the feed artifact, and `temporal-hn-import` backfills Algolia HN

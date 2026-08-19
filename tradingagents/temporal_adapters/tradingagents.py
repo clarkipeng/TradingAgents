@@ -234,7 +234,9 @@ def _record_hacker_news_documents(
                     "availability_basis": "hn-story-created_utc",
                 },
             },
-            available_at=published_at,
+            # A story's timestamp is preserved below, but it enters our owned
+            # search corpus only once this poller observed the feed.
+            available_at=captured_at,
             observed_at=captured_at,
             event_at=published_at,
             source_published_at=published_at,
