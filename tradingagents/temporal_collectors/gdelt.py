@@ -5,12 +5,18 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, time, timezone
 from typing import Any
+from urllib.parse import urlencode
 
-import requests
-
+from tradingagents.dataflows.errors import ProviderResponseError, ProviderTransientError
+from tradingagents.dataflows.gdelt_common import (
+    GDELT_DOC_API_URL,
+    article_list_params,
+    normalize_gdelt_query,
+)
+from tradingagents.dataflows.provider_http import get_json
 from tradingagents.temporal import TemporalStore, canonical_json, parse_timestamp
 
-_DOC_API_URL = "https://api.gdeltproject.org/api/v2/doc/doc"
+_DOC_API_URL = GDELT_DOC_API_URL
 _MAX_RECORDS = 250
 
 
@@ -44,29 +50,36 @@ def import_gdelt_articles(
     This is discovery metadata; fetching or licensing the original publisher
     article is intentionally a separate collector decision.
     """
-    if not query.strip():
-        raise ValueError("query must not be empty")
+    query = normalize_gdelt_query(query)
     if not 1 <= max_records <= _MAX_RECORDS:
         raise ValueError(f"max_records must be between 1 and {_MAX_RECORDS}")
     start_at = _boundary(start, is_end=False)
     end_at = _boundary(end, is_end=True)
     if start_at > end_at:
         raise ValueError("start must not be after end")
-    params = {
-        "query": query,
-        "mode": "artlist",
-        "format": "json",
-        "maxrecords": str(max_records),
-        "startdatetime": _gdelt_timestamp(start_at),
-        "enddatetime": _gdelt_timestamp(end_at),
-    }
-    client = session or requests.Session()
-    response = client.get(_DOC_API_URL, params=params, timeout=30)
-    response.raise_for_status()
-    try:
-        payload = response.json()
-    except ValueError as error:
-        raise GdeltResponseError("GDELT returned a non-JSON response (often a rate-limit message)") from error
+    params = article_list_params(
+        query,
+        start=_gdelt_timestamp(start_at),
+        end=_gdelt_timestamp(end_at),
+        max_records=max_records,
+    )
+    if session is None:
+        try:
+            payload = get_json(
+                f"{_DOC_API_URL}?{urlencode(sorted(params.items()))}",
+                timeout=30,
+                attempts=1,
+                max_bytes=1_000_000,
+            )
+        except (ProviderResponseError, ProviderTransientError) as error:
+            raise GdeltResponseError(str(error)) from error
+    else:
+        response = session.get(_DOC_API_URL, params=params, timeout=30)
+        response.raise_for_status()
+        try:
+            payload = response.json()
+        except ValueError as error:
+            raise GdeltResponseError("GDELT returned a non-JSON response (often a rate-limit message)") from error
     if not isinstance(payload, dict) or not isinstance(payload.get("articles"), list):
         raise GdeltResponseError("GDELT response has no article list")
     raw_response_artifact_hash = store.put_artifact(

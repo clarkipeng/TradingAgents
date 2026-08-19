@@ -93,3 +93,34 @@ def test_gdelt_import_rejects_unusable_rate_limit_bodies_and_invalid_ranges(tmp_
             end="2024-02-21",
             session=session,
         )
+
+
+def test_gdelt_archive_import_uses_the_shared_bounded_transport_and_query_normalization(
+    tmp_path, monkeypatch
+):
+    captured = {}
+
+    def fake_get_json(url, **kwargs):
+        captured.update({"url": url, **kwargs})
+        return {
+            "articles": [
+                {
+                    "url": "https://news.example/nvda",
+                    "title": "NVIDIA data-center demand rises",
+                    "seendate": "20240221T170203Z",
+                }
+            ]
+        }
+
+    monkeypatch.setattr("tradingagents.temporal_collectors.gdelt.get_json", fake_get_json)
+    result = import_gdelt_articles(
+        TemporalStore(tmp_path),
+        query="  NVDA   OR   AI  ",
+        start="2024-02-21",
+        end="2024-02-21",
+    )
+
+    assert result.imported == 1
+    assert "query=NVDA+OR+AI" in captured["url"]
+    assert captured["attempts"] == 1
+    assert captured["max_bytes"] == 1_000_000

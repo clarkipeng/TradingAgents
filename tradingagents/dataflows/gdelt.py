@@ -12,10 +12,14 @@ from typing import Any
 from urllib.parse import urlencode, urlsplit, urlunsplit
 
 from tradingagents.dataflows.errors import ProviderResponseError
+from tradingagents.dataflows.gdelt_common import (
+    GDELT_DOC_API_URL,
+    article_list_params,
+)
 from tradingagents.dataflows.media_sources import looks_company_authored
 from tradingagents.dataflows.provider_http import get_json
 
-_API_URL = "https://api.gdeltproject.org/api/v2/doc/doc"
+_API_URL = GDELT_DOC_API_URL
 _MAX_ARTICLES = 25
 _MAX_LOOKBACK_HOURS = 48
 
@@ -75,15 +79,15 @@ def fetch_gdelt_articles(
     if window_start < 0:
         raise ValueError("lookback window must not precede the Unix epoch")
 
-    params = {
-        "ENDDATETIME": _gdelt_request_time(window_end),
-        "STARTDATETIME": _gdelt_request_time(window_start),
-        "format": "json",
-        "maxrecords": str(limit),
-        "mode": "artlist",
-        "query": CATEGORY_QUERIES[category],
-        "sort": "datedesc",
-    }
+    params = article_list_params(
+        CATEGORY_QUERIES[category],
+        start=_gdelt_request_time(window_start),
+        end=_gdelt_request_time(window_end),
+        max_records=limit,
+        start_key="STARTDATETIME",
+        end_key="ENDDATETIME",
+        extra={"sort": "datedesc"},
+    )
     deadline = time.monotonic() + float(
         GDELT_ADAPTER_POLICY["total_deadline_seconds_per_slot"]
     )
