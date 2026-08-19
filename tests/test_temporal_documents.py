@@ -116,3 +116,56 @@ def test_benchmark_maps_evidence_targets_to_document_keys_and_rejects_unknown(tm
     bench.write_text(json.dumps({"queries": [{"query": "alpha", "expected_document_keys": ["missing"]}]}))
     with pytest.raises(ValueError, match="neither an evidence ID nor document key"):
         run_benchmark(bench, tmp_path)
+
+
+def test_rubric_seals_with_mixed_tool_and_document_evidence(tmp_path):
+    # Rubrics legitimately mix searchable documents with tool-tape evidence
+    # (price data, fundamentals): the evaluator scores coverage of both, and
+    # only document-backed entries concern the retrieval bench. Sealing must
+    # require document keys for corpus documents only.
+    store = TemporalStore(tmp_path)
+    doc = store.record(
+        "corpus.document",
+        {"url": "one"},
+        {"text": "NVDA supply constraints"},
+        available_at="2025-01-02T09:00:00Z",
+    )
+    tool_blob = store.record(
+        "dataflow.get_stock_data",
+        {"args": ["NVDA"], "kwargs": {}},
+        "csv payload",
+        available_at="2025-01-02T09:00:00Z",
+    )
+    store.seal_scenario("mixed", as_of="2025-01-02T10:00:00Z", basis="forward-captured")
+
+    rubric = store.seal_scenario_rubric(
+        "mixed",
+        material_evidence_ids=(doc.evidence_id, tool_blob.evidence_id),
+        useful_evidence_ids=(doc.evidence_id, tool_blob.evidence_id),
+    )
+
+    assert set(rubric.material_evidence_ids) == {doc.evidence_id, tool_blob.evidence_id}
+    stored = store.get_scenario_rubric("mixed")
+    assert set(stored.useful_evidence_ids) == {doc.evidence_id, tool_blob.evidence_id}
+
+
+def test_rubric_still_requires_reindex_for_unmapped_documents(tmp_path):
+    store = TemporalStore(tmp_path)
+    doc = store.record(
+        "corpus.document",
+        {"url": "one"},
+        {"text": "NVDA supply constraints"},
+        available_at="2025-01-02T09:00:00Z",
+    )
+    store.seal_scenario("unmapped", as_of="2025-01-02T10:00:00Z", basis="forward-captured")
+    with store._connect() as connection:
+        connection.execute("DELETE FROM document_chunks_fts")
+        connection.execute("DELETE FROM document_chunks")
+        connection.execute("DELETE FROM documents")
+
+    with pytest.raises(ValueError, match="reindexed"):
+        store.seal_scenario_rubric(
+            "unmapped",
+            material_evidence_ids=(doc.evidence_id,),
+            useful_evidence_ids=(doc.evidence_id,),
+        )

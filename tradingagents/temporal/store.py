@@ -655,10 +655,20 @@ class TemporalStore:
                     useful,
                 ).fetchall()
             }
-            if set(document_keys) != set(useful):
+            # Rubrics mix searchable documents with tool-tape evidence (price
+            # data, fundamentals). Only corpus documents must map to stable
+            # document keys; tool-tape evidence stays evidence-id-labeled.
+            document_backed = {
+                row["evidence_id"]
+                for row in connection.execute(
+                    f"SELECT evidence_id FROM evidence WHERE tool = 'corpus.document' AND evidence_id IN ({','.join('?' for _ in useful)})",
+                    useful,
+                ).fetchall()
+            }
+            if document_backed - set(document_keys):
                 raise ValueError("document layer must be reindexed before sealing a rubric")
-            material_documents = tuple(document_keys[key] for key in material)
-            useful_documents = tuple(document_keys[key] for key in useful)
+            material_documents = tuple(document_keys[key] for key in material if key in document_keys)
+            useful_documents = tuple(document_keys[key] for key in useful if key in document_keys)
             existing = connection.execute(
                 "SELECT * FROM scenario_rubrics WHERE scenario_id = ?", (scenario_id,)
             ).fetchone()
