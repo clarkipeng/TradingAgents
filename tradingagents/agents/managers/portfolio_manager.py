@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from tradingagents.agents.schemas import PortfolioDecision, render_pm_decision
 from tradingagents.agents.utils.agent_utils import (
+    get_analyst_report_citations,
     get_instrument_context_from_state,
     get_language_instruction,
 )
@@ -32,6 +33,13 @@ def create_portfolio_manager(llm):
         risk_debate_state = state["risk_debate_state"]
         research_plan = state["investment_plan"]
         trader_plan = state["trader_investment_plan"]
+        analyst_citations = get_analyst_report_citations(state)
+        citation_guidance = (
+            f"\n- Analyst-report citations to carry into the final decision: {analyst_citations}"
+            " (preserve each citation you rely on)."
+            if analyst_citations
+            else ""
+        )
 
         past_context = state.get("past_context", "")
         lessons_line = (
@@ -56,6 +64,7 @@ def create_portfolio_manager(llm):
 **Context:**
 - Research Manager's investment plan: **{research_plan}**
 - Trader's transaction proposal: **{trader_plan}**
+{citation_guidance}
 {lessons_line}
 **Risk Analysts Debate History:**
 {history}

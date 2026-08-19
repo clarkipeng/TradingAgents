@@ -120,6 +120,70 @@ def test_portfolio_manager_prompt_states_constraint():
 
 
 @pytest.mark.unit
+def test_analyst_report_citations_survive_trader_to_portfolio_manager_prompts():
+    from tradingagents.agents.schemas import (
+        PortfolioDecision,
+        PortfolioRating,
+        TraderAction,
+        TraderProposal,
+    )
+
+    citation = "[evidence:analyst-001]"
+    reports = {
+        "market_report": f"Technical setup supports the thesis {citation}",
+        "sentiment_report": "",
+        "news_report": "",
+        "fundamentals_report": "",
+    }
+    trader_capture = {}
+    trader = create_trader(
+        _capturing_llm(
+            trader_capture,
+            TraderProposal(action=TraderAction.BUY, reasoning=f"Use the report {citation}"),
+        )
+    )
+    trader_result = trader({
+        "company_of_interest": "NVDA",
+        "investment_plan": "Buy",
+        **reports,
+    })
+
+    portfolio_capture = {}
+    portfolio = create_portfolio_manager(
+        _capturing_llm(
+            portfolio_capture,
+            PortfolioDecision(
+                rating=PortfolioRating.BUY,
+                executive_summary=f"Buy {citation}",
+                investment_thesis="The cited analyst evidence supports the position.",
+            ),
+        )
+    )
+    risk = {
+        "history": "debate",
+        "aggressive_history": "",
+        "conservative_history": "",
+        "neutral_history": "",
+        "current_aggressive_response": "",
+        "current_conservative_response": "",
+        "current_neutral_response": "",
+        "latest_speaker": "Neutral",
+        "count": 1,
+    }
+    final = portfolio({
+        "company_of_interest": "NVDA",
+        "risk_debate_state": risk,
+        "investment_plan": "Buy",
+        "trader_investment_plan": trader_result["trader_investment_plan"],
+        **reports,
+    })
+
+    assert citation in _prompt_text(trader_capture["prompt"])
+    assert citation in _prompt_text(portfolio_capture["prompt"])
+    assert citation in final["final_trade_decision"]
+
+
+@pytest.mark.unit
 def test_sentiment_prompt_states_constraint(monkeypatch):
     from tradingagents.agents.schemas import SentimentBand, SentimentReport
 

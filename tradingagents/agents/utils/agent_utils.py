@@ -1,5 +1,6 @@
 import functools
 import logging
+import re
 from collections.abc import Mapping
 from typing import Any
 
@@ -46,10 +47,32 @@ __all__ = [
     "resolve_instrument_identity",
     "get_instrument_context_from_state",
     "get_language_instruction",
+    "get_analyst_report_citations",
     "create_msg_delete",
 ]
 
 logger = logging.getLogger(__name__)
+
+_EVIDENCE_CITATION = re.compile(r"\[evidence:[^\]\s]+\]")
+
+
+def get_analyst_report_citations(state: Mapping[str, Any]) -> str:
+    """Return analyst-report citations in first-seen order for downstream prompts."""
+    citations = []
+    seen = set()
+    for report_key in (
+        "market_report",
+        "sentiment_report",
+        "news_report",
+        "fundamentals_report",
+    ):
+        report = state.get(report_key, "")
+        report_text = report if isinstance(report, str) else ""
+        for citation in _EVIDENCE_CITATION.findall(report_text):
+            if citation not in seen:
+                seen.add(citation)
+                citations.append(citation)
+    return " ".join(citations)
 
 
 def get_language_instruction() -> str:
@@ -239,4 +262,3 @@ def create_msg_delete():
         return {"messages": removal_operations + [placeholder]}
 
     return delete_messages
-
