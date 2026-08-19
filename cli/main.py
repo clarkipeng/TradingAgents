@@ -75,6 +75,18 @@ app = typer.Typer(
 )
 
 
+@app.command("temporal-mcp")
+def temporal_mcp(
+    store: Path = typer.Option(..., "--store"),  # noqa: B008
+    scenario: str = typer.Option(..., "--scenario"),  # noqa: B008
+):
+    """Serve scenario-scoped temporal retrieval over MCP stdio."""
+    from cli.temporal_mcp import serve
+    from tradingagents.temporal import TemporalStore
+
+    serve(TemporalStore(store), scenario)
+
+
 # Create a deque to store recent messages with a maximum length
 class MessageBuffer:
     # Fixed teams that always run (not user-selectable)

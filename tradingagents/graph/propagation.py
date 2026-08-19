@@ -1,19 +1,22 @@
 # TradingAgents/graph/propagation.py
 
+from collections.abc import Mapping
 from typing import Any
 
 from tradingagents.agents.utils.agent_states import (
     InvestDebateState,
     RiskDebateState,
 )
+from tradingagents.temporal import build_evidence_brief, current_context
 
 
 class Propagator:
     """Handles state initialization and propagation through the graph."""
 
-    def __init__(self, max_recur_limit=100):
+    def __init__(self, max_recur_limit=100, config: Mapping[str, Any] | None = None):
         """Initialize with configuration parameters."""
         self.max_recur_limit = max_recur_limit
+        self.config = config or {}
 
     def create_initial_state(
         self,
@@ -31,7 +34,7 @@ class Propagator:
         fall back to ticker-only context via
         ``get_instrument_context_from_state``.
         """
-        return {
+        state = {
             "messages": [("human", company_name)],
             "company_of_interest": company_name,
             "asset_type": asset_type,
@@ -67,6 +70,19 @@ class Propagator:
             "sentiment_report": "",
             "news_report": "",
         }
+        settings = self.config.get("temporal")
+        context = current_context()
+        if (
+            isinstance(settings, Mapping)
+            and settings.get("evidence_brief", False)
+            and context is not None
+            and context.store is not None
+        ):
+            state["evidence_brief"] = build_evidence_brief(
+                context.store, company_name, context.clock.as_of,
+                int(settings.get("evidence_brief_k", 5)),
+            )
+        return state
 
     def get_graph_args(self, callbacks: list | None = None) -> dict[str, Any]:
         """Get arguments for the graph invocation.

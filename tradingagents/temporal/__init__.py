@@ -1,5 +1,6 @@
 """Framework-neutral capture and replay primitives for temporal tools."""
 
+from .brief import build_evidence_brief
 from .clock import VirtualClock, format_timestamp, parse_timestamp
 from .evaluation import (
     FactualClaim,
@@ -40,8 +41,8 @@ from .models import (
     canonical_json,
     request_key,
 )
+from .retriever import TemporalRetriever
 from .runtime import TemporalContext, current_context, temporal_context
-from .search import TemporalSearch
 from .simulation import (
     Fill,
     InsufficientBuyingPowerError,
@@ -82,7 +83,7 @@ __all__ = [
     "TemporalGateway",
     "TemporalMode",
     "TemporalOutcome",
-    "TemporalSearch",
+    "TemporalRetriever",
     "TemporalSearchResponse",
     "TemporalSearchResult",
     "ToolTraceRecord",
@@ -110,4 +111,5 @@ __all__ = [
     "ScenarioDefinition",
     "temporal_context",
     "trace_from_tool_run",
+    "build_evidence_brief",
 ]

@@ -51,6 +51,9 @@ poller = [
     "psycopg[binary]>=3.1",
     "exchange-calendars>=4.5",
 ]
+mcp = [
+    "mcp>=1.0",
+]
 
 [project.scripts]
 tradingagents = "cli.entrypoints:interactive"
@@ -58,6 +61,7 @@ tradingagents-poller = "cli.entrypoints:poller"
 tradingagents-backtest = "cli.entrypoints:backtest"
 tradingagents-walkforward = "cli.entrypoints:walkforward"
 tradingagents-research = "cli.entrypoints:research"
+tradingagents-temporal-mcp = "cli.temporal_mcp:main"
 temporal-retrieval-bench = "cli.temporal_retrieval_bench:main"
 
 [tool.setuptools.packages.find]

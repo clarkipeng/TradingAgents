@@ -18,6 +18,7 @@ from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, ConfigDict, PrivateAttr
 
 from tradingagents.temporal import LLMCallRecord, TemporalStore, canonical_json, current_context
+from tradingagents.temporal.retriever import search_payload
 
 logger = logging.getLogger(__name__)
 
@@ -94,36 +95,7 @@ def _build_temporal_search_tool(expected_store: TemporalStore | None = None) -> 
                 manifest=response.manifest,
                 invoked_at=context.clock.as_of,
             )
-        return canonical_json(
-            {
-                "results": [
-                    {
-                        "evidence_id": result.evidence.evidence_id,
-                        "doc_key": result.doc_key,
-                        "title": result.document.title if result.document else result.evidence.response.get("title"),
-                        "source": result.evidence.source or (result.document.source_domain if result.document else None),
-                        "available_at": result.evidence.available_at,
-                        "fidelity": result.evidence.fidelity,
-                        **_snippet(result.evidence.response),
-                    }
-                    for result in response.results
-                ],
-                "manifest": {
-                    "query": response.manifest.query,
-                    "as_of": response.manifest.as_of,
-                    "ranker_version": response.manifest.ranker_version,
-                    "corpus_hash": response.manifest.corpus_hash,
-                    "evidence_ids": response.manifest.evidence_ids,
-                    "index_state_hash": response.manifest.index_state_hash,
-                    "tie_break": response.manifest.tie_break,
-                    "page": response.manifest.page,
-                    "limit": response.manifest.limit,
-                    "date_from": response.manifest.date_from,
-                    "date_to": response.manifest.date_to,
-                    "source": response.manifest.source,
-                },
-            }
-        )
+        return canonical_json(search_payload(response))
 
     return StructuredTool.from_function(
         search,

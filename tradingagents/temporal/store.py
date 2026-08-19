@@ -43,6 +43,9 @@ class TemporalStore:
         self._eligible_index_cache: dict[tuple[str, str], EligibleChunkIndex] = {}
         self.artifacts_dir.mkdir(parents=True, exist_ok=True)
         self._initialize()
+        from .retriever import TemporalRetriever
+
+        self.retriever = TemporalRetriever(self)
 
     @contextmanager
     def _connect(self) -> Iterator[sqlite3.Connection]:
@@ -898,6 +901,12 @@ class TemporalStore:
         corpus_hash_pin: str | None = None,
     ) -> TemporalSearchResponse:
         """Search eligible normalized chunks and aggregate to one result per document cluster."""
+        return self.retriever.search(
+            query, as_of=as_of, limit=limit, page=page, date_from=date_from,
+            date_to=date_to, source=source, corpus_hash_pin=corpus_hash_pin,
+        )
+        # Kept below only as a source-compatible migration marker; retrieval is
+        # owned by TemporalRetriever and this branch is unreachable.
         if limit < 1:
             raise ValueError("limit must be positive")
         if page < 1:
