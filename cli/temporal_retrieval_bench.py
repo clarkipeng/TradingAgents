@@ -13,6 +13,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from tradingagents.temporal.models import canonical_json
+from tradingagents.temporal.ranking import build_eligible_index, rank
+
 
 def _fts_query(query: str) -> str:
     return " OR ".join(f'"{token}"' for token in re.findall(r"[\w]+", query, re.UNICODE))
@@ -78,7 +81,9 @@ def _read_connection(store: Path) -> sqlite3.Connection:
     database = store / "temporal.sqlite3" if store.is_dir() else store
     if not database.is_file():
         raise FileNotFoundError(f"temporal database not found: {database}")
-    return sqlite3.connect(f"file:{database}?mode=ro", uri=True)
+    connection = sqlite3.connect(f"file:{database}?mode=ro", uri=True)
+    connection.row_factory = sqlite3.Row
+    return connection
 
 
 def _trace_cases(connection: sqlite3.Connection) -> list[tuple[str, str, list[str]]]:
@@ -104,7 +109,7 @@ def _trace_cases(connection: sqlite3.Connection) -> list[tuple[str, str, list[st
     ]
 
 
-def _search(connection: sqlite3.Connection, case: Case, limit: int) -> list[str]:
+def _search(connection: sqlite3.Connection, case: Case, limit: int, index_cache: dict[tuple[str, str], Any] | None = None) -> list[str]:
     query = _fts_query(case.query)
     if not query:
         return []
@@ -112,16 +117,19 @@ def _search(connection: sqlite3.Connection, case: Case, limit: int) -> list[str]
         "SELECT 1 FROM sqlite_master WHERE type='table' AND name='documents'"
     ).fetchone()
     if has_documents:
-        rows = connection.execute(
-        """SELECT d.doc_key, MIN(document_chunks_fts.rank) AS rank
-             FROM document_chunks_fts
-             JOIN document_chunks c ON c.rowid = document_chunks_fts.rowid
-             JOIN documents d ON d.doc_key = c.doc_key
-             WHERE document_chunks_fts MATCH ? AND d.available_at <= ?
-             GROUP BY d.doc_key ORDER BY rank ASC, d.doc_key ASC LIMIT ?""",
-        (query, case.as_of, limit),
+        cutoff = case.as_of
+        eligible = connection.execute(
+            "SELECT evidence_id FROM evidence WHERE available_at <= ? ORDER BY evidence_id", (cutoff,)
         ).fetchall()
-        return [row[0] for row in rows]
+        corpus_hash = __import__("hashlib").sha256(
+            canonical_json({"as_of": cutoff, "evidence_ids": [row[0] for row in eligible]}).encode()
+        ).hexdigest()
+        cache = index_cache if index_cache is not None else {}
+        index = cache.get((corpus_hash, cutoff))
+        if index is None:
+            index = build_eligible_index(connection, corpus_hash=corpus_hash, as_of=cutoff)
+            cache[(corpus_hash, cutoff)] = index
+        return [key for key, _score in rank(index, case.query, limit)]
     return [row[0] for row in connection.execute(
         """SELECT f.evidence_id FROM evidence_fts AS f
            JOIN evidence AS e ON e.evidence_id = f.evidence_id
@@ -173,9 +181,10 @@ def run_benchmark(bench: str | Path, store: str | Path | None = None, k: int = 1
                     )
                 cases = normalized_cases
         rows = []
+        index_cache: dict[tuple[str, str], Any] = {}
         for case in cases:
             evaluated_k = max(k, 2 * len(case.expected))
-            metrics = _query_metrics(_search(connection, case, evaluated_k), case.expected, evaluated_k)
+            metrics = _query_metrics(_search(connection, case, evaluated_k, index_cache), case.expected, evaluated_k)
             rows.append({
                 "query": case.query,
                 "kind": case.kind,

@@ -94,6 +94,8 @@ def _build_temporal_search_tool(expected_store: TemporalStore | None = None) -> 
                     "ranker_version": response.manifest.ranker_version,
                     "corpus_hash": response.manifest.corpus_hash,
                     "evidence_ids": response.manifest.evidence_ids,
+                    "index_state_hash": response.manifest.index_state_hash,
+                    "tie_break": response.manifest.tie_break,
                 },
             }
         )

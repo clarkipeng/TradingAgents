@@ -1,0 +1,33 @@
+{
+  "queries": [
+    {
+      "query": "Tesla reduces Model 3 and Model Y prices",
+      "as_of": "2023-01-16T23:59:59Z",
+      "expected_document_keys": ["53a96adc35fb584a1bbf287f60c918c145688a39173a17ae70d84369c6f46106"],
+      "kind": "known-item",
+      "scenario": "tsla-2023-01-price-cuts"
+    },
+    {
+      "query": "TSLA January 2023 vehicle price cuts",
+      "as_of": "2023-01-16T23:59:59Z",
+      "expected_document_keys": ["53a96adc35fb584a1bbf287f60c918c145688a39173a17ae70d84369c6f46106"],
+      "kind": "known-item",
+      "scenario": "tsla-2023-01-price-cuts"
+    },
+    {
+      "query": "Microsoft investment partnership announcement OpenAI",
+      "as_of": "2023-01-26T23:59:59Z",
+      "expected_document_keys": ["18b990375374ae78c82a349a4156857c7e5111da839cbb3bc1c8af9f158abe7b"],
+      "kind": "known-item",
+      "scenario": "msft-2023-01-openai-investment"
+    },
+    {
+      "query": "MSFT OpenAI investment January 2023 8-K",
+      "as_of": "2023-01-26T23:59:59Z",
+      "expected_document_keys": ["18b990375374ae78c82a349a4156857c7e5111da839cbb3bc1c8af9f158abe7b"],
+      "kind": "known-item",
+      "scenario": "msft-2023-01-openai-investment"
+    }
+  ],
+  "floors": {}
+}

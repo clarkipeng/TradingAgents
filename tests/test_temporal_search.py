@@ -20,7 +20,8 @@ def test_temporal_search_excludes_future_evidence(tmp_path):
     assert len(early.results) == 1
     assert len(later.results) == 2
     assert early.results[0].evidence.response["text"] == "NVDA supply constraints"
-    assert early.manifest.ranker_version == "temporal-document-v2"
+    assert early.manifest.ranker_version == "temporal-hybrid-v3"
+    assert early.manifest.index_state_hash
     assert early.manifest.corpus_hash != later.manifest.corpus_hash
 
 
@@ -48,6 +49,16 @@ def test_long_natural_queries_still_match_partially_relevant_documents(tmp_path)
 
     assert len(response.results) == 1
     assert response.results[0].evidence.response["text"].startswith("NVDA data center")
+
+
+def test_post_as_of_documents_cannot_change_frozen_ranking(tmp_path):
+    store = TemporalStore(tmp_path / "store")
+    store.record("corpus.document", {"url": "old"}, {"title": "NVDA supply", "text": "NVDA supply constraints"}, available_at=at(9))
+    before = store.search("NVDA supply", as_of=at(10), limit=10)
+    store.record("corpus.document", {"url": "future"}, {"title": "NVDA supply", "text": "NVDA supply improves dramatically"}, available_at=at(11))
+    after = store.search("NVDA supply", as_of=at(10), limit=10)
+    assert [(result.doc_key, result.rank) for result in before.results] == [(result.doc_key, result.rank) for result in after.results]
+    assert before.manifest == after.manifest
 
 
 def test_documents_matching_more_query_terms_rank_first(tmp_path):

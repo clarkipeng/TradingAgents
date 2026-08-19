@@ -30,6 +30,7 @@ from .models import (
     canonical_json,
     request_key,
 )
+from .ranking import RANKER_VERSION, EligibleChunkIndex, build_eligible_index, rank
 
 
 class TemporalStore:
@@ -39,6 +40,7 @@ class TemporalStore:
         self.root = Path(root)
         self.artifacts_dir = self.root / "artifacts"
         self.database_path = self.root / "temporal.sqlite3"
+        self._eligible_index_cache: dict[tuple[str, str], EligibleChunkIndex] = {}
         self.artifacts_dir.mkdir(parents=True, exist_ok=True)
         self._initialize()
 
@@ -207,6 +209,11 @@ class TemporalStore:
                 connection.execute("ALTER TABLE evidence ADD COLUMN event_at TEXT")
             if "source_published_at" not in columns:
                 connection.execute("ALTER TABLE evidence ADD COLUMN source_published_at TEXT")
+            search_columns = {row["name"] for row in connection.execute("PRAGMA table_info(search_traces)")}
+            if "index_state_hash" not in search_columns:
+                connection.execute("ALTER TABLE search_traces ADD COLUMN index_state_hash TEXT NOT NULL DEFAULT ''")
+            if "tie_break" not in search_columns:
+                connection.execute("ALTER TABLE search_traces ADD COLUMN tie_break TEXT NOT NULL DEFAULT 'evidence_id/doc_key'")
             scenario_columns = {row["name"] for row in connection.execute("PRAGMA table_info(scenarios)")}
             if "corpus_hash" not in scenario_columns:
                 connection.execute("ALTER TABLE scenarios ADD COLUMN corpus_hash TEXT NOT NULL DEFAULT ''")
@@ -888,45 +895,35 @@ class TemporalStore:
         """Search eligible normalized chunks and aggregate to one result per document cluster."""
         if limit < 1:
             raise ValueError("limit must be positive")
-        fts_query = _fts_query(query)
         cutoff = format_timestamp(parse_timestamp(as_of))
-        if not fts_query:
+        corpus_hash = self.corpus_hash(as_of=as_of)
+        cache_key = (corpus_hash, cutoff)
+        index = self._eligible_index_cache.get(cache_key)
+        if index is None:
+            with self._connect() as connection:
+                index = build_eligible_index(connection, corpus_hash=corpus_hash, as_of=cutoff)
+            self._eligible_index_cache[cache_key] = index
+        if not query.strip():
             return TemporalSearchResponse(
                 results=(),
                 manifest=SearchManifest(
                     query=query,
                     as_of=parse_timestamp(as_of),
-                    ranker_version="temporal-document-v2",
-                    corpus_hash=self.corpus_hash(as_of=as_of),
+                    ranker_version=RANKER_VERSION,
+                    corpus_hash=corpus_hash,
                     evidence_ids=(),
+                    index_state_hash=index.index_state_hash,
                 ),
             )
-        candidate_limit = max(limit * 8, 32)
-        with self._connect() as connection:
-            candidates = connection.execute(
-                """
-                -- FTS5's rank column is bm25(document_chunks_fts); unlike the
-                -- auxiliary function it is legal in a grouped aggregate.
-                SELECT c.doc_key, d.cluster_key, MIN(document_chunks_fts.rank) AS rank
-                FROM document_chunks_fts
-                JOIN document_chunks c ON c.rowid = document_chunks_fts.rowid
-                JOIN documents d ON d.doc_key = c.doc_key
-                WHERE document_chunks_fts MATCH ? AND d.available_at <= ?
-                GROUP BY c.doc_key, d.cluster_key
-                ORDER BY rank ASC, c.doc_key ASC
-                LIMIT ?
-                """,
-                (fts_query, cutoff, candidate_limit),
-            ).fetchall()
+        candidates = [(doc_key, score) for doc_key, score in rank(index, query, max(limit * 8, 32))]
+        cluster_by_key = {chunk.doc_key: chunk.cluster_key for chunk in index.chunks}
         best: dict[str, sqlite3.Row] = {}
-        for row in candidates:
-            cluster = row["cluster_key"]
-            if cluster not in best or (float(row["rank"]), row["doc_key"]) < (
-                float(best[cluster]["rank"]), best[cluster]["doc_key"]
-            ):
-                best[cluster] = row
+        for doc_key, score in candidates:
+            cluster = cluster_by_key[doc_key]
+            if cluster not in best or (-score, doc_key) < (-float(best[cluster]["rank"]), best[cluster]["doc_key"]):
+                best[cluster] = {"doc_key": doc_key, "cluster_key": cluster, "rank": score}
         selected_candidates = sorted(
-            best.values(), key=lambda row: (float(row["rank"]), row["doc_key"])
+            best.values(), key=lambda row: (-float(row["rank"]), row["doc_key"])
         )[:limit]
         selected_keys = [row["doc_key"] for row in selected_candidates]
         placeholders = ",".join("?" for _ in selected_keys)
@@ -967,9 +964,10 @@ class TemporalStore:
             manifest=SearchManifest(
                 query=query,
                 as_of=parse_timestamp(as_of),
-                ranker_version="temporal-document-v2",
-                corpus_hash=self.corpus_hash(as_of=as_of),
+                ranker_version=RANKER_VERSION,
+                corpus_hash=corpus_hash,
                 evidence_ids=tuple(result.evidence.evidence_id for result in results),
+                index_state_hash=index.index_state_hash,
             ),
         )
 
@@ -1073,14 +1071,16 @@ class TemporalStore:
                 "as_of": format_timestamp(manifest.as_of),
                 "corpus_hash": manifest.corpus_hash,
                 "evidence_ids": manifest.evidence_ids,
+                "index_state_hash": manifest.index_state_hash,
+                "tie_break": manifest.tie_break,
             }
             trace_id = hashlib.sha256(canonical_json(identity).encode("utf-8")).hexdigest()
             connection.execute(
                 """
                 INSERT INTO search_traces(
                     trace_id, run_id, sequence, scenario_id, mode, query, as_of, ranker_version,
-                    corpus_hash, evidence_ids_json, invoked_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    corpus_hash, evidence_ids_json, index_state_hash, tie_break, invoked_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     trace_id,
@@ -1093,6 +1093,8 @@ class TemporalStore:
                     manifest.ranker_version,
                     manifest.corpus_hash,
                     canonical_json(manifest.evidence_ids),
+                    manifest.index_state_hash,
+                    manifest.tie_break,
                     format_timestamp(invoked),
                 ),
             )
@@ -1228,12 +1230,15 @@ class TemporalStore:
 
     @staticmethod
     def _search_trace_from_row(row: sqlite3.Row) -> SearchTraceRecord:
+        trace_columns = set(row.keys())
         manifest = SearchManifest(
             query=row["query"],
             as_of=parse_timestamp(row["as_of"]),
             ranker_version=row["ranker_version"],
             corpus_hash=row["corpus_hash"],
             evidence_ids=tuple(json.loads(row["evidence_ids_json"])),
+            index_state_hash=row["index_state_hash"] if "index_state_hash" in trace_columns else "",
+            tie_break=row["tie_break"] if "tie_break" in trace_columns else "evidence_id/doc_key",
         )
         return SearchTraceRecord(
             trace_id=row["trace_id"],

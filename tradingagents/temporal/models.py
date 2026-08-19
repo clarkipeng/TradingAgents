@@ -178,6 +178,8 @@ class SearchManifest:
     ranker_version: str
     corpus_hash: str
     evidence_ids: tuple[str, ...]
+    index_state_hash: str = ""
+    tie_break: str = "evidence_id/doc_key"
 
 
 @dataclass(frozen=True)
