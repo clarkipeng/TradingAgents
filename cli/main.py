@@ -1535,6 +1535,43 @@ def temporal_media_import(
         raise typer.Exit(code=1)
 
 
+@app.command("temporal-reddit-import")
+def temporal_reddit_import(
+    ticker: str = typer.Option(..., "--ticker", help="Ticker phrase to search for."),  # noqa: B008
+    start: str = typer.Option(..., "--from", help="Inclusive ISO date/time."),  # noqa: B008
+    end: str = typer.Option(..., "--to", help="Inclusive ISO date/time."),  # noqa: B008
+    store: Path = typer.Option(  # noqa: B008
+        Path(".tradingagents/temporal"), "--store", help="Temporal evidence-store directory."
+    ),
+    subreddits: str = typer.Option(  # noqa: B008
+        "wallstreetbets,stocks,investing", "--subreddits", help="Comma-separated subreddit names."
+    ),
+    max_records: int = typer.Option(100, min=1, max=1_000, help="Maximum posts/comments."),  # noqa: B008
+):
+    """Backfill public Reddit posts and comments from Arctic Shift."""
+    import requests
+
+    from tradingagents.temporal import TemporalStore
+    from tradingagents.temporal_collectors import RedditArchiveResponseError, import_reddit_archive
+
+    try:
+        result = import_reddit_archive(
+            TemporalStore(store),
+            ticker=ticker,
+            start=start,
+            end=end,
+            subreddits=tuple(item.strip() for item in subreddits.split(",") if item.strip()),
+            max_records=max_records,
+        )
+    except (requests.RequestException, RedditArchiveResponseError) as error:
+        typer.echo(f"Reddit archive import failed: {error}", err=True)
+        raise typer.Exit(code=1) from None
+    typer.echo(f"Imported {result.imported}/{result.requested} Reddit records into {store}")
+    if result.failures:
+        typer.echo("Failures: " + ", ".join(result.failures), err=True)
+        raise typer.Exit(code=1)
+
+
 @app.command("temporal-scenario")
 def temporal_scenario(
     scenario_id: str = typer.Option(..., "--id", help="Stable scenario identifier."),  # noqa: B008

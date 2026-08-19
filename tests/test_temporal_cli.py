@@ -10,6 +10,7 @@ from tradingagents.temporal_collectors import (
     GdeltImportResult,
     HackerNewsImportResult,
     MediaStoreImportResult,
+    RedditArchiveImportResult,
     SecEdgarImportResult,
     WaybackImportResult,
 )
@@ -282,6 +283,46 @@ def test_temporal_media_import_bridges_existing_poller_rows(tmp_path, monkeypatc
     assert captured["tickers"] == ("NVDA", "MSFT")
     assert captured["limit"] == 2
     assert "Imported 2/2 poller media posts" in result.output
+
+
+def test_temporal_reddit_import_passes_a_bounded_archive_request(tmp_path, monkeypatch):
+    captured = {}
+
+    def fake_import(store, **kwargs):
+        captured.update({"store": store, **kwargs})
+        return RedditArchiveImportResult(
+            requested=2,
+            imported=2,
+            evidence_ids=("a", "b"),
+            failures=(),
+            response_artifact_hashes=("one",),
+        )
+
+    monkeypatch.setattr("tradingagents.temporal_collectors.import_reddit_archive", fake_import)
+    result = CliRunner().invoke(
+        cli.app,
+        [
+            "temporal-reddit-import",
+            "--ticker",
+            "nvda",
+            "--from",
+            "2024-02-01",
+            "--to",
+            "2024-02-29",
+            "--subreddits",
+            "stocks,investing",
+            "--max-records",
+            "2",
+            "--store",
+            str(tmp_path),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert captured["ticker"] == "nvda"
+    assert captured["subreddits"] == ("stocks", "investing")
+    assert captured["max_records"] == 2
+    assert "Imported 2/2 Reddit records" in result.output
 
 
 def test_temporal_scenario_command_seals_a_manifest(tmp_path):

@@ -181,7 +181,11 @@ class TemporalStore:
             )
             connection.execute("DELETE FROM evidence_fts")
             connection.execute(
-                "INSERT INTO evidence_fts(evidence_id, content) SELECT evidence_id, response_json FROM evidence"
+                """
+                INSERT INTO evidence_fts(evidence_id, content)
+                SELECT evidence_id, response_json FROM evidence
+                WHERE tool = 'corpus.document' AND is_error = 0
+                """
             )
 
     def put_artifact(self, content: bytes, media_type: str = "application/json") -> str:
@@ -299,10 +303,11 @@ class TemporalStore:
                 ),
             )
             connection.execute("DELETE FROM evidence_fts WHERE evidence_id = ?", (record.evidence_id,))
-            connection.execute(
-                "INSERT INTO evidence_fts(evidence_id, content) VALUES (?, ?)",
-                (record.evidence_id, response_json),
-            )
+            if record.tool == "corpus.document" and not record.is_error:
+                connection.execute(
+                    "INSERT INTO evidence_fts(evidence_id, content) VALUES (?, ?)",
+                    (record.evidence_id, response_json),
+                )
         return record
 
     def record_error(

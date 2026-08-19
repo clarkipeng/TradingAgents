@@ -42,3 +42,23 @@ def test_archive_jsonl_is_explicitly_reconstructed_and_searchable(tmp_path):
     assert result.results[0].evidence.source == "https://example.com/filing"
     assert result.results[0].evidence.event_at == at(8)
     assert result.results[0].evidence.source_published_at == datetime(2025, 1, 2, 8, 30, tzinfo=UTC)
+
+
+def test_owned_search_indexes_documents_not_raw_tool_blobs(tmp_path):
+    store = TemporalStore(tmp_path / "store")
+    store.record(
+        "dataflow.get_stock_data",
+        {"ticker": "NVDA"},
+        {"payload": "NVDA is repeated in a large raw market blob"},
+        available_at=at(9),
+    )
+    store.record(
+        "corpus.document",
+        {"url": "https://example.com"},
+        {"text": "NVDA reported a new product"},
+        available_at=at(9),
+    )
+
+    result = store.search("NVDA", as_of=at(10))
+
+    assert [item.evidence.tool for item in result.results] == ["corpus.document"]

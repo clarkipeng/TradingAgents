@@ -14,9 +14,16 @@
   linked to the feed artifact, and `temporal-hn-import` backfills Algolia HN
   stories with their creation clock. `temporal.hacker_news_enabled` exposes the
   fixed feed to news and sentiment analysis without changing the default graph.
-- **Still pending:** Reddit/X migration, broader daily surfaces, scheduler,
-  scenario labeling, and the first paired experiment. They remain separate
-  waves because none should fork the canonical temporal corpus.
+- **Reddit archive slice complete:** `temporal-reddit-import` uses bounded
+  Arctic Shift post/comment searches over explicit subreddits and dates, stores
+  each raw response, and writes per-record documents marked
+  `archive-reconstructed`.
+- **Search hygiene complete:** owned FTS indexes only `corpus.document` records;
+  raw tool tapes (especially market-price payloads) remain replay evidence but
+  cannot crowd retrieval.
+- **Still pending:** direct X writer migration, broader daily surfaces,
+  scheduler deployment, scenario labeling, and the first paired experiment.
+  They remain separate waves because none should fork the canonical corpus.
 
 ## Historical starting state
 
@@ -78,11 +85,11 @@ Gate: exactly one canonical answer per row above is reflected in imports; no mod
 
 1. **Hacker News forward capture:** wire `dataflows/hacker_news.py` through `invoke_tool` as `social.hackernews`, add it to `capture_daily_market_research`, and expose it to the news/sentiment analysts as an opt-in tool.
 2. **Hacker News backfill:** new `temporal_collectors/hn_algolia.py` using the Algolia HN search API - the one social source with true historical search - writing per-story `corpus.document` evidence with `available_at` = story creation time, basis `archive-reconstructed`.
-3. **X capture:** port `x_cycle`/`poller` fetch loops to write temporal evidence through the gateway, keeping the budget policy (hard daily USD caps) and one-terminal-attempt-per-day discipline intact. Forward-only; there is no X backfill.
+3. **X capture:** port `x_cycle`/`poller` fetch loops to write temporal evidence through the gateway, keeping the budget policy (hard daily USD caps) and one-terminal-attempt-per-day discipline intact. Forward-only; there is no X backfill. Until then, `temporal-media-import` is the one-way bridge for captured X rows.
 4. **Per-post social documents:** a derivative pass that explodes each captured Reddit/StockTwits/HN/X fetch blob into per-post `corpus.document` records (post clocks, linked to parent evidence by input hash). The fetch blob stays the replay-tape unit; the per-post docs are what FTS ranks and labels point at.
-5. **Reddit backfill:** `temporal_collectors/reddit_archive.py` over Arctic Shift / Pushshift dumps, filtered by subreddit + ticker mention, per-post documents with `available_at` = `created_utc`.
+5. **Reddit backfill:** complete. `temporal-reddit-import` uses Arctic Shift post/comment queries, filtered by subreddit + ticker mention, and writes per-record documents with `available_at` = `created_utc` and a retained raw-response artifact.
 6. **Full-surface daily capture:** extend the cron loop to fundamentals, insider transactions, macro/FRED, Polymarket, HN, and the X cycle output.
-7. **FTS hygiene:** exclude `dataflow.get_stock_data` blobs (and other non-text payloads) from the FTS index.
+7. **FTS hygiene:** complete. Only `corpus.document` records are indexed; tool blobs remain available for exact replay only.
 
 Gate: one daily capture run records every tool surface for the universe; a backfilled window contains per-post social documents from at least Reddit and HN.
 
