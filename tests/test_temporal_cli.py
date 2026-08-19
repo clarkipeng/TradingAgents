@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timezone
 
 import requests
@@ -378,3 +379,49 @@ def test_temporal_scenario_command_seals_a_manifest(tmp_path):
     assert scenario is not None
     assert scenario.metadata["sources"] == ["sec-edgar"]
     assert scenario.capture_run_id == "run-123"
+
+
+def test_temporal_rubric_and_score_commands_use_sealed_evidence(tmp_path):
+    store = TemporalStore(tmp_path)
+    evidence = store.record(
+        "corpus.document",
+        {"url": "https://example.com"},
+        {"text": "NVDA earnings"},
+        available_at=datetime(2025, 1, 2, 9, tzinfo=timezone.utc),
+    )
+    store.seal_scenario(
+        "nvda-rubric",
+        as_of=datetime(2025, 1, 2, 10, tzinfo=timezone.utc),
+        basis="archive-reconstructed",
+    )
+    store.record_tool_trace(
+        run_id="run-rubric",
+        scenario_id="nvda-rubric",
+        mode="replay",
+        tool="temporal_search",
+        request={"query": "NVDA"},
+        evidence_id=evidence.evidence_id,
+    )
+
+    rubric = CliRunner().invoke(
+        cli.app,
+        [
+            "temporal-rubric",
+            "--id",
+            "nvda-rubric",
+            "--material",
+            evidence.evidence_id,
+            "--useful",
+            evidence.evidence_id,
+            "--store",
+            str(tmp_path),
+        ],
+    )
+    scored = CliRunner().invoke(
+        cli.app,
+        ["temporal-score-run", "--run-id", "run-rubric", "--id", "nvda-rubric", "--store", str(tmp_path)],
+    )
+
+    assert rubric.exit_code == 0, rubric.output
+    assert scored.exit_code == 0, scored.output
+    assert json.loads(scored.output)["evidence_coverage"] == 1.0

@@ -29,8 +29,10 @@
   receipt (including X) into per-post temporal documents without altering its
   budget or once-per-day controls. Retiring the poller staging store remains a
   later migration, not a prerequisite for usable temporal search.
-- **Still pending:** scheduler deployment, scenario labeling, and the first
-  paired experiment.
+- **Scenario labeling complete:** `temporal-rubric` seals material/useful
+  evidence IDs against a scenario, and `temporal-score-run` scores a persisted
+  replay trace with the same immutable rubric each arm uses.
+- **Still pending:** scheduler deployment and the first paired experiment.
   They remain separate waves because none should fork the canonical corpus.
 
 ## Historical starting state
@@ -105,7 +107,7 @@ Gate: one daily capture run records every tool surface for the universe; a backf
 
 1. **Scheduler:** local `launchd`/cron invoking `tradingagents temporal-capture` daily over the fixed universe (20-50 liquid US equities + SPY/QQQ). The Fly poller redeploy is optional later; local-first keeps the loop simple.
 2. **Backfill scenarios:** for a few historical windows (earnings, guidance, launches, macro shocks): SEC filings, Wayback IR/press pages, GDELT discovery, then the GDELT-to-Wayback body bridge so headlines have readable article text, plus Reddit/HN archive imports. Seal each as `archive-reconstructed`.
-3. **Label a small eval set:** per scenario, which evidence was materially relevant vs noise; this becomes the shared rubric for coverage metrics. Keep it small (10-20 scenarios).
+3. **Label a small eval set:** tooling complete. `temporal-rubric` seals per-scenario material/useful evidence IDs and `temporal-score-run` reports trace metrics; curate the initial 10-20 actual scenarios once the scheduler has accumulated forward capture.
 4. **Run the first paired experiment:** current TradingAgents vs one changed prompt/retrieval/graph arm, same scenarios, same pinned model; compare coverage, grounding, efficiency, stability.
 5. **Only after trace metrics show signal:** connect decisions to the simulator and add outcome metrics, using both `forward-captured` and non-event-window scenarios to avoid selection bias.
 

@@ -1613,6 +1613,70 @@ def temporal_scenario(
     )
 
 
+@app.command("temporal-rubric")
+def temporal_rubric(
+    scenario_id: str = typer.Option(..., "--id", help="Sealed scenario ID."),  # noqa: B008
+    material: str = typer.Option(..., "--material", help="Comma-separated material evidence IDs."),  # noqa: B008
+    useful: str = typer.Option(..., "--useful", help="Comma-separated useful evidence IDs."),  # noqa: B008
+    store: Path = typer.Option(  # noqa: B008
+        Path(".tradingagents/temporal"), "--store", help="Temporal evidence-store directory."
+    ),
+):
+    """Seal human relevance labels for a scenario before comparing agent arms."""
+    from tradingagents.temporal import TemporalStore
+
+    rubric = TemporalStore(store).seal_scenario_rubric(
+        scenario_id,
+        material_evidence_ids=tuple(item.strip() for item in material.split(",") if item.strip()),
+        useful_evidence_ids=tuple(item.strip() for item in useful.split(",") if item.strip()),
+    )
+    typer.echo(
+        f"Sealed rubric for {rubric.scenario_id}: {len(rubric.material_evidence_ids)} material, "
+        f"{len(rubric.useful_evidence_ids)} useful evidence records"
+    )
+
+
+@app.command("temporal-score-run")
+def temporal_score_run(
+    run_id: str = typer.Option(..., "--run-id", help="Temporal run ID to score."),  # noqa: B008
+    scenario_id: str = typer.Option(..., "--id", help="Sealed scenario ID."),  # noqa: B008
+    decision_file: Path | None = typer.Option(  # noqa: B008
+        None, "--decision-file", exists=True, readable=True, help="Optional markdown decision/report."
+    ),
+    store: Path = typer.Option(  # noqa: B008
+        Path(".tradingagents/temporal"), "--store", help="Temporal evidence-store directory."
+    ),
+):
+    """Score one persisted evidence-replay trace against its sealed rubric."""
+    from tradingagents.temporal import (
+        TemporalStore,
+        cited_claims_from_markdown,
+        score_recorded_run,
+    )
+
+    decision = decision_file.read_text(encoding="utf-8") if decision_file is not None else None
+    trace, metrics = score_recorded_run(
+        TemporalStore(store),
+        run_id=run_id,
+        scenario_id=scenario_id,
+        claims=cited_claims_from_markdown(decision or ""),
+        decision=decision,
+    )
+    typer.echo(
+        json.dumps(
+            {
+                "scenario_id": scenario_id,
+                "run_id": run_id,
+                "evidence_ids": list(trace.evidence_ids),
+                "evidence_coverage": metrics.evidence_coverage,
+                "citation_grounding": metrics.citation_grounding,
+                "retrieval_efficiency": metrics.retrieval_efficiency,
+            },
+            sort_keys=True,
+        )
+    )
+
+
 @app.command()
 def analyze(
     checkpoint: bool | None = typer.Option(

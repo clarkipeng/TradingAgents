@@ -6,7 +6,7 @@ import hashlib
 import json
 import re
 import sqlite3
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -17,6 +17,7 @@ from .models import (
     EvidenceRecord,
     LLMCallRecord,
     ScenarioDefinition,
+    ScenarioRubricRecord,
     ScenarioSnapshot,
     SearchManifest,
     SearchTraceRecord,
@@ -114,6 +115,13 @@ class TemporalStore:
                     artifact_hash TEXT NOT NULL REFERENCES artifacts(content_hash),
                     created_at TEXT NOT NULL,
                     capture_run_id TEXT
+                );
+                CREATE TABLE IF NOT EXISTS scenario_rubrics (
+                    scenario_id TEXT PRIMARY KEY REFERENCES scenarios(scenario_id),
+                    material_evidence_ids_json TEXT NOT NULL,
+                    useful_evidence_ids_json TEXT NOT NULL,
+                    artifact_hash TEXT NOT NULL REFERENCES artifacts(content_hash),
+                    created_at TEXT NOT NULL
                 );
                 CREATE VIRTUAL TABLE IF NOT EXISTS evidence_fts USING fts5(
                     evidence_id UNINDEXED,
@@ -489,6 +497,73 @@ class TemporalStore:
             raise KeyError(f"unknown scenario: {scenario_id}")
         return scenario.corpus_hash == self.corpus_hash(as_of=scenario.as_of)
 
+    def seal_scenario_rubric(
+        self,
+        scenario_id: str,
+        *,
+        material_evidence_ids: Iterable[str],
+        useful_evidence_ids: Iterable[str],
+        created_at: datetime | None = None,
+    ) -> ScenarioRubricRecord:
+        """Seal the relevance labels used to score every arm of one scenario."""
+        material = _normalized_evidence_ids(material_evidence_ids, "material_evidence_ids")
+        useful = _normalized_evidence_ids(useful_evidence_ids, "useful_evidence_ids")
+        if not material:
+            raise ValueError("material_evidence_ids must not be empty")
+        if not set(material) <= set(useful):
+            raise ValueError("useful_evidence_ids must include all material evidence")
+        created = parse_timestamp(created_at or datetime.now(timezone.utc))
+        payload = {
+            "scenario_id": scenario_id,
+            "material_evidence_ids": material,
+            "useful_evidence_ids": useful,
+        }
+        artifact_hash = self.put_artifact(canonical_json(payload).encode("utf-8"))
+        with self._connect() as connection:
+            if connection.execute(
+                "SELECT 1 FROM scenarios WHERE scenario_id = ?", (scenario_id,)
+            ).fetchone() is None:
+                raise KeyError(f"unknown scenario: {scenario_id}")
+            known = {
+                row["evidence_id"]
+                for row in connection.execute(
+                    f"SELECT evidence_id FROM evidence WHERE evidence_id IN ({','.join('?' for _ in useful)})",
+                    useful,
+                ).fetchall()
+            }
+            missing = sorted(set(useful) - known)
+            if missing:
+                raise KeyError(f"unknown rubric evidence: {missing[0]}")
+            existing = connection.execute(
+                "SELECT * FROM scenario_rubrics WHERE scenario_id = ?", (scenario_id,)
+            ).fetchone()
+            material_json = canonical_json(material)
+            useful_json = canonical_json(useful)
+            if existing is None:
+                connection.execute(
+                    """
+                    INSERT INTO scenario_rubrics(
+                        scenario_id, material_evidence_ids_json, useful_evidence_ids_json,
+                        artifact_hash, created_at
+                    ) VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (scenario_id, material_json, useful_json, artifact_hash, format_timestamp(created)),
+                )
+                return ScenarioRubricRecord(scenario_id, material, useful, artifact_hash, created)
+            if (
+                existing["material_evidence_ids_json"] != material_json
+                or existing["useful_evidence_ids_json"] != useful_json
+            ):
+                raise ValueError(f"scenario rubric already sealed: {scenario_id}")
+        return self._rubric_from_row(existing)
+
+    def get_scenario_rubric(self, scenario_id: str) -> ScenarioRubricRecord | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM scenario_rubrics WHERE scenario_id = ?", (scenario_id,)
+            ).fetchone()
+        return self._rubric_from_row(row) if row is not None else None
+
     def get_scenario_snapshot(self, scenario_id: str, name: str) -> ScenarioSnapshot | None:
         with self._connect() as connection:
             row = connection.execute(
@@ -858,6 +933,16 @@ class TemporalStore:
         )
 
     @staticmethod
+    def _rubric_from_row(row: sqlite3.Row) -> ScenarioRubricRecord:
+        return ScenarioRubricRecord(
+            scenario_id=row["scenario_id"],
+            material_evidence_ids=tuple(json.loads(row["material_evidence_ids_json"])),
+            useful_evidence_ids=tuple(json.loads(row["useful_evidence_ids_json"])),
+            artifact_hash=row["artifact_hash"],
+            created_at=parse_timestamp(row["created_at"]),
+        )
+
+    @staticmethod
     def _tool_trace_from_row(row: sqlite3.Row) -> ToolTraceRecord:
         return ToolTraceRecord(
             trace_id=row["trace_id"],
@@ -894,3 +979,10 @@ class TemporalStore:
 def _fts_query(query: str) -> str:
     """Turn user text into a conservative FTS5 query without FTS syntax injection."""
     return " AND ".join(f'"{token}"' for token in re.findall(r"[\w]+", query, flags=re.UNICODE))
+
+
+def _normalized_evidence_ids(values: Iterable[str], name: str) -> tuple[str, ...]:
+    raw = tuple(values)
+    if any(not isinstance(value, str) or not value for value in raw):
+        raise ValueError(f"{name} must contain non-empty evidence IDs")
+    return tuple(dict.fromkeys(raw))

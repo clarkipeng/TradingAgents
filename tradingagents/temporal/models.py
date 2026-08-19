@@ -119,6 +119,17 @@ class ScenarioDefinition:
 
 
 @dataclass(frozen=True)
+class ScenarioRubricRecord:
+    """Immutable human relevance labels attached to one sealed scenario."""
+
+    scenario_id: str
+    material_evidence_ids: tuple[str, ...]
+    useful_evidence_ids: tuple[str, ...]
+    artifact_hash: str
+    created_at: datetime
+
+
+@dataclass(frozen=True)
 class TemporalSearchResult:
     """One evidence item returned by the owned temporal full-text index."""
 

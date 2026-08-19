@@ -165,11 +165,15 @@ tradingagents temporal-hn-import --query NVDA --from 2024-02-01 --to 2024-02-29 
 tradingagents temporal-reddit-import --ticker NVDA --from 2024-02-01 --to 2024-02-29 --store .tradingagents/temporal
 tradingagents temporal-media-import --from 2024-02-01 --to 2024-02-29 --sources x,reddit --store .tradingagents/temporal
 tradingagents temporal-scenario --id nvda-q4 --as-of 2024-02-21T17:02:03Z --basis archive-reconstructed --metadata '{"ticker":"NVDA"}'
+tradingagents temporal-rubric --id nvda-q4 --material evidence-id-1 --useful evidence-id-1,evidence-id-2 --store .tradingagents/temporal
+tradingagents temporal-score-run --run-id replay-run-id --id nvda-q4 --store .tradingagents/temporal
 ```
 
 For a running poller, set `TRADINGAGENTS_POLLER_TEMPORAL_STORE` to the same
 store directory. It projects media rows only after their poller terminal receipt
 commits, preserving the poller's existing request-budget and failure semantics.
+Rubrics are immutable scenario labels: both experimental arms are scored against
+the exact same material/useful evidence set.
 
 ## Smallest architecture that works
 

@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 import pytest
 
 from tradingagents.temporal import (
@@ -11,6 +13,7 @@ from tradingagents.temporal import (
     decision_stability,
     run_paired_evaluation,
     run_repeated_paired_evaluation,
+    score_recorded_run,
     score_trace,
     trace_from_tool_run,
 )
@@ -179,6 +182,44 @@ def test_repeated_paired_harness_rejects_zero_repetitions():
             left_runner=lambda *_args: pytest.fail("must not run"),
             right_runner=lambda *_args: pytest.fail("must not run"),
         )
+
+
+def test_sealed_rubric_scores_a_persisted_trace(tmp_path):
+    store = TemporalStore(tmp_path)
+    evidence = store.record(
+        "corpus.document",
+        {"url": "https://example.com"},
+        {"text": "NVDA earnings"},
+        available_at=datetime(2025, 1, 2, 9, tzinfo=timezone.utc),
+    )
+    store.seal_scenario(
+        "scenario-rubric",
+        as_of=datetime(2025, 1, 2, 10, tzinfo=timezone.utc),
+        basis="archive-reconstructed",
+    )
+    rubric = store.seal_scenario_rubric(
+        "scenario-rubric",
+        material_evidence_ids=(evidence.evidence_id,),
+        useful_evidence_ids=(evidence.evidence_id,),
+    )
+    store.record_tool_trace(
+        run_id="run-rubric",
+        scenario_id="scenario-rubric",
+        mode="replay",
+        tool="temporal_search",
+        request={"query": "NVDA"},
+        evidence_id=evidence.evidence_id,
+    )
+
+    trace, metrics = score_recorded_run(
+        store,
+        run_id="run-rubric",
+        scenario_id="scenario-rubric",
+    )
+
+    assert rubric.material_evidence_ids == (evidence.evidence_id,)
+    assert trace.evidence_ids == (evidence.evidence_id,)
+    assert metrics.evidence_coverage == metrics.retrieval_efficiency == 1.0
 
 
 def test_tradingagents_adapter_replays_a_sealed_scenario_into_a_trace(tmp_path):

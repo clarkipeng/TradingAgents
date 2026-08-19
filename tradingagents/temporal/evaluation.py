@@ -177,6 +177,32 @@ def trace_from_tool_run(
     )
 
 
+def score_recorded_run(
+    store: TemporalStore,
+    *,
+    run_id: str,
+    scenario_id: str,
+    claims: Iterable[FactualClaim] = (),
+    decision: str | None = None,
+) -> tuple[ResearchTrace, TraceMetrics]:
+    """Score one persisted tool/search trace against its sealed scenario rubric."""
+    rubric = store.get_scenario_rubric(scenario_id)
+    if rubric is None:
+        raise KeyError(f"scenario has no sealed rubric: {scenario_id}")
+    trace = trace_from_tool_run(
+        store,
+        run_id=run_id,
+        scenario_id=scenario_id,
+        claims=claims,
+        decision=decision,
+    )
+    return trace, score_trace(
+        trace,
+        material_evidence_ids=rubric.material_evidence_ids,
+        useful_evidence_ids=rubric.useful_evidence_ids,
+    )
+
+
 def run_paired_evaluation(
     rubrics: Iterable[ScenarioRubric],
     *,
