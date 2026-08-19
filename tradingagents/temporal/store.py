@@ -891,44 +891,67 @@ class TemporalStore:
                     evidence_ids=(),
                 ),
             )
+        candidate_limit = max(limit * 8, 32)
         with self._connect() as connection:
-            rows = connection.execute(
+            candidates = connection.execute(
                 """
-                SELECT d.*, e.*, json_extract(e.response_json, '$.metadata') AS metadata_json,
-                       bm25(document_chunks_fts) AS rank
-                FROM document_chunks_fts f
-                JOIN document_chunks c ON c.rowid = f.rowid
+                -- FTS5's rank column is bm25(document_chunks_fts); unlike the
+                -- auxiliary function it is legal in a grouped aggregate.
+                SELECT c.doc_key, d.cluster_key, MIN(document_chunks_fts.rank) AS rank
+                FROM document_chunks_fts
+                JOIN document_chunks c ON c.rowid = document_chunks_fts.rowid
                 JOIN documents d ON d.doc_key = c.doc_key
-                JOIN evidence e ON e.evidence_id = d.parent_evidence_id
                 WHERE document_chunks_fts MATCH ? AND d.available_at <= ?
-                ORDER BY rank ASC, d.doc_key ASC
+                GROUP BY c.doc_key, d.cluster_key
+                ORDER BY rank ASC, c.doc_key ASC
+                LIMIT ?
                 """,
-                (fts_query, cutoff),
+                (fts_query, cutoff, candidate_limit),
             ).fetchall()
         best: dict[str, sqlite3.Row] = {}
-        for row in rows:
+        for row in candidates:
             cluster = row["cluster_key"]
-            if cluster not in best or (float(row["rank"]), row["doc_key"]) < (float(best[cluster]["rank"]), best[cluster]["doc_key"]):
+            if cluster not in best or (float(row["rank"]), row["doc_key"]) < (
+                float(best[cluster]["rank"]), best[cluster]["doc_key"]
+            ):
                 best[cluster] = row
-        selected = sorted(best.values(), key=lambda row: (float(row["rank"]), row["doc_key"]))[:limit]
+        selected_candidates = sorted(
+            best.values(), key=lambda row: (float(row["rank"]), row["doc_key"])
+        )[:limit]
+        selected_keys = [row["doc_key"] for row in selected_candidates]
+        placeholders = ",".join("?" for _ in selected_keys)
         with self._connect() as connection:
+            hydrated_rows = connection.execute(
+                f"""
+                SELECT d.*, e.*, json_extract(e.response_json, '$.metadata') AS metadata_json
+                FROM documents d
+                JOIN evidence e ON e.evidence_id = d.parent_evidence_id
+                WHERE d.doc_key IN ({placeholders})
+                """,
+                selected_keys,
+            ).fetchall()
+            hydrated = {row["doc_key"]: row for row in hydrated_rows}
             siblings = {
                 row["cluster_key"]: tuple(r["doc_key"] for r in connection.execute(
                     "SELECT doc_key FROM documents WHERE cluster_key=? AND doc_key<>? ORDER BY doc_key",
                     (row["cluster_key"], row["doc_key"])).fetchall())
-                for row in selected
+                for row in selected_candidates
             }
         results = tuple(TemporalSearchResult(
-            evidence=self._search_evidence_from_row(row),
+            evidence=self._search_evidence_from_row(hydrated[row["doc_key"]]),
             rank=float(row["rank"]),
             document=TemporalDocument(
-                doc_key=row["doc_key"], parent_evidence_id=row["parent_evidence_id"], title=row["title"],
-                body=row["body"], source_domain=row["source_domain"], canonical_url=row["canonical_url"],
-                published_at=parse_timestamp(row["published_at"]) if row["published_at"] else None,
-                available_at=parse_timestamp(row["available_at"]), doc_kind=row["doc_kind"],
+                doc_key=row["doc_key"], parent_evidence_id=hydrated[row["doc_key"]]["parent_evidence_id"],
+                title=hydrated[row["doc_key"]]["title"], body=hydrated[row["doc_key"]]["body"],
+                source_domain=hydrated[row["doc_key"]]["source_domain"],
+                canonical_url=hydrated[row["doc_key"]]["canonical_url"],
+                published_at=parse_timestamp(hydrated[row["doc_key"]]["published_at"])
+                if hydrated[row["doc_key"]]["published_at"] else None,
+                available_at=parse_timestamp(hydrated[row["doc_key"]]["available_at"]),
+                doc_kind=hydrated[row["doc_key"]]["doc_kind"],
                 siblings=siblings[row["cluster_key"]],
             ),
-        ) for row in selected)
+        ) for row in selected_candidates)
         return TemporalSearchResponse(
             results=results,
             manifest=SearchManifest(

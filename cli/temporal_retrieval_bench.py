@@ -113,18 +113,15 @@ def _search(connection: sqlite3.Connection, case: Case, limit: int) -> list[str]
     ).fetchone()
     if has_documents:
         rows = connection.execute(
-        """SELECT d.doc_key, bm25(document_chunks_fts) AS rank
+        """SELECT d.doc_key, MIN(document_chunks_fts.rank) AS rank
              FROM document_chunks_fts
              JOIN document_chunks c ON c.rowid = document_chunks_fts.rowid
              JOIN documents d ON d.doc_key = c.doc_key
              WHERE document_chunks_fts MATCH ? AND d.available_at <= ?
-           ORDER BY rank ASC, d.doc_key ASC""",
-        (query, case.as_of),
+             GROUP BY d.doc_key ORDER BY rank ASC, d.doc_key ASC LIMIT ?""",
+        (query, case.as_of, limit),
         ).fetchall()
-        best: dict[str, float] = {}
-        for doc_key, rank in rows:
-            best[doc_key] = min(best.get(doc_key, float("inf")), float(rank))
-        return [key for key, _rank in sorted(best.items(), key=lambda item: (item[1], item[0]))[:limit]]
+        return [row[0] for row in rows]
     return [row[0] for row in connection.execute(
         """SELECT f.evidence_id FROM evidence_fts AS f
            JOIN evidence AS e ON e.evidence_id = f.evidence_id

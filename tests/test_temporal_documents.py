@@ -81,6 +81,20 @@ def test_store_open_does_not_write_existing_database(tmp_path):
     assert (tmp_path / "temporal.sqlite3").read_bytes() == before
 
 
+def test_search_aggregates_large_documents_before_hydration(tmp_path):
+    store = TemporalStore(tmp_path)
+    body = "NVIDIA quarterly 10-Q filing supply demand " * 45_000
+    store.record(
+        "corpus.document",
+        {"url": "https://sec.example/10-q"},
+        {"text": body, "metadata": {"form": "10-Q"}},
+        available_at=at(9),
+    )
+    result = store.search("NVIDIA quarterly 10-Q filing", as_of=at(10), limit=3)
+    assert len(result.results) == 1
+    assert result.results[0].doc_key
+
+
 def test_benchmark_maps_evidence_targets_to_document_keys_and_rejects_unknown(tmp_path):
     database = tmp_path / "temporal.sqlite3"
     connection = sqlite3.connect(database)
