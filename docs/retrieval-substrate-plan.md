@@ -71,6 +71,12 @@ Gate: on the held-out scenario(s) never used during tuning - success@10 for a ma
 - Both registered via `_configured_analyst_extra_tools` with the same live-mode guard; the prompt hint in `agent_utils.py` updated to describe search-then-fetch and the citation contract.
 - Stated consequence: ranking/tool-shape changes invalidate `use_capture_tape` golden replay of previously sealed capture runs (byte-exact prompt verification). Evidence replay and all metrics are unaffected; new experiments seal new tapes. Accepted and documented, not silent.
 
+R4 accepts this golden-tape invalidation: changing the analyst tool schema or
+prompt hint changes the byte-exact LLM request, so an old `use_capture_tape`
+run must be resealed for golden replay. This does not weaken evidence replay:
+the immutable evidence rows, eligibility clock, fetch traces, and derived
+metrics remain replayable and are never rewritten as part of this change.
+
 Gate: an agent locates the NVDA 10-Q via search and reads its financials section via fetch, fully offline in replay.
 
 ## R5: one retriever, three consumers

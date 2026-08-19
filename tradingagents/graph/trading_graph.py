@@ -258,9 +258,17 @@ class TradingAgentsGraph:
             return ()
         if settings.get("mode", TemporalMode.LIVE.value) == TemporalMode.LIVE.value:
             raise ValueError("temporal search requires a capture or replay temporal mode")
-        from tradingagents.temporal_adapters.langchain import create_contextual_temporal_search_tool
+        from tradingagents.temporal_adapters.langchain import (
+            create_contextual_temporal_fetch_tool,
+            create_contextual_temporal_overview_tool,
+            create_contextual_temporal_search_tool,
+        )
 
-        return (create_contextual_temporal_search_tool(),)
+        return (
+            create_contextual_temporal_search_tool(),
+            create_contextual_temporal_fetch_tool(),
+            create_contextual_temporal_overview_tool(),
+        )
 
     def _resolve_benchmark(self, ticker: str) -> str:
         """Pick the benchmark ticker for alpha calculation against ``ticker``.
