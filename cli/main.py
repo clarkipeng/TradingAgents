@@ -1787,6 +1787,7 @@ def temporal_compare_repeated_runs(
     ),
 ):
     """Compare repeated persisted arms, including modal decision stability."""
+    from tradingagents.agents.utils.rating import parse_rating
     from tradingagents.temporal import TemporalStore, compare_recorded_run_sets
 
     result = compare_recorded_run_sets(
@@ -1794,6 +1795,7 @@ def temporal_compare_repeated_runs(
         left_run_ids=tuple(item.strip() for item in left_run_ids.split(",") if item.strip()),
         right_run_ids=tuple(item.strip() for item in right_run_ids.split(",") if item.strip()),
         scenario_id=scenario_id,
+        decision_key=parse_rating,
     )
     typer.echo(
         json.dumps(

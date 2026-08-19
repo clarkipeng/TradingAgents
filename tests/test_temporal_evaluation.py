@@ -357,6 +357,53 @@ def test_repeated_persisted_runs_include_decision_stability(tmp_path):
     assert result.decision_stability_delta == 0.5
 
 
+def test_decision_stability_uses_the_provided_decision_key():
+    # Two same-rating markdown decisions with different prose must count as
+    # agreement once the caller supplies a normalizer.
+    decisions = ["**Rating**: Overweight\n\nAdd in tranches.", "**Rating**: Overweight\n\nHold sizing."]
+    assert decision_stability(decisions) == 0.5
+    assert decision_stability(decisions, decision_key=lambda text: text.splitlines()[0]) == 1.0
+
+
+def test_repeated_persisted_runs_normalize_decisions_with_decision_key(tmp_path):
+    store = TemporalStore(tmp_path)
+    evidence = store.record(
+        "corpus.document",
+        {"url": "https://example.com"},
+        {"text": "NVDA earnings"},
+        available_at="2025-01-02T09:00:00Z",
+    )
+    store.seal_scenario(
+        "scenario-normalized",
+        as_of="2025-01-02T10:00:00Z",
+        basis="archive-reconstructed",
+    )
+    store.seal_scenario_rubric(
+        "scenario-normalized",
+        material_evidence_ids=(evidence.evidence_id,),
+        useful_evidence_ids=(evidence.evidence_id,),
+    )
+    for run_id, decision in (
+        ("left-1", "**Rating**: Overweight\n\nAdd in tranches."),
+        ("left-2", "**Rating**: Overweight\n\nKeep moderate sizing."),
+        ("right-1", "**Rating**: Underweight\n\nTrim exposure."),
+        ("right-2", "**Rating**: Overweight\n\nAdd on weakness."),
+    ):
+        store.record_research_run(run_id, "scenario-normalized", decision=decision)
+
+    result = compare_recorded_run_sets(
+        store,
+        left_run_ids=("left-1", "left-2"),
+        right_run_ids=("right-1", "right-2"),
+        scenario_id="scenario-normalized",
+        decision_key=lambda text: text.splitlines()[0],
+    )
+
+    assert result.left.decision_stability == 1.0
+    assert result.right.decision_stability == 0.5
+    assert result.decision_stability_delta == -0.5
+
+
 def test_tradingagents_adapter_replays_a_sealed_scenario_into_a_trace(tmp_path):
     store = TemporalStore(tmp_path)
     evidence = store.record(

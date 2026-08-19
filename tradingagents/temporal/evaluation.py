@@ -257,6 +257,7 @@ def compare_recorded_run_sets(
     left_run_ids: Iterable[str],
     right_run_ids: Iterable[str],
     scenario_id: str,
+    decision_key: Callable[[str], str] | None = None,
 ) -> RepeatedPairedScenarioResult:
     """Summarize repeated persisted A/B runs, including decision stability."""
     left_ids = tuple(left_run_ids)
@@ -285,6 +286,7 @@ def compare_recorded_run_sets(
             run_id=right_ids[repetition],
             scenario_id=scenario_id,
         ),
+        decision_key=decision_key,
     )
     return results[0]
 
@@ -323,6 +325,7 @@ def run_repeated_paired_evaluation(
     repetitions: int,
     left_runner: Callable[[str, int], ResearchTrace],
     right_runner: Callable[[str, int], ResearchTrace],
+    decision_key: Callable[[str], str] | None = None,
 ) -> tuple[RepeatedPairedScenarioResult, ...]:
     """Repeat paired evidence-replay experiments and summarize both arms.
 
@@ -344,8 +347,8 @@ def run_repeated_paired_evaluation(
                 raise ValueError("runner returned a trace for a different scenario")
             left_traces.append(left)
             right_traces.append(right)
-        left_metrics = _summarize_repeated_traces(left_traces, rubric)
-        right_metrics = _summarize_repeated_traces(right_traces, rubric)
+        left_metrics = _summarize_repeated_traces(left_traces, rubric, decision_key)
+        right_metrics = _summarize_repeated_traces(right_traces, rubric, decision_key)
         results.append(
             RepeatedPairedScenarioResult(
                 scenario_id=rubric.scenario_id,
@@ -368,16 +371,28 @@ def run_repeated_paired_evaluation(
     return tuple(results)
 
 
-def decision_stability(decisions: Iterable[str | None]) -> float | None:
-    """Return the fraction of repeated seeded runs that agree with the modal decision."""
+def decision_stability(
+    decisions: Iterable[str | None],
+    decision_key: Callable[[str], str] | None = None,
+) -> float | None:
+    """Return the fraction of repeated seeded runs that agree with the modal decision.
+
+    ``decision_key`` normalizes each decision before comparison (for example,
+    extracting the parsed rating from a markdown report) so prose variation
+    between same-verdict runs does not read as instability.
+    """
     non_empty = [decision for decision in decisions if decision is not None]
     if not non_empty:
         return None
+    if decision_key is not None:
+        non_empty = [decision_key(decision) for decision in non_empty]
     return max(non_empty.count(decision) for decision in set(non_empty)) / len(non_empty)
 
 
 def _summarize_repeated_traces(
-    traces: Iterable[ResearchTrace], rubric: ScenarioRubric
+    traces: Iterable[ResearchTrace],
+    rubric: ScenarioRubric,
+    decision_key: Callable[[str], str] | None = None,
 ) -> RepeatedArmMetrics:
     trace_list = tuple(traces)
     metrics = tuple(
@@ -393,7 +408,9 @@ def _summarize_repeated_traces(
         evidence_coverage=_mean(metric.evidence_coverage for metric in metrics),
         citation_grounding=_mean(metric.citation_grounding for metric in metrics),
         retrieval_efficiency=_mean(metric.retrieval_efficiency for metric in metrics),
-        decision_stability=decision_stability(trace.decision for trace in trace_list),
+        decision_stability=decision_stability(
+            (trace.decision for trace in trace_list), decision_key
+        ),
     )
 
 
