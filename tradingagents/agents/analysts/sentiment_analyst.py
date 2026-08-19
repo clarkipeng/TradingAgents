@@ -42,6 +42,7 @@ from tradingagents.agents.utils.structured import (
 )
 from tradingagents.dataflows.reddit import fetch_reddit_posts
 from tradingagents.dataflows.stocktwits import fetch_stocktwits_messages
+from tradingagents.temporal_adapters.tradingagents import invoke_tool
 
 
 def _seven_days_back(trade_date: str) -> str:
@@ -68,8 +69,16 @@ def create_sentiment_analyst(llm):
         # returns a string (no exceptions surface from here), so the LLM
         # always sees something — either real data or a clear placeholder.
         news_block = get_news.func(ticker, start_date, end_date)
-        stocktwits_block = fetch_stocktwits_messages(ticker, limit=30)
-        reddit_block = fetch_reddit_posts(ticker)
+        stocktwits_block = invoke_tool(
+            "social.stocktwits",
+            {"ticker": ticker, "limit": 30},
+            lambda: fetch_stocktwits_messages(ticker, limit=30),
+        )
+        reddit_block = invoke_tool(
+            "social.reddit",
+            {"ticker": ticker, "subreddits": "default", "limit_per_sub": 5},
+            lambda: fetch_reddit_posts(ticker),
+        )
 
         system_message = _build_system_message(
             ticker=ticker,

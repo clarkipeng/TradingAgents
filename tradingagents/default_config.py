@@ -77,6 +77,18 @@ DEFAULT_CONFIG = _apply_env_overrides({
     # the oldest resolved entries are pruned once this limit is exceeded.
     # Pending entries are never pruned. None disables rotation entirely.
     "memory_log_max_entries": None,
+    # Temporal research is deliberately opt-in. ``live`` preserves the
+    # existing graph behavior; switch mode and provide a store to capture a
+    # run or replay a sealed scenario without changing graph call sites.
+    "temporal": {
+        "mode": "live",  # live | live_capture | replay
+        "store": os.getenv("TRADINGAGENTS_TEMPORAL_STORE", os.path.join(_TRADINGAGENTS_HOME, "temporal")),
+        "as_of": None,  # ISO-8601; required for replay without scenario_id
+        "scenario_id": None,
+        "source_run_id": None,  # exact tool tape; normally supplied by a scenario
+        "use_capture_tape": False,
+        "search_enabled": False,  # add owned temporal_search to analyst tool sets
+    },
     # LLM settings
     "llm_provider": "openai",
     "deep_think_llm": "gpt-5.5",

@@ -3,6 +3,8 @@
 import json
 import logging
 import os
+from collections.abc import Mapping
+from contextlib import nullcontext
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -33,6 +35,14 @@ from tradingagents.dataflows.utils import safe_ticker_component
 from tradingagents.default_config import DEFAULT_CONFIG
 from tradingagents.llm_clients import create_llm_client
 from tradingagents.reporting import write_report_tree
+from tradingagents.temporal import (
+    TemporalContext,
+    TemporalMode,
+    TemporalStore,
+    current_context,
+    parse_timestamp,
+    temporal_context,
+)
 
 from .checkpointer import checkpoint_step, clear_checkpoint, get_checkpointer, thread_id
 from .conditional_logic import ConditionalLogic
@@ -71,6 +81,8 @@ class TradingAgentsGraph:
         debug=False,
         config: dict[str, Any] = None,
         callbacks: list | None = None,
+        quick_thinking_llm: Any = None,
+        deep_thinking_llm: Any = None,
     ):
         """Initialize the trading agents graph and components.
 
@@ -79,6 +91,8 @@ class TradingAgentsGraph:
             debug: Whether to run in debug mode
             config: Configuration dictionary. If None, uses default config
             callbacks: Optional list of callback handlers (e.g., for tracking LLM/tool stats)
+            quick_thinking_llm: Optional prebuilt model, used by full-trace replay.
+            deep_thinking_llm: Optional prebuilt model, used by full-trace replay.
         """
         self.debug = debug
         self.config = config or DEFAULT_CONFIG
@@ -91,30 +105,40 @@ class TradingAgentsGraph:
         os.makedirs(self.config["data_cache_dir"], exist_ok=True)
         os.makedirs(self.config["results_dir"], exist_ok=True)
 
-        # Initialize LLMs with provider-specific thinking configuration
-        llm_kwargs = self._get_provider_kwargs()
+        if (quick_thinking_llm is None) != (deep_thinking_llm is None):
+            raise ValueError("provide both quick_thinking_llm and deep_thinking_llm, or neither")
+        if quick_thinking_llm is not None:
+            self.quick_thinking_llm = quick_thinking_llm
+            self.deep_thinking_llm = deep_thinking_llm
+        else:
+            # Initialize LLMs with provider-specific thinking configuration.
+            llm_kwargs = self._get_provider_kwargs()
 
-        # Add callbacks to kwargs if provided (passed to LLM constructor)
-        if self.callbacks:
-            llm_kwargs["callbacks"] = self.callbacks
+            # Add callbacks to kwargs if provided (passed to LLM constructor).
+            if self.callbacks:
+                llm_kwargs["callbacks"] = self.callbacks
 
-        deep_client = create_llm_client(
-            provider=self.config["llm_provider"],
-            model=self.config["deep_think_llm"],
-            base_url=self.config.get("backend_url"),
-            **llm_kwargs,
-        )
-        quick_client = create_llm_client(
-            provider=self.config["llm_provider"],
-            model=self.config["quick_think_llm"],
-            base_url=self.config.get("backend_url"),
-            **llm_kwargs,
-        )
+            deep_client = create_llm_client(
+                provider=self.config["llm_provider"],
+                model=self.config["deep_think_llm"],
+                base_url=self.config.get("backend_url"),
+                **llm_kwargs,
+            )
+            quick_client = create_llm_client(
+                provider=self.config["llm_provider"],
+                model=self.config["quick_think_llm"],
+                base_url=self.config.get("backend_url"),
+                **llm_kwargs,
+            )
 
-        self.deep_thinking_llm = deep_client.get_llm()
-        self.quick_thinking_llm = quick_client.get_llm()
+            self.deep_thinking_llm = deep_client.get_llm()
+            self.quick_thinking_llm = quick_client.get_llm()
 
         self.memory_log = TradingMemoryLog(self.config)
+
+        # The owned corpus search is opt-in because it changes the tools an
+        # analyst can choose. Existing graphs retain their current tool sets.
+        self.analyst_extra_tools = self._configured_analyst_extra_tools()
 
         # Create tool nodes
         self.tool_nodes = self._create_tool_nodes()
@@ -129,6 +153,7 @@ class TradingAgentsGraph:
             self.deep_thinking_llm,
             self.tool_nodes,
             self.conditional_logic,
+            analyst_extra_tools=self.analyst_extra_tools,
         )
 
         self.propagator = Propagator(
@@ -187,6 +212,7 @@ class TradingAgentsGraph:
 
     def _create_tool_nodes(self) -> dict[str, ToolNode]:
         """Create tool nodes for different data sources using abstract methods."""
+        analyst_extra_tools = getattr(self, "analyst_extra_tools", ())
         return {
             "market": ToolNode(
                 [
@@ -198,6 +224,7 @@ class TradingAgentsGraph:
                     # LLM and required by its prompt; must be executable here or
                     # the call fails and the model reports it "unavailable").
                     get_verified_market_snapshot,
+                    *analyst_extra_tools,
                 ]
             ),
             "social": ToolNode(
@@ -214,6 +241,7 @@ class TradingAgentsGraph:
                     get_insider_transactions,
                     get_macro_indicators,
                     get_prediction_markets,
+                    *analyst_extra_tools,
                 ]
             ),
             "fundamentals": ToolNode(
@@ -223,9 +251,21 @@ class TradingAgentsGraph:
                     get_balance_sheet,
                     get_cashflow,
                     get_income_statement,
+                    *analyst_extra_tools,
                 ]
             ),
         }
+
+    def _configured_analyst_extra_tools(self) -> tuple[Any, ...]:
+        """Return optional tools that must be registered before graph compilation."""
+        settings = self.config.get("temporal")
+        if not isinstance(settings, Mapping) or not settings.get("search_enabled", False):
+            return ()
+        if settings.get("mode", TemporalMode.LIVE.value) == TemporalMode.LIVE.value:
+            raise ValueError("temporal search requires a capture or replay temporal mode")
+        from tradingagents.temporal_adapters.langchain import create_contextual_temporal_search_tool
+
+        return (create_contextual_temporal_search_tool(),)
 
     def _resolve_benchmark(self, ticker: str) -> str:
         """Pick the benchmark ticker for alpha calculation against ``ticker``.
@@ -359,7 +399,13 @@ class TradingAgentsGraph:
             f"asset={asset_type}",
         ])
 
-    def propagate(self, company_name, trade_date, asset_type: str = "stock"):
+    def propagate(
+        self,
+        company_name,
+        trade_date,
+        asset_type: str = "stock",
+        temporal: TemporalContext | None = None,
+    ):
         """Run the trading agents graph for a company on a specific date.
 
         ``asset_type`` selects between the stock pipeline (default) and the
@@ -369,37 +415,102 @@ class TradingAgentsGraph:
         a per-ticker SqliteSaver so a crashed run can resume from the last
         successful node on a subsequent invocation with the same ticker+date.
         """
-        self.ticker = company_name
+        # An explicit context always wins. The config path is intentionally a
+        # convenience layer, not a second temporal implementation: both feed
+        # the same run-scoped context to every existing tool call.
+        active_temporal = temporal or self._temporal_context_from_config()
+        run_context = temporal_context(active_temporal) if active_temporal is not None else nullcontext()
+        with run_context:
+            self.ticker = company_name
 
-        # Resolve any pending memory-log entries for this ticker before the pipeline runs.
-        self._resolve_pending_entries(company_name)
+            # Pending-memory reflection is a mutable side effect of prior runs.
+            # A temporal replay must not generate a new LLM call from that state;
+            # a later scenario-memory snapshot can supply it explicitly instead.
+            if active_temporal is None or active_temporal.mode is not TemporalMode.REPLAY:
+                self._resolve_pending_entries(company_name)
 
-        # Recompile with a checkpointer if the user opted in.
-        if self.config.get("checkpoint_enabled"):
-            self._checkpointer_ctx = get_checkpointer(
-                self.config["data_cache_dir"], company_name
-            )
-            saver = self._checkpointer_ctx.__enter__()
-            self.graph = self.workflow.compile(checkpointer=saver)
-
-            step = checkpoint_step(
-                self.config["data_cache_dir"], company_name, str(trade_date),
-                self._run_signature(asset_type),
-            )
-            if step is not None:
-                logger.info(
-                    "Resuming from step %d for %s on %s", step, company_name, trade_date
+            # Recompile with a checkpointer if the user opted in.
+            if self.config.get("checkpoint_enabled"):
+                self._checkpointer_ctx = get_checkpointer(
+                    self.config["data_cache_dir"], company_name
                 )
-            else:
-                logger.info("Starting fresh for %s on %s", company_name, trade_date)
+                saver = self._checkpointer_ctx.__enter__()
+                self.graph = self.workflow.compile(checkpointer=saver)
 
+                step = checkpoint_step(
+                    self.config["data_cache_dir"], company_name, str(trade_date),
+                    self._run_signature(asset_type),
+                )
+                if step is not None:
+                    logger.info(
+                        "Resuming from step %d for %s on %s", step, company_name, trade_date
+                    )
+                else:
+                    logger.info("Starting fresh for %s on %s", company_name, trade_date)
+
+            try:
+                return self._run_graph(company_name, trade_date, asset_type=asset_type)
+            finally:
+                if self._checkpointer_ctx is not None:
+                    self._checkpointer_ctx.__exit__(None, None, None)
+                    self._checkpointer_ctx = None
+                    self.graph = self.workflow.compile()
+
+    def _temporal_context_from_config(self) -> TemporalContext | None:
+        """Build the optional temporal context declared in the normal config.
+
+        Keeping this at the graph boundary makes configuration ergonomic while
+        retaining the core's explicit context API for other frameworks.
+        """
+        settings = self.config.get("temporal")
+        if settings is None:
+            return None
+        if not isinstance(settings, Mapping):
+            raise TypeError("config['temporal'] must be a mapping")
+        raw_mode = settings.get("mode", TemporalMode.LIVE.value)
         try:
-            return self._run_graph(company_name, trade_date, asset_type=asset_type)
-        finally:
-            if self._checkpointer_ctx is not None:
-                self._checkpointer_ctx.__exit__(None, None, None)
-                self._checkpointer_ctx = None
-                self.graph = self.workflow.compile()
+            mode = TemporalMode(raw_mode)
+        except ValueError as error:
+            allowed = ", ".join(item.value for item in TemporalMode)
+            raise ValueError(f"temporal mode must be one of: {allowed}") from error
+        if mode is TemporalMode.LIVE:
+            return None
+
+        store_path = settings.get("store")
+        if not isinstance(store_path, (str, os.PathLike)) or not store_path:
+            raise ValueError("temporal capture or replay requires config['temporal']['store']")
+        store = TemporalStore(store_path)
+        scenario_id = settings.get("scenario_id")
+        if scenario_id is not None and not isinstance(scenario_id, str):
+            raise TypeError("config['temporal']['scenario_id'] must be a string")
+        source_run_id = settings.get("source_run_id")
+        if source_run_id is not None and not isinstance(source_run_id, str):
+            raise TypeError("config['temporal']['source_run_id'] must be a string")
+        use_capture_tape = settings.get("use_capture_tape", False)
+        if not isinstance(use_capture_tape, bool):
+            raise TypeError("config['temporal']['use_capture_tape'] must be a boolean")
+
+        if mode is TemporalMode.REPLAY and scenario_id is not None:
+            return TemporalContext.from_scenario(
+                mode,
+                store,
+                scenario_id,
+                source_run_id=source_run_id,
+                use_capture_tape=use_capture_tape,
+            )
+
+        as_of = settings.get("as_of")
+        if as_of is None:
+            if mode is TemporalMode.REPLAY:
+                raise ValueError("temporal replay requires scenario_id or as_of")
+            as_of = datetime.now().astimezone()
+        return TemporalContext.at(
+            mode,
+            parse_timestamp(as_of),
+            scenario_id=scenario_id,
+            store=store,
+            source_run_id=source_run_id,
+        )
 
     def save_reports(self, final_state, ticker, save_path=None) -> Path:
         """Write the markdown report tree for a completed run, like the CLI does.
@@ -417,10 +528,38 @@ class TradingAgentsGraph:
         return write_report_tree(final_state, ticker, save_path)
 
     def _run_graph(self, company_name, trade_date, asset_type: str = "stock"):
-        """Execute the graph and write the resulting state to disk and memory log."""
+        """Execute the graph and persist ordinary-run state without mutating a replay."""
         # Initialize state — inject memory log context for PM and the
         # deterministically resolved instrument identity for all agents.
-        past_context = self.memory_log.get_past_context(company_name)
+        temporal = current_context()
+        is_replay = temporal is not None and temporal.mode is TemporalMode.REPLAY
+        # Ambient decision memory is not evidence in a replay tape. A future
+        # sealed scenario snapshot supplies that history instead; replay never
+        # reads or appends the host log.
+        snapshot_name = "tradingagents.memory_context"
+        if is_replay:
+            snapshot = (
+                temporal.store.get_scenario_snapshot(temporal.scenario_id, snapshot_name)
+                if temporal.store is not None and temporal.scenario_id is not None
+                else None
+            )
+            if snapshot is not None and not isinstance(snapshot.state, str):
+                raise TypeError("tradingagents memory snapshot must contain a string")
+            past_context = snapshot.state if snapshot is not None else ""
+        else:
+            past_context = self.memory_log.get_past_context(company_name)
+            if (
+                temporal is not None
+                and temporal.mode is TemporalMode.LIVE_CAPTURE
+                and temporal.store is not None
+                and temporal.scenario_id is not None
+            ):
+                temporal.store.seal_scenario_snapshot(
+                    temporal.scenario_id,
+                    snapshot_name,
+                    past_context,
+                    captured_at=temporal.clock.as_of,
+                )
         instrument_context = self.resolve_instrument_context(company_name, asset_type)
         init_agent_state = self.propagator.create_initial_state(
             company_name,
@@ -466,11 +605,12 @@ class TradingAgentsGraph:
         self._log_state(trade_date, final_state)
 
         # Store decision for deferred reflection on the next same-ticker run.
-        self.memory_log.store_decision(
-            ticker=company_name,
-            trade_date=trade_date,
-            final_trade_decision=final_state["final_trade_decision"],
-        )
+        if not is_replay:
+            self.memory_log.store_decision(
+                ticker=company_name,
+                trade_date=trade_date,
+                final_trade_decision=final_state["final_trade_decision"],
+            )
 
         # Clear checkpoint on successful completion to avoid stale state.
         if self.config.get("checkpoint_enabled"):

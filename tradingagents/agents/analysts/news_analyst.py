@@ -10,7 +10,7 @@ from tradingagents.agents.utils.agent_utils import (
 )
 
 
-def create_news_analyst(llm):
+def create_news_analyst(llm, *, extra_tools=()):
     def news_analyst_node(state):
         current_date = state["trade_date"]
         asset_type = state.get("asset_type", "stock")
@@ -22,6 +22,7 @@ def create_news_analyst(llm):
             get_global_news,
             get_macro_indicators,
             get_prediction_markets,
+            *extra_tools,
         ]
 
         system_message = (

@@ -9,7 +9,7 @@ from tradingagents.agents.utils.agent_utils import (
 )
 
 
-def create_market_analyst(llm):
+def create_market_analyst(llm, *, extra_tools=()):
 
     def market_analyst_node(state):
         current_date = state["trade_date"]
@@ -19,6 +19,7 @@ def create_market_analyst(llm):
             get_stock_data,
             get_indicators,
             get_verified_market_snapshot,
+            *extra_tools,
         ]
 
         system_message = (

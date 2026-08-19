@@ -1,4 +1,5 @@
 import datetime
+import json
 import os
 import sys
 import time
@@ -69,6 +70,7 @@ app = typer.Typer(
     name="TradingAgents",
     help="TradingAgents CLI: Multi-Agents LLM Financial Trading Framework",
     add_completion=True,  # Enable shell completion
+    invoke_without_command=True,
 )
 
 
@@ -1280,6 +1282,225 @@ def run_analysis(checkpoint: bool | None = None):
         display_complete_report(final_state)
 
 
+@app.command("temporal-import")
+def temporal_import(
+    archive: Path = typer.Argument(  # noqa: B008
+        ..., exists=True, readable=True, help="JSONL archive evidence to import."
+    ),
+    store: Path = typer.Option(  # noqa: B008
+        Path(".tradingagents/temporal"),
+        "--store",
+        help="Temporal evidence-store directory.",
+    ),
+):
+    """Import archive-reconstructed evidence into the owned temporal corpus."""
+    from tradingagents.temporal import TemporalStore, import_archive_jsonl
+
+    summary = import_archive_jsonl(archive, TemporalStore(store))
+    typer.echo(f"Imported {summary.imported} archive records into {store}")
+
+
+@app.command("temporal-capture")
+def temporal_capture(
+    tickers: str = typer.Option(  # noqa: B008
+        ..., "--tickers", help="Comma-separated ticker universe."
+    ),
+    store: Path = typer.Option(  # noqa: B008
+        Path(".tradingagents/temporal"),
+        "--store",
+        help="Temporal evidence-store directory.",
+    ),
+    news_lookback_days: int = typer.Option(7, min=1, help="News window captured for each ticker."),
+    scenario_id: str | None = typer.Option(  # noqa: B008
+        None,
+        "--scenario-id",
+        help="Seal a one-ticker forward-captured scenario after a successful capture.",
+    ),
+):
+    """Capture the existing price/news tools once; invoke this from a daily scheduler."""
+    from tradingagents.temporal import TemporalStore
+    from tradingagents.temporal_adapters.tradingagents import capture_daily_market_research
+
+    universe = tuple(ticker.strip().upper() for ticker in tickers.split(",") if ticker.strip())
+    if not universe:
+        raise typer.BadParameter("--tickers must contain at least one symbol")
+    if scenario_id is not None and len(universe) != 1:
+        raise typer.BadParameter("--scenario-id requires exactly one ticker")
+    temporal_store = TemporalStore(store)
+    result = capture_daily_market_research(
+        temporal_store,
+        universe,
+        news_lookback_days=news_lookback_days,
+    )
+    typer.echo(
+        f"Captured {result.completed}/{result.attempted} tool calls for {len(universe)} tickers "
+        f"(run {result.run_id})"
+    )
+    if result.failures:
+        typer.echo("Failures: " + ", ".join(result.failures), err=True)
+        raise typer.Exit(code=1)
+    if scenario_id is not None:
+        scenario = temporal_store.seal_scenario(
+            scenario_id,
+            as_of=result.captured_at,
+            basis="forward-captured",
+            metadata={
+                "ticker": universe[0],
+                "trade_date": result.end_date,
+                "asset_type": "stock",
+                "news_lookback_days": news_lookback_days,
+            },
+            capture_run_id=result.run_id,
+        )
+        typer.echo(f"Sealed scenario {scenario.scenario_id} with corpus {scenario.corpus_hash}")
+
+
+@app.command("temporal-sec-import")
+def temporal_sec_import(
+    cik: str = typer.Option(..., "--cik", help="SEC Central Index Key (CIK)."),  # noqa: B008
+    user_agent: str = typer.Option(  # noqa: B008
+        ..., "--user-agent", help="Identifying User-Agent required by SEC fair-access guidance."
+    ),
+    store: Path = typer.Option(  # noqa: B008
+        Path(".tradingagents/temporal"), "--store", help="Temporal evidence-store directory."
+    ),
+    start_date: str | None = typer.Option(None, "--start-date", help="Inclusive filing date (YYYY-MM-DD)."),  # noqa: B008
+    end_date: str | None = typer.Option(None, "--end-date", help="Inclusive filing date (YYYY-MM-DD)."),  # noqa: B008
+    forms: str = typer.Option("10-K,10-Q,8-K", "--forms", help="Comma-separated SEC form types."),  # noqa: B008
+    max_filings: int = typer.Option(25, min=1, help="Maximum filing documents to import."),  # noqa: B008
+):
+    """Import public SEC EDGAR filings as archive-reconstructed evidence."""
+    import requests
+
+    from tradingagents.temporal import TemporalStore
+    from tradingagents.temporal_collectors import import_sec_edgar_filings
+
+    try:
+        result = import_sec_edgar_filings(
+            TemporalStore(store),
+            cik=cik,
+            user_agent=user_agent,
+            start_date=start_date,
+            end_date=end_date,
+            forms=tuple(form.strip() for form in forms.split(",") if form.strip()),
+            max_filings=max_filings,
+        )
+    except requests.RequestException as error:
+        typer.echo(
+            "SEC import request failed. Check fair-access limits and use an identifying User-Agent: "
+            f"{error}",
+            err=True,
+        )
+        raise typer.Exit(code=1) from None
+    typer.echo(f"Imported {result.imported}/{result.requested} SEC filings into {store}")
+    if result.failures:
+        typer.echo("Failures: " + ", ".join(result.failures), err=True)
+        raise typer.Exit(code=1)
+
+
+@app.command("temporal-wayback-import")
+def temporal_wayback_import(
+    url: str = typer.Option(..., "--url", help="Original URL or supported Wayback wildcard."),  # noqa: B008
+    store: Path = typer.Option(  # noqa: B008
+        Path(".tradingagents/temporal"), "--store", help="Temporal evidence-store directory."
+    ),
+    start: str | None = typer.Option(None, "--from", help="Inclusive capture boundary (ISO or CDX timestamp)."),  # noqa: B008
+    end: str | None = typer.Option(None, "--to", help="Inclusive capture boundary (ISO or CDX timestamp)."),  # noqa: B008
+    max_captures: int = typer.Option(25, min=1, help="Maximum deduplicated archive captures."),  # noqa: B008
+):
+    """Backfill public Wayback HTML captures as archive-reconstructed evidence."""
+    import requests
+
+    from tradingagents.temporal import TemporalStore
+    from tradingagents.temporal_collectors import import_wayback_captures
+
+    try:
+        result = import_wayback_captures(
+            TemporalStore(store),
+            url=url,
+            start=start,
+            end=end,
+            max_captures=max_captures,
+        )
+    except requests.RequestException as error:
+        typer.echo(f"Wayback import request failed: {error}", err=True)
+        raise typer.Exit(code=1) from None
+    typer.echo(f"Imported {result.imported}/{result.requested} Wayback captures into {store}")
+    if result.failures:
+        typer.echo("Failures: " + ", ".join(result.failures), err=True)
+        raise typer.Exit(code=1)
+
+
+@app.command("temporal-gdelt-import")
+def temporal_gdelt_import(
+    query: str = typer.Option(..., "--query", help="GDELT DOC query, e.g. NVDA or a Boolean expression."),  # noqa: B008
+    start: str = typer.Option(..., "--from", help="Inclusive ISO date/time."),  # noqa: B008
+    end: str = typer.Option(..., "--to", help="Inclusive ISO date/time."),  # noqa: B008
+    store: Path = typer.Option(  # noqa: B008
+        Path(".tradingagents/temporal"), "--store", help="Temporal evidence-store directory."
+    ),
+    max_records: int = typer.Option(100, min=1, max=250, help="Maximum GDELT article-list records."),  # noqa: B008
+):
+    """Backfill GDELT historical-news discovery records into the evidence corpus."""
+    import requests
+
+    from tradingagents.temporal import TemporalStore
+    from tradingagents.temporal_collectors import GdeltResponseError, import_gdelt_articles
+
+    try:
+        result = import_gdelt_articles(
+            TemporalStore(store),
+            query=query,
+            start=start,
+            end=end,
+            max_records=max_records,
+        )
+    except (requests.RequestException, GdeltResponseError) as error:
+        typer.echo(f"GDELT import request failed: {error}", err=True)
+        raise typer.Exit(code=1) from None
+    typer.echo(f"Imported {result.imported}/{result.requested} GDELT article records into {store}")
+    if result.failures:
+        typer.echo("Failures: " + ", ".join(result.failures), err=True)
+        raise typer.Exit(code=1)
+
+
+@app.command("temporal-scenario")
+def temporal_scenario(
+    scenario_id: str = typer.Option(..., "--id", help="Stable scenario identifier."),  # noqa: B008
+    as_of: str = typer.Option(..., "--as-of", help="UTC ISO-8601 temporal boundary."),  # noqa: B008
+    basis: str = typer.Option(  # noqa: B008
+        ..., "--basis", help="Evidence basis, e.g. forward-captured or archive-reconstructed."
+    ),
+    metadata: str = typer.Option("{}", "--metadata", help="JSON metadata such as ticker and source set."),  # noqa: B008
+    capture_run_id: str | None = typer.Option(  # noqa: B008
+        None, "--capture-run-id", help="Optional run ID used for exact full-trace replay."
+    ),
+    store: Path = typer.Option(  # noqa: B008
+        Path(".tradingagents/temporal"), "--store", help="Temporal evidence-store directory."
+    ),
+):
+    """Seal the historical world used by later replay and paired evaluation."""
+    from tradingagents.temporal import TemporalStore
+
+    try:
+        parsed_metadata = json.loads(metadata)
+    except json.JSONDecodeError as error:
+        raise typer.BadParameter("--metadata must be a JSON object") from error
+    if not isinstance(parsed_metadata, dict):
+        raise typer.BadParameter("--metadata must be a JSON object")
+    scenario = TemporalStore(store).seal_scenario(
+        scenario_id,
+        as_of=as_of,
+        basis=basis,
+        metadata=parsed_metadata,
+        capture_run_id=capture_run_id,
+    )
+    typer.echo(
+        f"Sealed scenario {scenario.scenario_id} at {scenario.as_of.isoformat()} "
+        f"with corpus {scenario.corpus_hash}"
+    )
+
+
 @app.command()
 def analyze(
     checkpoint: bool | None = typer.Option(
@@ -1311,6 +1532,13 @@ def analyze(
             err=True,
         )
         raise typer.Exit(code=1) from None
+
+
+@app.callback()
+def default_to_analysis(context: typer.Context):
+    """Preserve the historical no-subcommand interactive analysis entrypoint."""
+    if context.invoked_subcommand is None:
+        analyze()
 
 
 if __name__ == "__main__":

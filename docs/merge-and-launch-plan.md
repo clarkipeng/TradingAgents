@@ -1,0 +1,88 @@
+# Merge and Launch Plan: Temporal Core + X Pipeline + Hacker News
+
+## Starting state
+
+Two real lines of work exist; everything else is a stale duplicate.
+
+| Worktree | Branch | State | Contains |
+|---|---|---|---|
+| `london` | `agent-trading-simulation-backtest` | **uncommitted**, at `main` tip | Temporal core (`temporal/`, `temporal_adapters/`, `temporal_collectors/`), SEC/Wayback/GDELT importers, capture/replay, FTS search, A/B evaluation, simulator, 15 test files |
+| `calgary` | `add-x-api-key` | committed, 40 commits ahead of `main` | X poller (`x_shadow.py`, `x_cycle.py`, `poller.py`), `hacker_news.py`, live `gdelt.py`, `media_store` + 13 Postgres migrations, `research/` evaluation package, backtest/walkforward, Fly deploy infra |
+
+The directories `workspaces/TradingAgents/add-x-api-key/` and `.../agent-trading-simulation-backtest/` are byte-identical clones of calgary and london; delete them after Phase 0 confirms everything is pushed.
+
+Both branches fork from the same `main` tip (`a33fd4c`), so the merge base is clean.
+192 files differ on calgary; only 8 files conflict with london's changes.
+
+## Phase 0: preserve state (do first, mechanical)
+
+1. Commit london's temporal work on `agent-trading-simulation-backtest` (logical commits: core, adapters, collectors, CLI, tests, docs).
+2. Push both branches to the fork.
+3. Remove the two duplicate clone directories once pushes are verified.
+
+Gate: both branches recoverable from the remote; `git status` clean in both worktrees.
+
+## Phase 1: the merge
+
+Merge `add-x-api-key` into `agent-trading-simulation-backtest` in the london worktree.
+Calgary is the committed, CI-tested branch; london's smaller diff re-applies on top of it in each conflict.
+
+Per-file conflict resolutions:
+
+| File | Resolution |
+|---|---|
+| `dataflows/interface.py` | Take calgary's expanded router body (more vendors, hardening) as `_route_to_vendor_live`; keep london's temporal-gateway wrapper as the public `route_to_vendor` |
+| `agents/analysts/sentiment_analyst.py` | Take calgary's content; re-wrap its Reddit/StockTwits prefetches in london's `invoke_tool` |
+| `agents/analysts/news_analyst.py` | Take calgary's content; no temporal edits needed beyond what `route_to_vendor` already covers |
+| `graph/trading_graph.py`, `graph/setup.py` | Take calgary's checkpointer/structured changes; re-apply london's `temporal_context` entry in `propagate()` and the LangChain adapter hookup |
+| `default_config.py` | Union: calgary's keys plus london's `temporal` block |
+| `cli/main.py` | Union: both branches only add commands |
+| `pyproject.toml` / `uv.lock` | Merge dependency lists, then regenerate the lock with `uv lock` |
+
+Gate: full pytest green (union of both suites, ~115 test files), including calgary's `test_architecture_boundaries.py`.
+If the boundary tests reject `temporal/` imports, extend the boundary rules deliberately in the same commit, never by weakening the test.
+
+## Phase 2: reconcile duplicated subsystems
+
+One decision per overlap, recorded here so the merge does not silently run two of everything.
+
+| Overlap | Decision |
+|---|---|
+| Evidence stores: temporal SQLite store vs `media_store` + Postgres migrations | The temporal store is the canonical corpus. `media_store` remains the X poller's staging layer only until Phase 3 ports the poller; then its write path retires. The Postgres migrations stay unused unless the Fly poller is redeployed. |
+| GDELT: calgary's live `dataflows/gdelt.py` vs london's archive `temporal_collectors/gdelt.py` | Both stay - live discovery and archive import are different jobs - but share one HTTP client and query normalization. |
+| Evaluation: calgary `research/` (coverage, label, evaluate, outcomes) vs london `temporal/evaluation.py` | London's paired trace-metric harness is the runner. Port calgary's labeling and coverage-rubric pieces into it as the scenario rubric source. Calgary's outcome/decision validation feeds Phase 5 simulation, not the trace harness. |
+| Backtest: calgary `backtest.py`/`walkforward.py`/`portfolio_backtest.py` vs london `temporal/simulation.py` | `simulation.py` stays the fill model. Walkforward becomes the scenario iterator when outcome evaluation lands. No unification work now; the only Phase 2 requirement is no import cycles between them. |
+| Evidence identity: calgary `evidence_lineage.py` vs temporal content-addressed IDs | Temporal IDs are canonical. Keep `evidence_lineage` helpers inside the poller until its port, then map its `(source, external_id)` identity into evidence metadata. |
+
+Gate: exactly one canonical answer per row above is reflected in imports; no module writes evidence to two stores.
+
+## Phase 3: social and HN capture
+
+1. **Hacker News forward capture:** wire `dataflows/hacker_news.py` through `invoke_tool` as `social.hackernews`, add it to `capture_daily_market_research`, and expose it to the news/sentiment analysts as an opt-in tool.
+2. **Hacker News backfill:** new `temporal_collectors/hn_algolia.py` using the Algolia HN search API - the one social source with true historical search - writing per-story `corpus.document` evidence with `available_at` = story creation time, basis `archive-reconstructed`.
+3. **X capture:** port `x_cycle`/`poller` fetch loops to write temporal evidence through the gateway, keeping the budget policy (hard daily USD caps) and one-terminal-attempt-per-day discipline intact. Forward-only; there is no X backfill.
+4. **Per-post social documents:** a derivative pass that explodes each captured Reddit/StockTwits/HN/X fetch blob into per-post `corpus.document` records (post clocks, linked to parent evidence by input hash). The fetch blob stays the replay-tape unit; the per-post docs are what FTS ranks and labels point at.
+5. **Reddit backfill:** `temporal_collectors/reddit_archive.py` over Arctic Shift / Pushshift dumps, filtered by subreddit + ticker mention, per-post documents with `available_at` = `created_utc`.
+6. **Full-surface daily capture:** extend the cron loop to fundamentals, insider transactions, macro/FRED, Polymarket, HN, and the X cycle output.
+7. **FTS hygiene:** exclude `dataflow.get_stock_data` blobs (and other non-text payloads) from the FTS index.
+
+Gate: one daily capture run records every tool surface for the universe; a backfilled window contains per-post social documents from at least Reddit and HN.
+
+## Phase 4: get it running
+
+1. **Scheduler:** local `launchd`/cron invoking `tradingagents temporal-capture` daily over the fixed universe (20-50 liquid US equities + SPY/QQQ). The Fly poller redeploy is optional later; local-first keeps the loop simple.
+2. **Backfill scenarios:** for a few historical windows (earnings, guidance, launches, macro shocks): SEC filings, Wayback IR/press pages, GDELT discovery, then the GDELT-to-Wayback body bridge so headlines have readable article text, plus Reddit/HN archive imports. Seal each as `archive-reconstructed`.
+3. **Label a small eval set:** per scenario, which evidence was materially relevant vs noise; this becomes the shared rubric for coverage metrics. Keep it small (10-20 scenarios).
+4. **Run the first paired experiment:** current TradingAgents vs one changed prompt/retrieval/graph arm, same scenarios, same pinned model; compare coverage, grounding, efficiency, stability.
+5. **Only after trace metrics show signal:** connect decisions to the simulator and add outcome metrics, using both `forward-captured` and non-event-window scenarios to avoid selection bias.
+
+Gate: the daily cron has run unattended for a week with failures visible in its report; one A/B experiment produced attributable per-scenario metric differences.
+
+## Order and risk
+
+Phases 0-1 are one sitting; Phase 2 is decisions plus small refactors; Phase 3 items are independent and parallelizable; Phase 4 runs concurrently with Phase 3 once capture works.
+
+Known risks:
+- The merge is large by file count but narrow by conflict; the danger is semantic drift in the 8 shared files, which the union test suite gates.
+- Calgary's boundary tests may need deliberate extension for `temporal/` imports.
+- Running `media_store` and the temporal store simultaneously past Phase 3 would fork the corpus; the Phase 2 table exists to prevent that.

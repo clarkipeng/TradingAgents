@@ -166,6 +166,18 @@ def get_vendor(category: str, method: str = None) -> str:
     return config.get("data_vendors", {}).get(category, "default")
 
 def route_to_vendor(method: str, *args, **kwargs):
+    """Route a tool call through the active temporal context when one is configured."""
+    from tradingagents.temporal_adapters.tradingagents import invoke_dataflow
+
+    return invoke_dataflow(
+        method,
+        args,
+        kwargs,
+        lambda: _route_to_vendor_live(method, *args, **kwargs),
+    )
+
+
+def _route_to_vendor_live(method: str, *args, **kwargs):
     """Route method calls to appropriate vendor implementation with fallback support."""
     category = get_category_for_method(method)
     vendor_config = get_vendor(category, method)
