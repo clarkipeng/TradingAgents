@@ -1,0 +1,13 @@
+{
+  "as_of": "2025-01-02T12:00:00Z",
+  "documents": [
+    {"document_key": "doc-nvda-earnings", "available_at": "2025-01-02T09:00:00Z", "text": "NVDA earnings guidance data center demand"},
+    {"document_key": "doc-nvda-supply", "available_at": "2025-01-02T09:00:00Z", "text": "NVDA supply chain constraints and chips"},
+    {"document_key": "doc-market", "available_at": "2025-01-02T09:00:00Z", "text": "broader market commentary"}
+  ],
+  "queries": [
+    {"query": "NVDA earnings guidance", "expected_document_keys": ["doc-nvda-earnings"], "kind": "known-item"},
+    {"query": "NVDA supply chain", "expected_document_keys": ["doc-nvda-supply"], "kind": "topic"}
+  ],
+  "floors": {"success@k": 1.0, "recall@k": 1.0, "nDCG@k": 1.0, "MRR": 1.0}
+}

@@ -1,0 +1,19 @@
+{
+  "topic_from_search_traces": {"limit": 20},
+  "queries": [
+    {"query": "NVDA latest SEC filing August 2026", "expected_document_keys": ["24f3f86afa8e87a4677fae71ae1d9276ffb2549935ce9f4e7f03332c5913d3e7"], "kind": "known-item"},
+    {"query": "NVIDIA latest 8-K filing", "expected_document_keys": ["24f3f86afa8e87a4677fae71ae1d9276ffb2549935ce9f4e7f03332c5913d3e7"], "kind": "known-item"},
+    {"query": "NVIDIA Q2 earnings preview cleanest AI bet", "expected_document_keys": ["9bdccf5727bf27bb0db27122eb8c53dd6ea81a51b23fd0286cbb6f3cebcb3785"], "kind": "known-item"},
+    {"query": "NVDA earnings preview ahead of Q2", "expected_document_keys": ["9bdccf5727bf27bb0db27122eb8c53dd6ea81a51b23fd0286cbb6f3cebcb3785"], "kind": "known-item"},
+    {"query": "Nvidia $500B AI financing deal", "expected_document_keys": ["f790f62583bfaf90233b9e22e4ef10694747691195c962010ef67a835e35073d", "4cb084d7c9562883ad5a417500e8345654d22b286cfff12646bbdf43c5c66026", "f8d0e4def7d3e0b85b83e69458c83396da5abd8f12f56cbfa5f2bb8926dc18dd"], "kind": "known-item"},
+    {"query": "Nvidia $500 billion AI infrastructure push Wall Street giants", "expected_document_keys": ["f790f62583bfaf90233b9e22e4ef10694747691195c962010ef67a835e35073d"], "kind": "known-item"},
+    {"query": "Nvidia half trillion hyperscaler funding bottleneck", "expected_document_keys": ["4cb084d7c9562883ad5a417500e8345654d22b286cfff12646bbdf43c5c66026"], "kind": "known-item"},
+    {"query": "AI chip stocks mixed Nvidia financing", "expected_document_keys": ["f8d0e4def7d3e0b85b83e69458c83396da5abd8f12f56cbfa5f2bb8926dc18dd"], "kind": "known-item"},
+    {"query": "NVDA AI financing hyperscaler capital", "expected_document_keys": ["f790f62583bfaf90233b9e22e4ef10694747691195c962010ef67a835e35073d", "4cb084d7c9562883ad5a417500e8345654d22b286cfff12646bbdf43c5c66026"], "kind": "known-item"},
+    {"query": "Nvidia Wall Street giants AI buildout financing", "expected_document_keys": ["f790f62583bfaf90233b9e22e4ef10694747691195c962010ef67a835e35073d", "f8d0e4def7d3e0b85b83e69458c83396da5abd8f12f56cbfa5f2bb8926dc18dd"], "kind": "known-item"},
+    {"query": "NVDA analyst funding bottleneck AI infrastructure", "expected_document_keys": ["4cb084d7c9562883ad5a417500e8345654d22b286cfff12646bbdf43c5c66026"], "kind": "known-item"},
+    {"query": "Nvidia $500B AI financing coverage", "expected_document_keys": ["f790f62583bfaf90233b9e22e4ef10694747691195c962010ef67a835e35073d", "4cb084d7c9562883ad5a417500e8345654d22b286cfff12646bbdf43c5c66026", "f8d0e4def7d3e0b85b83e69458c83396da5abd8f12f56cbfa5f2bb8926dc18dd"], "kind": "known-item"},
+    {"query": "Moody Aa1 affirmation NVIDIA AI data center guarantees financing", "expected_document_keys": ["f790f62583bfaf90233b9e22e4ef10694747691195c962010ef67a835e35073d", "4cb084d7c9562883ad5a417500e8345654d22b286cfff12646bbdf43c5c66026", "f8d0e4def7d3e0b85b83e69458c83396da5abd8f12f56cbfa5f2bb8926dc18dd"], "kind": "known-item"}
+  ],
+  "floors": {}
+}
