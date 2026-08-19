@@ -58,6 +58,7 @@ tradingagents-poller = "cli.entrypoints:poller"
 tradingagents-backtest = "cli.entrypoints:backtest"
 tradingagents-walkforward = "cli.entrypoints:walkforward"
 tradingagents-research = "cli.entrypoints:research"
+temporal-retrieval-bench = "cli.temporal_retrieval_bench:main"
 
 [tool.setuptools.packages.find]
 include = ["tradingagents*", "cli*"]
