@@ -21,8 +21,11 @@
 - **Search hygiene complete:** owned FTS indexes only `corpus.document` records;
   raw tool tapes (especially market-price payloads) remain replay evidence but
   cannot crowd retrieval.
-- **Still pending:** direct X writer migration, broader daily surfaces,
-  scheduler deployment, scenario labeling, and the first paired experiment.
+- **Extended daily capture complete:** `temporal-capture --full-surface` adds
+  ticker fundamentals/statements/insiders plus global news, a small macro
+  basket, and prediction markets while preserving the lightweight default.
+- **Still pending:** direct X writer migration, scheduler deployment, scenario
+  labeling, and the first paired experiment.
   They remain separate waves because none should fork the canonical corpus.
 
 ## Historical starting state
@@ -88,7 +91,7 @@ Gate: exactly one canonical answer per row above is reflected in imports; no mod
 3. **X capture:** port `x_cycle`/`poller` fetch loops to write temporal evidence through the gateway, keeping the budget policy (hard daily USD caps) and one-terminal-attempt-per-day discipline intact. Forward-only; there is no X backfill. Until then, `temporal-media-import` is the one-way bridge for captured X rows.
 4. **Per-post social documents:** a derivative pass that explodes each captured Reddit/StockTwits/HN/X fetch blob into per-post `corpus.document` records (post clocks, linked to parent evidence by input hash). The fetch blob stays the replay-tape unit; the per-post docs are what FTS ranks and labels point at.
 5. **Reddit backfill:** complete. `temporal-reddit-import` uses Arctic Shift post/comment queries, filtered by subreddit + ticker mention, and writes per-record documents with `available_at` = `created_utc` and a retained raw-response artifact.
-6. **Full-surface daily capture:** extend the cron loop to fundamentals, insider transactions, macro/FRED, Polymarket, HN, and the X cycle output.
+6. **Full-surface daily capture:** implemented for fundamentals, statements, insiders, global news, macro/FRED, Polymarket, and HN via `temporal-capture --full-surface`. X remains supplied through the poller-media bridge until its writer migrates.
 7. **FTS hygiene:** complete. Only `corpus.document` records are indexed; tool blobs remain available for exact replay only.
 
 Gate: one daily capture run records every tool surface for the universe; a backfilled window contains per-post social documents from at least Reddit and HN.

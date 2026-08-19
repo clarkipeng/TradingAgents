@@ -85,11 +85,14 @@ def capture_daily_market_research(
     *,
     now: datetime | None = None,
     news_lookback_days: int = 7,
+    full_surface: bool = False,
 ) -> DailyCaptureResult:
-    """Capture existing price/news/social tools once; a scheduler can invoke this daily.
+    """Capture existing tool surfaces once; a scheduler can invoke this daily.
 
     Source errors are persisted by the tool tape and reported here while the
-    rest of the ticker universe continues.
+    rest of the ticker universe continues. ``full_surface`` adds statements,
+    insiders, global news, a small macro basket, and prediction markets; it is
+    opt-in so the original fast daily capture remains unchanged.
     """
     if news_lookback_days < 1:
         raise ValueError("news_lookback_days must be positive")
@@ -106,6 +109,19 @@ def capture_daily_market_research(
     from tradingagents.dataflows.interface import route_to_vendor
     from tradingagents.dataflows.reddit import fetch_reddit_posts
     from tradingagents.dataflows.stocktwits import fetch_stocktwits_messages
+
+    def record_capture(scope: str, name: str, call: Callable[[], Any]) -> None:
+        nonlocal attempted, completed
+        attempted += 1
+        try:
+            call()
+        except Exception as error:
+            # Preserve the source failure in the operator summary even when
+            # the normal vendor router wraps it in VendorError.
+            root_error = error.__cause__ or error
+            failures.append(f"{scope}:{name}:{type(root_error).__name__}")
+        else:
+            completed += 1
 
     with temporal_context(context):
         for ticker in tickers:
@@ -137,22 +153,21 @@ def capture_daily_market_research(
                     ),
                 ),
             )
-            for name, capture in captures:
-                attempted += 1
-                try:
-                    capture()
-                except Exception as error:
-                    # Preserve the source failure in the operator summary even
-                    # when the normal vendor router wraps it in VendorError.
-                    root_error = error.__cause__ or error
-                    failures.append(f"{ticker}:{name}:{type(root_error).__name__}")
-                else:
-                    completed += 1
+            for name, call in captures:
+                record_capture(ticker, name, call)
+            if full_surface:
+                for name, call in (
+                    ("get_fundamentals", lambda ticker=ticker: route_to_vendor("get_fundamentals", ticker, end_date)),
+                    ("get_balance_sheet", lambda ticker=ticker: route_to_vendor("get_balance_sheet", ticker, "quarterly", end_date)),
+                    ("get_cashflow", lambda ticker=ticker: route_to_vendor("get_cashflow", ticker, "quarterly", end_date)),
+                    ("get_income_statement", lambda ticker=ticker: route_to_vendor("get_income_statement", ticker, "quarterly", end_date)),
+                    ("get_insider_transactions", lambda ticker=ticker: route_to_vendor("get_insider_transactions", ticker)),
+                ):
+                    record_capture(ticker, name, call)
         # Hacker News is a global feed, so collect it once per capture run rather
         # than redundantly once per ticker. Its immutable tape entry remains
         # available to every scenario created from this run.
-        attempted += 1
-        try:
+        def capture_hacker_news() -> None:
             hacker_news_request = {"feed": "top", "limit": 8}
             hacker_news_rows = invoke_tool(
                 "social.hackernews",
@@ -167,10 +182,16 @@ def capture_daily_market_research(
                 request=hacker_news_request,
                 captured_at=captured_at,
             )
-        except Exception as error:
-            failures.append(f"global:hacker_news:{type(error).__name__}")
-        else:
-            completed += 1
+        record_capture("global", "hacker_news", capture_hacker_news)
+        if full_surface:
+            for name, call in (
+                ("get_global_news", lambda: route_to_vendor("get_global_news", end_date, 7, 20)),
+                ("macro_cpi", lambda: route_to_vendor("get_macro_indicators", "cpi", end_date, 365)),
+                ("macro_unemployment", lambda: route_to_vendor("get_macro_indicators", "unemployment", end_date, 365)),
+                ("macro_fed_funds_rate", lambda: route_to_vendor("get_macro_indicators", "fed_funds_rate", end_date, 365)),
+                ("get_prediction_markets", lambda: route_to_vendor("get_prediction_markets", "US equities", 6)),
+            ):
+                record_capture("global", name, call)
     return DailyCaptureResult(
         attempted=attempted,
         completed=completed,

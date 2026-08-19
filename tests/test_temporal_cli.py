@@ -67,6 +67,34 @@ def test_temporal_capture_command_is_scheduler_friendly(tmp_path, monkeypatch):
     assert scenario is not None and scenario.capture_run_id == "capture-1"
 
 
+def test_temporal_capture_can_request_the_extended_surface(tmp_path, monkeypatch):
+    captured = {}
+
+    def fake_capture(store, tickers, *, news_lookback_days, full_surface):
+        captured.update({"tickers": tuple(tickers), "days": news_lookback_days, "full": full_surface})
+        return DailyCaptureResult(
+            attempted=15,
+            completed=15,
+            failures=(),
+            run_id="capture-extended",
+            captured_at=datetime(2025, 1, 2, tzinfo=timezone.utc),
+            start_date="2024-12-26",
+            end_date="2025-01-02",
+        )
+
+    monkeypatch.setattr(
+        "tradingagents.temporal_adapters.tradingagents.capture_daily_market_research",
+        fake_capture,
+    )
+    result = CliRunner().invoke(
+        cli.app,
+        ["temporal-capture", "--tickers", "nvda", "--store", str(tmp_path), "--full-surface"],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert captured == {"tickers": ("NVDA",), "days": 7, "full": True}
+
+
 def test_temporal_sec_import_command_passes_a_narrow_corpus_request(tmp_path, monkeypatch):
     captured = {}
 

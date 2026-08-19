@@ -157,7 +157,7 @@ commands that a scheduler can call:
 
 ```bash
 tradingagents temporal-import historical-news.jsonl --store .tradingagents/temporal
-tradingagents temporal-capture --tickers NVDA,MSFT,AAPL --store .tradingagents/temporal
+tradingagents temporal-capture --tickers NVDA,MSFT,AAPL --full-surface --store .tradingagents/temporal
 tradingagents temporal-sec-import --cik 1045810 --user-agent "Research team contact@example.com" --store .tradingagents/temporal
 tradingagents temporal-wayback-import --url 'https://investor.example.com/*' --from 2024-01-01 --to 2024-03-31 --store .tradingagents/temporal
 tradingagents temporal-gdelt-import --query NVDA --from 2024-02-01 --to 2024-02-29 --store .tradingagents/temporal

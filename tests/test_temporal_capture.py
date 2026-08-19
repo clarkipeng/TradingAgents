@@ -80,3 +80,47 @@ def test_daily_capture_uses_existing_router_and_continues_after_a_failure(tmp_pa
     document = store.search("NVIDIA", as_of=datetime(2025, 1, 2, 16, tzinfo=UTC)).results[0]
     assert document.evidence.tool == "corpus.document"
     assert document.evidence.response["metadata"]["parent_artifact_hash"]
+
+
+def test_full_surface_capture_records_extended_research_tools(tmp_path, monkeypatch):
+    set_config(
+        {
+            "data_vendors": {
+                "core_stock_apis": "yfinance",
+                "news_data": "yfinance",
+                "fundamental_data": "yfinance",
+                "macro_data": "fred",
+                "prediction_markets": "polymarket",
+            }
+        }
+    )
+    for method in (
+        "get_stock_data",
+        "get_news",
+        "get_fundamentals",
+        "get_balance_sheet",
+        "get_cashflow",
+        "get_income_statement",
+        "get_insider_transactions",
+        "get_global_news",
+    ):
+        monkeypatch.setitem(
+            interface.VENDOR_METHODS[method], "yfinance", lambda *_args, method=method: method
+        )
+    monkeypatch.setitem(interface.VENDOR_METHODS["get_macro_indicators"], "fred", lambda *_args: "macro")
+    monkeypatch.setitem(
+        interface.VENDOR_METHODS["get_prediction_markets"], "polymarket", lambda *_args: "markets"
+    )
+    monkeypatch.setattr(stocktwits, "fetch_stocktwits_messages", lambda *_args, **_kwargs: "stocktwits")
+    monkeypatch.setattr(reddit, "fetch_reddit_posts", lambda *_args, **_kwargs: "reddit")
+    monkeypatch.setattr(hacker_news, "fetch_hacker_news_stories", lambda *_args, **_kwargs: [])
+
+    result = capture_daily_market_research(
+        TemporalStore(tmp_path),
+        ["NVDA"],
+        now=datetime(2025, 1, 2, 16, tzinfo=UTC),
+        full_surface=True,
+    )
+
+    assert result.attempted == result.completed == 15
+    assert not result.failures

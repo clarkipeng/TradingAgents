@@ -1320,6 +1320,11 @@ def temporal_capture(
         "--scenario-id",
         help="Seal a one-ticker forward-captured scenario after a successful capture.",
     ),
+    full_surface: bool = typer.Option(
+        False,
+        "--full-surface",
+        help="Also capture statements, insiders, global news, macro, and prediction markets.",
+    ),
 ):
     """Capture the existing price/news tools once; invoke this from a daily scheduler."""
     from tradingagents.temporal import TemporalStore
@@ -1331,11 +1336,10 @@ def temporal_capture(
     if scenario_id is not None and len(universe) != 1:
         raise typer.BadParameter("--scenario-id requires exactly one ticker")
     temporal_store = TemporalStore(store)
-    result = capture_daily_market_research(
-        temporal_store,
-        universe,
-        news_lookback_days=news_lookback_days,
-    )
+    capture_kwargs = {"news_lookback_days": news_lookback_days}
+    if full_surface:
+        capture_kwargs["full_surface"] = True
+    result = capture_daily_market_research(temporal_store, universe, **capture_kwargs)
     typer.echo(
         f"Captured {result.completed}/{result.attempted} tool calls for {len(universe)} tickers "
         f"(run {result.run_id})"
