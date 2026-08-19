@@ -203,6 +203,43 @@ def score_recorded_run(
     )
 
 
+def compare_recorded_runs(
+    store: TemporalStore,
+    *,
+    left_run_id: str,
+    right_run_id: str,
+    scenario_id: str,
+    left_claims: Iterable[FactualClaim] = (),
+    right_claims: Iterable[FactualClaim] = (),
+    left_decision: str | None = None,
+    right_decision: str | None = None,
+) -> tuple[ResearchTrace, ResearchTrace, PairedScenarioResult]:
+    """Compare two persisted replay runs against one immutable scenario rubric."""
+    rubric = store.get_scenario_rubric(scenario_id)
+    if rubric is None:
+        raise KeyError(f"scenario has no sealed rubric: {scenario_id}")
+    left = trace_from_tool_run(
+        store,
+        run_id=left_run_id,
+        scenario_id=scenario_id,
+        claims=left_claims,
+        decision=left_decision,
+    )
+    right = trace_from_tool_run(
+        store,
+        run_id=right_run_id,
+        scenario_id=scenario_id,
+        claims=right_claims,
+        decision=right_decision,
+    )
+    return left, right, compare_pair(
+        left,
+        right,
+        material_evidence_ids=rubric.material_evidence_ids,
+        useful_evidence_ids=rubric.useful_evidence_ids,
+    )
+
+
 def run_paired_evaluation(
     rubrics: Iterable[ScenarioRubric],
     *,

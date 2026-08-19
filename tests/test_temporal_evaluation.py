@@ -10,6 +10,7 @@ from tradingagents.temporal import (
     TemporalStore,
     cited_claims_from_markdown,
     compare_pair,
+    compare_recorded_runs,
     decision_stability,
     run_paired_evaluation,
     run_repeated_paired_evaluation,
@@ -220,6 +221,45 @@ def test_sealed_rubric_scores_a_persisted_trace(tmp_path):
     assert rubric.material_evidence_ids == (evidence.evidence_id,)
     assert trace.evidence_ids == (evidence.evidence_id,)
     assert metrics.evidence_coverage == metrics.retrieval_efficiency == 1.0
+
+
+def test_sealed_rubric_compares_two_persisted_runs(tmp_path):
+    store = TemporalStore(tmp_path)
+    evidence = store.record(
+        "corpus.document",
+        {"url": "https://example.com/nvda"},
+        {"text": "NVDA earnings"},
+        available_at="2025-01-02T09:00:00Z",
+    )
+    store.seal_scenario(
+        "scenario-comparison",
+        as_of="2025-01-02T10:00:00Z",
+        basis="archive-reconstructed",
+    )
+    store.seal_scenario_rubric(
+        "scenario-comparison",
+        material_evidence_ids=(evidence.evidence_id,),
+        useful_evidence_ids=(evidence.evidence_id,),
+    )
+    store.record_tool_trace(
+        run_id="baseline",
+        scenario_id="scenario-comparison",
+        mode="replay",
+        tool="temporal_search",
+        request={"query": "NVDA"},
+        evidence_id=evidence.evidence_id,
+    )
+
+    left, right, comparison = compare_recorded_runs(
+        store,
+        left_run_id="baseline",
+        right_run_id="changed",
+        scenario_id="scenario-comparison",
+    )
+
+    assert left.evidence_ids == (evidence.evidence_id,)
+    assert right.evidence_ids == ()
+    assert comparison.evidence_coverage_delta == -1.0
 
 
 def test_tradingagents_adapter_replays_a_sealed_scenario_into_a_trace(tmp_path):

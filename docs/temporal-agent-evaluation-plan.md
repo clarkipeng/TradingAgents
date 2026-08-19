@@ -167,6 +167,7 @@ tradingagents temporal-media-import --from 2024-02-01 --to 2024-02-29 --sources 
 tradingagents temporal-scenario --id nvda-q4 --as-of 2024-02-21T17:02:03Z --basis archive-reconstructed --metadata '{"ticker":"NVDA"}'
 tradingagents temporal-rubric --id nvda-q4 --material evidence-id-1 --useful evidence-id-1,evidence-id-2 --store .tradingagents/temporal
 tradingagents temporal-score-run --run-id replay-run-id --id nvda-q4 --store .tradingagents/temporal
+tradingagents temporal-compare-runs --left-run-id baseline-run-id --right-run-id changed-run-id --id nvda-q4 --store .tradingagents/temporal
 ```
 
 For a running poller, set `TRADINGAGENTS_POLLER_TEMPORAL_STORE` to the same

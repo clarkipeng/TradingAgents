@@ -425,3 +425,49 @@ def test_temporal_rubric_and_score_commands_use_sealed_evidence(tmp_path):
     assert rubric.exit_code == 0, rubric.output
     assert scored.exit_code == 0, scored.output
     assert json.loads(scored.output)["evidence_coverage"] == 1.0
+
+
+def test_temporal_compare_runs_uses_the_same_sealed_rubric(tmp_path):
+    store = TemporalStore(tmp_path)
+    evidence = store.record(
+        "corpus.document",
+        {"url": "https://example.com"},
+        {"text": "NVDA earnings"},
+        available_at=datetime(2025, 1, 2, 9, tzinfo=timezone.utc),
+    )
+    store.seal_scenario(
+        "nvda-comparison",
+        as_of=datetime(2025, 1, 2, 10, tzinfo=timezone.utc),
+        basis="archive-reconstructed",
+    )
+    store.seal_scenario_rubric(
+        "nvda-comparison",
+        material_evidence_ids=(evidence.evidence_id,),
+        useful_evidence_ids=(evidence.evidence_id,),
+    )
+    store.record_tool_trace(
+        run_id="baseline",
+        scenario_id="nvda-comparison",
+        mode="replay",
+        tool="temporal_search",
+        request={"query": "NVDA"},
+        evidence_id=evidence.evidence_id,
+    )
+
+    result = CliRunner().invoke(
+        cli.app,
+        [
+            "temporal-compare-runs",
+            "--left-run-id",
+            "baseline",
+            "--right-run-id",
+            "changed",
+            "--id",
+            "nvda-comparison",
+            "--store",
+            str(tmp_path),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)["evidence_coverage_delta"] == -1.0

@@ -1677,6 +1677,59 @@ def temporal_score_run(
     )
 
 
+@app.command("temporal-compare-runs")
+def temporal_compare_runs(
+    left_run_id: str = typer.Option(..., "--left-run-id", help="Baseline temporal run ID."),  # noqa: B008
+    right_run_id: str = typer.Option(..., "--right-run-id", help="Changed-arm temporal run ID."),  # noqa: B008
+    scenario_id: str = typer.Option(..., "--id", help="Sealed scenario ID."),  # noqa: B008
+    left_decision_file: Path | None = typer.Option(  # noqa: B008
+        None, "--left-decision-file", exists=True, readable=True, help="Optional baseline markdown report."
+    ),
+    right_decision_file: Path | None = typer.Option(  # noqa: B008
+        None, "--right-decision-file", exists=True, readable=True, help="Optional changed-arm markdown report."
+    ),
+    store: Path = typer.Option(  # noqa: B008
+        Path(".tradingagents/temporal"), "--store", help="Temporal evidence-store directory."
+    ),
+):
+    """Compare two persisted replay traces against the scenario's sealed rubric."""
+    from tradingagents.temporal import (
+        TemporalStore,
+        cited_claims_from_markdown,
+        compare_recorded_runs,
+    )
+
+    left_decision = (
+        left_decision_file.read_text(encoding="utf-8") if left_decision_file is not None else None
+    )
+    right_decision = (
+        right_decision_file.read_text(encoding="utf-8") if right_decision_file is not None else None
+    )
+    _left, _right, result = compare_recorded_runs(
+        TemporalStore(store),
+        left_run_id=left_run_id,
+        right_run_id=right_run_id,
+        scenario_id=scenario_id,
+        left_claims=cited_claims_from_markdown(left_decision or "", claim_prefix="left"),
+        right_claims=cited_claims_from_markdown(right_decision or "", claim_prefix="right"),
+        left_decision=left_decision,
+        right_decision=right_decision,
+    )
+    typer.echo(
+        json.dumps(
+            {
+                "scenario_id": result.scenario_id,
+                "left": result.left.__dict__,
+                "right": result.right.__dict__,
+                "evidence_coverage_delta": result.evidence_coverage_delta,
+                "citation_grounding_delta": result.citation_grounding_delta,
+                "retrieval_efficiency_delta": result.retrieval_efficiency_delta,
+            },
+            sort_keys=True,
+        )
+    )
+
+
 @app.command()
 def analyze(
     checkpoint: bool | None = typer.Option(
