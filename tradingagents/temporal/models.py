@@ -178,6 +178,11 @@ class SearchManifest:
     ranker_version: str
     corpus_hash: str
     evidence_ids: tuple[str, ...]
+    page: int = 1
+    limit: int = 10
+    date_from: str | None = None
+    date_to: str | None = None
+    source: str | None = None
 
 
 @dataclass(frozen=True)

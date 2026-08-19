@@ -43,6 +43,16 @@ def create_contextual_temporal_search_tool() -> StructuredTool:
     return _build_temporal_search_tool()
 
 
+def create_contextual_temporal_fetch_tool() -> StructuredTool:
+    """Create a graph-safe bounded reader for normalized temporal documents."""
+    return _build_temporal_fetch_tool()
+
+
+def create_contextual_temporal_overview_tool() -> StructuredTool:
+    """Create a graph-safe corpus metadata tool."""
+    return _build_temporal_overview_tool()
+
+
 # A matched document can be a full SEC filing (tens of MB); tool results feed
 # straight into an LLM request, so each result carries a bounded snippet and a
 # citation id instead of the whole document.
@@ -59,15 +69,23 @@ def _snippet(response: Any) -> dict[str, Any]:
     return {"snippet": text[:_SNIPPET_CHARS], "truncated": True}
 
 
+def _context_store(expected_store: TemporalStore | None) -> tuple[Any, TemporalStore]:
+    context = current_context()
+    if context is None or context.store is None:
+        raise RuntimeError("temporal tool requires an active TemporalContext with a store")
+    if expected_store is not None and expected_store.root.resolve() != context.store.root.resolve():
+        raise RuntimeError("temporal tool store does not match the active context")
+    return context, context.store
+
+
 def _build_temporal_search_tool(expected_store: TemporalStore | None = None) -> StructuredTool:
-    def search(query: str, limit: int = 10) -> str:
-        context = current_context()
-        if context is None or context.store is None:
-            raise RuntimeError("temporal_search requires an active TemporalContext with a store")
-        store = context.store
-        if expected_store is not None and expected_store.root.resolve() != store.root.resolve():
-            raise RuntimeError("temporal_search store does not match the active context")
-        response = store.search(query, as_of=context.clock.as_of, limit=limit)
+    def search(query: str, limit: int = 10, page: int = 1, date_from: str | None = None,
+               date_to: str | None = None, source: str | None = None,
+               corpus_hash: str | None = None) -> str:
+        context, store = _context_store(expected_store)
+        response = store.search(query, as_of=context.clock.as_of, limit=limit, page=page,
+                                date_from=date_from, date_to=date_to, source=source,
+                                corpus_hash_pin=corpus_hash)
         if context.run_id is not None:
             store.record_search_trace(
                 run_id=context.run_id,
@@ -81,7 +99,9 @@ def _build_temporal_search_tool(expected_store: TemporalStore | None = None) -> 
                 "results": [
                     {
                         "evidence_id": result.evidence.evidence_id,
-                        "source": result.evidence.source,
+                        "doc_key": result.doc_key,
+                        "title": result.document.title if result.document else result.evidence.response.get("title"),
+                        "source": result.evidence.source or (result.document.source_domain if result.document else None),
                         "available_at": result.evidence.available_at,
                         "fidelity": result.evidence.fidelity,
                         **_snippet(result.evidence.response),
@@ -94,6 +114,11 @@ def _build_temporal_search_tool(expected_store: TemporalStore | None = None) -> 
                     "ranker_version": response.manifest.ranker_version,
                     "corpus_hash": response.manifest.corpus_hash,
                     "evidence_ids": response.manifest.evidence_ids,
+                    "page": response.manifest.page,
+                    "limit": response.manifest.limit,
+                    "date_from": response.manifest.date_from,
+                    "date_to": response.manifest.date_to,
+                    "source": response.manifest.source,
                 },
             }
         )
@@ -103,9 +128,34 @@ def _build_temporal_search_tool(expected_store: TemporalStore | None = None) -> 
         name="temporal_search",
         description=(
             "Search the owned public-evidence corpus at the active historical time. "
-            "Cite returned evidence IDs in research as [evidence:<id>]."
+            "Empty query lists eligible documents by recency; page 2+ requires the "
+            "page-1 manifest corpus_hash. Cite returned evidence IDs as [evidence:<id>]."
         ),
     )
+
+
+def _build_temporal_fetch_tool(expected_store: TemporalStore | None = None) -> StructuredTool:
+    def fetch(doc_key: str, page: int = 1) -> str:
+        context, store = _context_store(expected_store)
+        result = store.fetch_document(doc_key, as_of=context.clock.as_of, page=page)
+        if context.run_id is not None:
+            store.record_tool_trace(run_id=context.run_id, scenario_id=context.scenario_id,
+                                    mode=context.mode.value, tool="temporal_fetch",
+                                    request={"doc_key": doc_key, "page": page},
+                                    evidence_id=result["evidence_id"], invoked_at=context.clock.as_of)
+        return canonical_json({"result": result})
+
+    return StructuredTool.from_function(fetch, name="temporal_fetch",
+        description="Read a bounded ~4k character page from an eligible normalized document. Fetch sequentially and cite its evidence_id.")
+
+
+def _build_temporal_overview_tool(expected_store: TemporalStore | None = None) -> StructuredTool:
+    def overview(source: str | None = None) -> str:
+        context, store = _context_store(expected_store)
+        return canonical_json(store.corpus_overview(as_of=context.clock.as_of, source=source))
+
+    return StructuredTool.from_function(overview, name="corpus_overview",
+        description="Summarize eligible temporal corpus source counts and available date span.")
 
 
 def _safe(value: Any) -> Any:

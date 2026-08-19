@@ -104,11 +104,12 @@ def get_temporal_search_guidance() -> str:
     if not isinstance(temporal, dict) or not temporal.get("search_enabled", False):
         return ""
     return (
-        " You also have temporal_search(query, limit): it searches an archived"
+        " You also have temporal_search(query, limit, page, date_from, date_to, source)"
         " corpus of news, filings, and public discussion restricted to what was"
-        " available at the analysis time. Use it to find evidence beyond the"
-        " fixed feeds, and cite each result you rely on inline as"
-        " [evidence:<id>] using the id it returns."
+        " available at the analysis time. Search first, then use temporal_fetch(doc_key, page)"
+        " sequentially for the bounded body text; corpus_overview provides source/date coverage."
+        " For pagination, pass the prior manifest corpus_hash. Cite each result you rely on"
+        " inline as [evidence:<id>] using the returned evidence id."
     )
 
 

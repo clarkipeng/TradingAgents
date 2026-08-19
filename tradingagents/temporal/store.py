@@ -884,40 +884,62 @@ class TemporalStore:
         *,
         as_of: datetime,
         limit: int = 10,
+        page: int = 1,
+        date_from: str | None = None,
+        date_to: str | None = None,
+        source: str | None = None,
+        corpus_hash_pin: str | None = None,
     ) -> TemporalSearchResponse:
         """Search eligible normalized chunks and aggregate to one result per document cluster."""
         if limit < 1:
             raise ValueError("limit must be positive")
+        if page < 1:
+            raise ValueError("page must be positive")
+        parsed_as_of = parse_timestamp(as_of)
+        start = (date_from[:10] if isinstance(date_from, str) and len(date_from) == 10 else parse_timestamp(date_from).date().isoformat()) if date_from else None
+        end = (date_to[:10] if isinstance(date_to, str) and len(date_to) == 10 else parse_timestamp(date_to).date().isoformat()) if date_to else None
+        if start and end and start > end:
+            raise ValueError("date_from must be on or before date_to")
+        current_hash = self.corpus_hash(as_of=parsed_as_of)
+        if page > 1 and corpus_hash_pin != current_hash:
+            raise ValueError("page > 1 requires a matching page-1 corpus_hash pin")
         fts_query = _fts_query(query)
-        cutoff = format_timestamp(parse_timestamp(as_of))
-        if not fts_query:
-            return TemporalSearchResponse(
-                results=(),
-                manifest=SearchManifest(
-                    query=query,
-                    as_of=parse_timestamp(as_of),
-                    ranker_version="temporal-document-v2",
-                    corpus_hash=self.corpus_hash(as_of=as_of),
-                    evidence_ids=(),
-                ),
-            )
-        candidate_limit = max(limit * 8, 32)
+        cutoff = format_timestamp(parsed_as_of)
+        predicates = ["d.available_at <= ?"]
+        parameters: list[Any] = [cutoff]
+        if start:
+            predicates.append("substr(d.available_at, 1, 10) >= ?")
+            parameters.append(start)
+        if end:
+            predicates.append("substr(d.available_at, 1, 10) <= ?")
+            parameters.append(end)
+        if source:
+            predicates.append("(d.source_domain = ? OR e.source = ? OR d.source_domain LIKE ?)")
+            parameters.extend((source, source, f"%{source}%"))
+        where = " AND ".join(predicates)
+        candidate_limit = max(limit * 8 * page, 32)
         with self._connect() as connection:
-            candidates = connection.execute(
-                """
+            if fts_query:
+                candidates = connection.execute(
+                    f"""
                 -- FTS5's rank column is bm25(document_chunks_fts); unlike the
                 -- auxiliary function it is legal in a grouped aggregate.
                 SELECT c.doc_key, d.cluster_key, MIN(document_chunks_fts.rank) AS rank
                 FROM document_chunks_fts
                 JOIN document_chunks c ON c.rowid = document_chunks_fts.rowid
                 JOIN documents d ON d.doc_key = c.doc_key
-                WHERE document_chunks_fts MATCH ? AND d.available_at <= ?
+                JOIN evidence e ON e.evidence_id = d.parent_evidence_id
+                WHERE document_chunks_fts MATCH ? AND {where}
                 GROUP BY c.doc_key, d.cluster_key
                 ORDER BY rank ASC, c.doc_key ASC
                 LIMIT ?
-                """,
-                (fts_query, cutoff, candidate_limit),
-            ).fetchall()
+                """, (fts_query, *parameters, candidate_limit)).fetchall()
+            else:
+                candidates = connection.execute(
+                    f"""SELECT d.doc_key, d.cluster_key, 0.0 AS rank
+                    FROM documents d JOIN evidence e ON e.evidence_id=d.parent_evidence_id
+                    WHERE {where} ORDER BY d.available_at DESC, d.doc_key ASC LIMIT ?""",
+                    (*parameters, candidate_limit)).fetchall()
         best: dict[str, sqlite3.Row] = {}
         for row in candidates:
             cluster = row["cluster_key"]
@@ -925,9 +947,13 @@ class TemporalStore:
                 float(best[cluster]["rank"]), best[cluster]["doc_key"]
             ):
                 best[cluster] = row
-        selected_candidates = sorted(
-            best.values(), key=lambda row: (float(row["rank"]), row["doc_key"])
-        )[:limit]
+        selected_candidates = sorted(best.values(), key=lambda row: (float(row["rank"]), row["doc_key"]))
+        if not fts_query:
+            with self._connect() as connection:
+                available = {r["doc_key"]: r["available_at"] for r in connection.execute(
+                    "SELECT doc_key, available_at FROM documents WHERE doc_key IN ({})".format(",".join("?" for _ in best)), tuple(best)).fetchall()}
+            selected_candidates.sort(key=lambda row: (available.get(row["doc_key"], ""), row["doc_key"]), reverse=True)
+        selected_candidates = selected_candidates[(page - 1) * limit: page * limit]
         selected_keys = [row["doc_key"] for row in selected_candidates]
         placeholders = ",".join("?" for _ in selected_keys)
         with self._connect() as connection:
@@ -965,13 +991,51 @@ class TemporalStore:
         return TemporalSearchResponse(
             results=results,
             manifest=SearchManifest(
-                query=query,
-                as_of=parse_timestamp(as_of),
+                query=query, as_of=parsed_as_of,
                 ranker_version="temporal-document-v2",
-                corpus_hash=self.corpus_hash(as_of=as_of),
+                corpus_hash=current_hash,
                 evidence_ids=tuple(result.evidence.evidence_id for result in results),
+                page=page, limit=limit, date_from=start, date_to=end, source=source,
             ),
         )
+
+    def fetch_document(self, doc_key: str, *, as_of: datetime, page: int = 1, page_chars: int = 4000) -> dict[str, Any]:
+        """Read one eligible normalized document in bounded sequential character pages."""
+        if page < 1 or not 1 <= page_chars <= 4000:
+            raise ValueError("page must be positive and page_chars must be between 1 and 4000")
+        with self._connect() as connection:
+            row = connection.execute("""SELECT d.*, e.observed_at, e.ingested_at, e.evidence_id,
+                e.event_at, e.source_published_at
+                FROM documents d JOIN evidence e ON e.evidence_id=d.parent_evidence_id
+                WHERE d.doc_key=? AND d.available_at <= ?""", (doc_key, format_timestamp(parse_timestamp(as_of)))).fetchone()
+        if row is None:
+            raise KeyError(f"unknown or ineligible document: {doc_key}")
+        body = row["body"]
+        start = (page - 1) * page_chars
+        chunk = body[start:start + page_chars]
+        if not chunk and start >= len(body):
+            raise ValueError("page is beyond document body")
+        return {"doc_key": doc_key, "title": row["title"], "body": chunk, "page": page,
+                "page_chars": page_chars, "has_more": start + len(chunk) < len(body),
+                "source": row["source_domain"], "available_at": row["available_at"],
+                "published_at": row["published_at"], "event_at": row["event_at"],
+                "observed_at": row["observed_at"], "ingested_at": row["ingested_at"],
+                "evidence_id": row["evidence_id"]}
+
+    def corpus_overview(self, *, as_of: datetime, source: str | None = None) -> dict[str, Any]:
+        cutoff = format_timestamp(parse_timestamp(as_of))
+        predicates = ["d.available_at <= ?"]
+        params: list[Any] = [cutoff]
+        if source:
+            predicates.append("(d.source_domain = ? OR e.source = ? OR d.source_domain LIKE ?)")
+            params.extend((source, source, f"%{source}%"))
+        with self._connect() as connection:
+            rows = connection.execute(f"SELECT d.source_domain, d.available_at FROM documents d JOIN evidence e ON e.evidence_id=d.parent_evidence_id WHERE {' AND '.join(predicates)} ORDER BY d.available_at", params).fetchall()
+        domains = sorted({row["source_domain"] for row in rows})
+        return {"as_of": cutoff, "source": source, "document_count": len(rows),
+                "source_counts": {domain: sum(row["source_domain"] == domain for row in rows) for domain in domains},
+                "date_span": {"from": rows[0]["available_at"][:10] if rows else None, "to": rows[-1]["available_at"][:10] if rows else None},
+                "corpus_hash": self.corpus_hash(as_of=as_of)}
 
     @staticmethod
     def _search_evidence_from_row(row: sqlite3.Row) -> EvidenceRecord:
