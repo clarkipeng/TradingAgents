@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import fcntl
 import hashlib
 import json
 import re
@@ -32,6 +33,8 @@ from .models import (
 )
 from .ranking import RANKER_VERSION, EligibleChunkIndex, build_eligible_index, rank
 
+_SQLITE_BUSY_TIMEOUT_SECONDS = 30.0
+
 
 class TemporalStore:
     """A local evidence store designed to promote cleanly to object storage and Postgres."""
@@ -49,7 +52,7 @@ class TemporalStore:
 
     @contextmanager
     def _connect(self) -> Iterator[sqlite3.Connection]:
-        connection = sqlite3.connect(self.database_path)
+        connection = sqlite3.connect(self.database_path, timeout=_SQLITE_BUSY_TIMEOUT_SECONDS)
         connection.row_factory = sqlite3.Row
         try:
             yield connection
@@ -59,6 +62,24 @@ class TemporalStore:
             raise
         finally:
             connection.close()
+
+    @contextmanager
+    def write_lock(self) -> Iterator[None]:
+        """Advisory single-mutator lock for batched writers of this store.
+
+        Concurrent mutators (daily capture, poller mirror, reindex) take this
+        lock so their write batches serialize by construction instead of by
+        scheduling convention. Readers are never blocked.
+        """
+        self.root.mkdir(parents=True, exist_ok=True)
+        lock_path = self.root / "mutator.lock"
+        handle = open(lock_path, "a+")
+        try:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+            yield
+        finally:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            handle.close()
 
     def _initialize(self) -> None:
         with self._connect() as connection:

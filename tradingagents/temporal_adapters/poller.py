@@ -33,18 +33,19 @@ def mirror_poller_media_fetch(
         return 0
     store = TemporalStore(root)
     observed_at = datetime.fromtimestamp(received_utc, timezone.utc)
-    imported = 0
-    for row in rows:
-        evidence_id = _record_row(
-            store,
-            row,
-            provider=provider,
-            query_key=query_key,
-            fetch_run_id=fetch_run_id,
-            observed_at=observed_at,
-        )
-        if evidence_id is not None:
-            imported += 1
+    with store.write_lock():
+        imported = 0
+        for row in rows:
+            evidence_id = _record_row(
+                store,
+                row,
+                provider=provider,
+                query_key=query_key,
+                fetch_run_id=fetch_run_id,
+                observed_at=observed_at,
+            )
+            if evidence_id is not None:
+                imported += 1
     return imported
 
 

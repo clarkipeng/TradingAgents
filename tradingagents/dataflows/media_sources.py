@@ -315,8 +315,9 @@ def _is_transient_http_error(exc: HTTPError) -> bool:
 
 
 # Sources that run without a key. 'x' is added by the poller only when a token
-# is present (see media poller's source resolution).
-KEYLESS_SOURCES = ("stocktwits", "reddit", "bluesky", "truthsocial", "news")
+# is present (see media poller's source resolution). 'truthsocial' is excluded:
+# it is Cloudflare-gated and cannot succeed without TRUTHSOCIAL_TOKEN.
+KEYLESS_SOURCES = ("stocktwits", "reddit", "bluesky", "news")
 
 
 def _iso_to_epoch(iso_str: str | None) -> float | None:

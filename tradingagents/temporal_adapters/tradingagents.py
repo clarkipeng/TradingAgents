@@ -135,7 +135,7 @@ def capture_daily_market_research(
         else:
             completed += 1
 
-    with temporal_context(context):
+    with temporal_context(context), store.write_lock():
         for ticker in tickers:
             captures = (
                 (
