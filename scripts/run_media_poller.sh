@@ -44,7 +44,8 @@ fi
 export MEDIA_DB_URL=${MEDIA_DB_URL:-"$HOME/.tradingagents/media-poller.sqlite3"}
 export TRADINGAGENTS_POLLER_TEMPORAL_STORE=${TRADINGAGENTS_POLLER_TEMPORAL_STORE:-"$HOME/.tradingagents/temporal"}
 
-if [ "$#" -eq 0 ] && [ -z "${MEDIA_POLLER_TICKERS:-}" ]; then
+extra_args=""
+if [ -z "${MEDIA_POLLER_TICKERS:-}" ] && ! printf '%s\n' "$@" | grep -q -- '--tickers'; then
     universe_file="$project_dir/config/temporal-universe.txt"
     if [ ! -r "$universe_file" ]; then
         echo "No tickers given and universe file is unreadable: $universe_file" >&2
@@ -54,7 +55,8 @@ if [ "$#" -eq 0 ] && [ -z "${MEDIA_POLLER_TICKERS:-}" ]; then
         /^[[:space:]]*#/ || /^[[:space:]]*$/ { next }
         { gsub(/[[:space:]]/, ""); if ($0 != "" && !seen[$0]++) print }
     ' "$universe_file" | paste -sd, -)
-    set -- --tickers "$tickers"
+    extra_args="--tickers $tickers"
 fi
 
-exec "$command_name" -m tradingagents.poller "$@"
+# shellcheck disable=SC2086 - extra_args is intentionally word-split
+exec "$command_name" -m tradingagents.poller $extra_args "$@"

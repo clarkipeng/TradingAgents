@@ -35,6 +35,23 @@ from .ranking import RANKER_VERSION, EligibleChunkIndex, build_eligible_index, r
 
 _SQLITE_BUSY_TIMEOUT_SECONDS = 30.0
 
+_TITLE_TOKEN_MIN_LENGTH = 4
+_STOPWORDS = frozenset(
+    "the this that with from what when where will would could should have been were their "
+    "about after before over under into out for and are was were has had its his her our "
+    "your they them then than thus here there these those says said say new now how why "
+    "not but all can may more most other some such only also just like near amid upon per"
+    .split()
+)
+
+
+def _significant_title_tokens(title: str) -> list[str]:
+    return [
+        token
+        for token in re.findall(r"[a-z0-9]+", title.lower())
+        if len(token) >= _TITLE_TOKEN_MIN_LENGTH and token not in _STOPWORDS
+    ]
+
 
 class TemporalStore:
     """A local evidence store designed to promote cleanly to object storage and Postgres."""
@@ -384,7 +401,9 @@ class TemporalStore:
                     (record.evidence_id, response_json),
                 )
                 self._maintain_document(connection, record)
-                self._refresh_document_clusters(connection)
+                self._refresh_document_clusters(
+                    connection, {stable_doc_key(record.evidence_id, 0)}
+                )
         return record
 
     @staticmethod
@@ -448,20 +467,82 @@ class TemporalStore:
                 )
 
     @staticmethod
-    def _refresh_document_clusters(connection: sqlite3.Connection) -> None:
-        rows = connection.execute("SELECT doc_key, title, canonical_url, source_domain FROM documents ORDER BY doc_key").fetchall()
-        clusters: dict[str, str] = {}
+    def _refresh_document_clusters(
+        connection: sqlite3.Connection,
+        target_keys: set[str] | None = None,
+    ) -> None:
+        """Cluster syndicated duplicates by canonical URL or near-identical titles.
+
+        Candidate title pairs come from a token inverted index so difflib only
+        runs on pairs sharing a non-ubiquitous significant token; the previous
+        all-pairs scan was O(N^2) SequenceMatcher calls and made every insert
+        cost minutes on a grown corpus.
+
+        When ``target_keys`` is given, only those documents get their cluster
+        reassigned (pairs must touch one of them) - the per-insert path. A
+        ``None`` target is the full recomputation used by ``reindex_documents``;
+        callers writing single documents pass the new keys so inserts stay
+        incremental while ``temporal-reindex`` remains the authoritative
+        rebuild.
+        """
+        rows = connection.execute(
+            "SELECT doc_key, title, canonical_url, source_domain FROM documents ORDER BY doc_key"
+        ).fetchall()
+        by_key = {row["doc_key"]: row for row in rows}
+        parent = {row["doc_key"]: row["doc_key"] for row in rows}
+
+        def find(key: str) -> str:
+            while parent[key] != key:
+                parent[key] = parent[parent[key]]
+                key = parent[key]
+            return key
+
+        def union(left: str, right: str) -> None:
+            left_root, right_root = find(left), find(right)
+            if left_root != right_root:
+                parent[max(left_root, right_root)] = min(left_root, right_root)
+
+        by_url: dict[str, list[str]] = {}
+        tokens_by_key: dict[str, frozenset[str]] = {}
+        token_index: dict[str, list[str]] = {}
         for row in rows:
-            cluster = row["doc_key"]
-            for other in rows:
-                if other["doc_key"] == row["doc_key"]:
-                    continue
-                same_url = row["canonical_url"] and row["canonical_url"] == other["canonical_url"]
-                similar = row["source_domain"] == other["source_domain"] and title_similarity(row["title"], other["title"]) >= 0.92
-                if same_url or similar:
-                    cluster = min(cluster, clusters.get(other["doc_key"], other["doc_key"]))
-            clusters[row["doc_key"]] = cluster
-        connection.executemany("UPDATE documents SET cluster_key=? WHERE doc_key=?", [(cluster, key) for key, cluster in clusters.items()])
+            if row["canonical_url"]:
+                by_url.setdefault(row["canonical_url"], []).append(row["doc_key"])
+            tokens = frozenset(_significant_title_tokens(row["title"]))
+            tokens_by_key[row["doc_key"]] = tokens
+            for token in tokens:
+                token_index.setdefault(token, []).append(row["doc_key"])
+        ubiquitous_cutoff = max(8, len(rows) // 20)
+
+        for url, keys in by_url.items():
+            for key in keys[1:]:
+                union(keys[0], key)
+
+        def pair_wanted(left: str, right: str) -> bool:
+            return target_keys is None or left in target_keys or right in target_keys
+
+        seen_pairs: set[tuple[str, str]] = set()
+        for keys in token_index.values():
+            if len(keys) > ubiquitous_cutoff:
+                continue
+            for i, left in enumerate(keys):
+                for right in keys[i + 1:]:
+                    if not pair_wanted(left, right):
+                        continue
+                    pair = (left, right) if left < right else (right, left)
+                    if pair in seen_pairs:
+                        continue
+                    seen_pairs.add(pair)
+                    if by_key[left]["source_domain"] != by_key[right]["source_domain"]:
+                        continue
+                    if title_similarity(by_key[left]["title"], by_key[right]["title"]) >= 0.92:
+                        union(left, right)
+
+        wanted = sorted(target_keys) if target_keys is not None else sorted(by_key)
+        connection.executemany(
+            "UPDATE documents SET cluster_key=? WHERE doc_key=?",
+            [(find(key), key) for key in wanted if key in parent],
+        )
 
     def record_error(
         self,
