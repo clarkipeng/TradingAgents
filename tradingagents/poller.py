@@ -2484,7 +2484,23 @@ def _x_count_window(captured_utc: float) -> tuple[float, float]:
 
 
 def _x_start_window_open(now: float) -> bool:
+    if _x_start_window_force_open():
+        logger.warning(
+            "X start-window check bypassed by TRADINGAGENTS_POLLER_X_IGNORE_START_WINDOW; "
+            "timing is relaxed but collector identity, budget caps, and receipts are unchanged"
+        )
+        return True
     return _x_start_window_state(now) == "open"
+
+
+def _x_start_window_force_open() -> bool:
+    """Ops escape hatch: run the daily X discovery outside its scheduled window.
+
+    Relaxes only the start-window *timing* gate. The once-per-UTC-day identity,
+    hard budget caps, manifest discipline, and receipt semantics are untouched,
+    so an early run is simply that UTC day's cycle executed early.
+    """
+    return os.environ.get("TRADINGAGENTS_POLLER_X_IGNORE_START_WINDOW", "").strip() == "1"
 
 
 def _x_start_window_state(now: float) -> str:
