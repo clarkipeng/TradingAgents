@@ -44,6 +44,44 @@ def test_poller_mirror_is_opt_in_and_uses_terminal_receipt_clock(tmp_path, monke
     assert record.response["metadata"]["poller_fetch_run_id"] == "fetch-1"
 
 
+def test_mirrored_posts_are_invisible_before_their_capture_time(tmp_path, monkeypatch):
+    """The lookahead guarantee, end to end through the mirror path.
+
+    A forward-captured post is knowable only from the moment the poller
+    observed it - not from when it was published. A replayed agent between
+    publication and capture must see nothing, or backtests quietly read the
+    future through the social layer."""
+    monkeypatch.setenv("TRADINGAGENTS_POLLER_TEMPORAL_STORE", str(tmp_path))
+    published = 1_708_531_000.0
+    captured = 1_708_532_500.0
+    assert mirror_poller_media_fetch(
+        [{
+            "source": "x",
+            "external_id": "tweet-leak-check",
+            "title": "",
+            "body": "NVIDIA supply shock discussion",
+            "created_utc": published,
+            "fetched_utc": captured,
+        }],
+        provider="x",
+        query_key="chip-demand",
+        fetch_run_id="fetch-leak-check",
+        received_utc=captured,
+    ) == 1
+
+    store = TemporalStore(tmp_path)
+
+    def visible_at(epoch: float) -> int:
+        return len(store.search(
+            "NVIDIA supply shock", as_of=datetime.fromtimestamp(epoch, UTC)
+        ).results)
+
+    assert visible_at(published - 1) == 0
+    assert visible_at(published + 1) == 0  # published but not yet captured
+    assert visible_at(captured - 1) == 0
+    assert visible_at(captured + 1) == 1
+
+
 def test_poller_mirror_skips_non_post_rows(tmp_path, monkeypatch):
     monkeypatch.setenv("TRADINGAGENTS_POLLER_TEMPORAL_STORE", str(tmp_path))
 

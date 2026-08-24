@@ -132,6 +132,65 @@ def test_failed_and_empty_fetches_do_not_advance_independent_watermark(tmp_path)
 
 
 @pytest.mark.unit
+def test_failed_paid_fetch_consumes_its_reservation(tmp_path):
+    """A crash between reservation and receipt must never refund the spend.
+
+    The provider charged for the request whether or not we parsed the
+    response, so a retry of the same request key the same day would be a
+    real double spend - the reservation has to survive the failure."""
+    store = SqliteMediaStore(tmp_path / "m.db")
+    limits = {"test:x:total": 5.0, "test:x:request:one": 1.0}
+
+    with pytest.raises(RuntimeError, match="boom"):
+        poller._run_fetch(
+            store, provider="x", query_key="paid topic",
+            fetch_fn=lambda _: (_ for _ in ()).throw(RuntimeError("boom")),
+            cost_units=1.0,
+            budget_limits=limits,
+            budget_metadata={"budget_category": "search"},
+        )
+    failed = store.fetch_runs(provider="x")[0]
+    assert failed["status"] == "failed"
+    assert failed["cost_units"] == 1.0
+
+    with pytest.raises(poller._FetchBudgetExceeded):
+        poller._run_fetch(
+            store, provider="x", query_key="paid topic",
+            fetch_fn=lambda _: pytest.fail("a refused request must never fetch"),
+            cost_units=1.0,
+            budget_limits=limits,
+            budget_metadata={"budget_category": "search"},
+        )
+    assert len(store.fetch_runs(provider="x")) == 1
+    store.close()
+
+
+@pytest.mark.unit
+def test_aggregate_budget_cap_refuses_requests_beyond_the_limit(tmp_path):
+    store = SqliteMediaStore(tmp_path / "m.db")
+
+    def run(request_key: str):
+        return poller._run_fetch(
+            store, provider="x", query_key=request_key,
+            fetch_fn=lambda _: [],
+            cost_units=1.0,
+            budget_limits={
+                "test:x:total": 2.0,
+                f"test:x:request:{request_key}": 1.0,
+            },
+            budget_metadata={"budget_category": "search"},
+        )
+
+    run("topic-one")
+    run("topic-two")
+    with pytest.raises(poller._FetchBudgetExceeded):
+        run("topic-three")
+    assert len(store.fetch_runs(provider="x")) == 2
+    store.close()
+    store.close()
+
+
+@pytest.mark.unit
 def test_formal_news_receipt_binds_exact_eligible_evidence_ids(tmp_path):
     store = SqliteMediaStore(tmp_path / "m.db")
     theme, queries = next(iter(GLOBAL_EVENT_V2_BROAD_NEWS_QUERIES.items()))
@@ -2904,6 +2963,7 @@ def test_preflight_checkpoints_a_complete_compatible_replay_mismatch(
     assert payload["x_evidence_health_validated"] is False
     assert checkpoint_reads == [spec["collection_cycle_id"]]
     assert "secret" not in json.dumps(payload)
+    store.close()
 
 
 @pytest.mark.unit

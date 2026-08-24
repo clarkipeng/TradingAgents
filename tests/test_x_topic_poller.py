@@ -1914,6 +1914,67 @@ def test_same_daily_x_cycle_cannot_retry_paid_requests(tmp_path, monkeypatch):
 
 
 @pytest.mark.unit
+def test_mid_cycle_crash_terminalizes_the_cycle_and_blocks_paid_retries(
+    tmp_path, monkeypatch,
+):
+    """Regression for the 2026-08-23 incident: a ValueError inside the
+    discovery stage crashed the collector after the paid trend fetches. The
+    cycle must land terminally incomplete (never left running), the paid
+    receipts must survive, and a same-day rerun must spend nothing."""
+    now = _X_WINDOW_OPEN_UTC
+    store = SqliteMediaStore(tmp_path / "x-crash.db")
+    monkeypatch.setattr(poller.time, "time", lambda: now)
+    monkeypatch.setattr(
+        poller,
+        "fetch_top_news_headlines",
+        lambda **_kwargs: [{
+            "category": "world",
+            "external_id": "story-1",
+            "title": "Major event changes outlook - Reuters",
+            "created_utc": now - 10,
+            "publisher": "Reuters",
+            "metadata": {"publisher_domain": "reuters.com"},
+        }],
+    )
+    monkeypatch.setattr(
+        poller, "fetch_x_trends", lambda *_args, **_kwargs: [{"name": "Major event"}]
+    )
+    monkeypatch.setattr(
+        poller,
+        "discover_x_topics",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            ValueError("stage invariant violated")
+        ),
+    )
+
+    with pytest.raises(ValueError, match="stage invariant violated"):
+        poller.poll_x_topics_once(store, now=now, limit=10, max_topics=_X_TOPIC_LIMIT)
+
+    cycle_id = poller._x_collection_cycle_spec(now, _X_TOPIC_LIMIT)["collection_cycle_id"]
+    cycle = store.collection_cycle(cycle_id)
+    assert cycle["status"] == "incomplete"
+    trend_receipts = store.fetch_runs(provider="xtrend")
+    assert trend_receipts and all(
+        receipt["status"] in {"success", "empty"} for receipt in trend_receipts
+    )
+
+    for paid in ("fetch_x_trends", "fetch_x_topic", "fetch_x_recent_counts"):
+        monkeypatch.setattr(
+            poller, paid,
+            lambda *_args, **_kwargs: pytest.fail("terminal day must not spend"),
+        )
+    monkeypatch.setattr(
+        poller,
+        "discover_x_topics",
+        lambda *_args, **_kwargs: pytest.fail("terminal day must not rediscover"),
+    )
+    slots = poller.poll_x_topics_once(store, now=now, limit=10, max_topics=_X_TOPIC_LIMIT)
+    assert ("xtrend", "woeid:1") in slots
+    assert len(store.fetch_runs(limit=100)) == len(trend_receipts) + 1  # + failed discovery
+    store.close()
+
+
+@pytest.mark.unit
 def test_duplicate_derived_queries_form_one_bound_request_with_all_labels(
     tmp_path, monkeypatch,
 ):
