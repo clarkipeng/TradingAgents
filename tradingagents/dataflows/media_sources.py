@@ -50,7 +50,9 @@ _ATOM_NS = {"atom": "http://www.w3.org/2005/Atom"}
 _STOCKTWITS_API = "https://api.stocktwits.com/api/2/streams/symbol/{ticker}.json"
 _REDDIT_RSS = "https://www.reddit.com/r/{sub}/search.rss?{qs}"
 _DEFAULT_SUBREDDITS = ("wallstreetbets", "stocks", "investing")
-_BLUESKY_SEARCH = "https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts?{qs}"
+# public.api.bsky.app serves 403 block pages (observed live 2026-08-23);
+# api.bsky.app is the reachable keyless AppView host.
+_BLUESKY_SEARCH = "https://api.bsky.app/xrpc/app.bsky.feed.searchPosts?{qs}"
 _TRUTHSOCIAL_SEARCH = "https://truthsocial.com/api/v2/search?{qs}"
 GLOBAL_X_ADAPTER_POLICY = MappingProxyType({
     "version": "global-event-x-request-v6-receipt-context",
@@ -319,7 +321,10 @@ def _is_transient_http_error(exc: HTTPError) -> bool:
 # Sources that run without a key. 'x' is added by the poller only when a token
 # is present (see media poller's source resolution). 'truthsocial' is excluded:
 # it is Cloudflare-gated and cannot succeed without TRUTHSOCIAL_TOKEN.
-KEYLESS_SOURCES = ("stocktwits", "reddit", "bluesky", "news")
+# 'bluesky' is excluded: the AppView blocks anonymous searchPosts after a few
+# requests (observed live 2026-08-23; zero posts ever landed) - reinstate when
+# authenticated search is wired up.
+KEYLESS_SOURCES = ("stocktwits", "reddit", "news")
 
 
 def _iso_to_epoch(iso_str: str | None) -> float | None:
@@ -1037,14 +1042,30 @@ def _reddit_qs(ticker: str, limit: int) -> str:
                       "t": "week", "limit": limit})
 
 
+# Reddit's anonymous quota is roughly 10 requests/minute per IP. The poller
+# makes ~90 requests per cycle across tickers, so pacing must hold across
+# fetch calls, not just between subreddits inside one call - a shared
+# monotonic gate makes the interval an invariant of the process.
+_REDDIT_MIN_REQUEST_INTERVAL_SECONDS = 6.5
+_reddit_last_request_at = [float("-inf")]
+
+
+def _pace_reddit_request(min_interval: float) -> None:
+    if min_interval > 0:
+        wait = _reddit_last_request_at[0] + min_interval - time.monotonic()
+        if wait > 0:
+            time.sleep(wait)
+    _reddit_last_request_at[0] = time.monotonic()
+
+
 def fetch_reddit(ticker: str, now: float, subreddits=_DEFAULT_SUBREDDITS,
                  limit_per_sub: int = 25, timeout: float = 10.0,
-                 inter_request_delay: float = 1.0) -> list[dict]:
+                 inter_request_delay: float = _REDDIT_MIN_REQUEST_INTERVAL_SECONDS,
+                 ) -> list[dict]:
     """Recent Reddit posts mentioning ``ticker`` (Atom search; dedup key: atom id)."""
     rows = []
-    for i, sub in enumerate(subreddits):
-        if i > 0:
-            time.sleep(inter_request_delay)
+    for sub in subreddits:
+        _pace_reddit_request(inter_request_delay)
         url = _REDDIT_RSS.format(sub=sub, qs=_reddit_qs(ticker, limit_per_sub))
         req = Request(url, headers={"User-Agent": _UA})
         try:

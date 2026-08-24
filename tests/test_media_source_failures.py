@@ -219,6 +219,55 @@ def test_reddit_accepts_explicit_empty_feed(monkeypatch):
 
 
 @pytest.mark.unit
+def test_reddit_requests_are_paced_across_calls(monkeypatch):
+    """Reddit's anonymous quota is roughly 10 requests/minute per IP; the
+    poller makes ~90 per cycle, so pacing must hold across fetch calls, not
+    just between subreddits inside one call - otherwise every slot 429s."""
+    body = b'<feed xmlns="http://www.w3.org/2005/Atom"></feed>'
+    monkeypatch.setattr(media_sources, "urlopen", lambda *_args, **_kwargs: _Response(body))
+    clock = {"now": 100.0}
+    sleeps = []
+
+    def fake_sleep(seconds):
+        sleeps.append(seconds)
+        clock["now"] += seconds
+
+    monkeypatch.setattr(media_sources.time, "monotonic", lambda: clock["now"])
+    monkeypatch.setattr(media_sources.time, "sleep", fake_sleep)
+    monkeypatch.setattr(media_sources, "_reddit_last_request_at", [float("-inf")])
+
+    media_sources.fetch_reddit("NVDA", 1.0, subreddits=("stocks", "investing"))
+    assert sleeps == [pytest.approx(media_sources._REDDIT_MIN_REQUEST_INTERVAL_SECONDS)]
+
+    media_sources.fetch_reddit("NVDA", 1.0, subreddits=("stocks",))
+    assert sleeps == [
+        pytest.approx(media_sources._REDDIT_MIN_REQUEST_INTERVAL_SECONDS),
+        pytest.approx(media_sources._REDDIT_MIN_REQUEST_INTERVAL_SECONDS),
+    ]
+
+    # An explicit zero interval (tests, backfills) disables pacing entirely.
+    media_sources.fetch_reddit(
+        "NVDA", 1.0, subreddits=("stocks",), inter_request_delay=0
+    )
+    assert len(sleeps) == 2
+
+
+@pytest.mark.unit
+def test_bluesky_uses_the_reachable_appview_host(monkeypatch):
+    """public.api.bsky.app now serves 403 block pages; api.bsky.app works."""
+    observed = {}
+
+    def get_json(url, headers, timeout):
+        observed["url"] = url
+        return {"posts": []}
+
+    monkeypatch.setattr(media_sources, "_get_json", get_json)
+
+    assert media_sources.fetch_bluesky("NVDA", 1.0) == []
+    assert observed["url"].startswith("https://api.bsky.app/xrpc/app.bsky.feed.searchPosts?")
+
+
+@pytest.mark.unit
 def test_reddit_transport_failure_is_not_returned_as_empty(monkeypatch):
     monkeypatch.setattr(
         media_sources,
