@@ -67,8 +67,17 @@ def _is_forward_looking(market: dict, now: datetime) -> bool:
     return end_date >= now
 
 
-def _validated_market(market: dict) -> dict:
-    """Reject a nonempty market item that cannot produce trustworthy odds."""
+def _validated_market(market: dict) -> dict | None:
+    """Validate one market's odds; ``None`` skips a market asserting none.
+
+    Dormant markets carry null outcomes/outcomePrices (observed live
+    2026-08-23): they assert no odds, so there is nothing to validate and
+    nothing trustworthy to lose - skipping them keeps one stale listing from
+    rejecting every other market in the response. Malformed non-null values
+    remain hard provider-contract failures.
+    """
+    if market.get("outcomes") is None or market.get("outcomePrices") is None:
+        return None
     if (
         not isinstance(market.get("question"), str)
         or not market["question"].strip()
@@ -99,13 +108,18 @@ def _validated_market(market: dict) -> dict:
     ):
         raise ProviderResponseError("Polymarket market schema was invalid")
 
+    # Dormant markets carry volumeNum null (observed live 2026-08-23); null
+    # volume means no volume, not a schema violation. Wrong types still reject.
     volume = market.get("volumeNum")
     weekly_change = market.get("oneWeekPriceChange")
     if (
-        isinstance(volume, bool)
-        or not isinstance(volume, (int, float))
-        or not math.isfinite(float(volume))
-        or volume < 0
+        volume is not None
+        and (
+            isinstance(volume, bool)
+            or not isinstance(volume, (int, float))
+            or not math.isfinite(float(volume))
+            or volume < 0
+        )
         or weekly_change is not None
         and (
             isinstance(weekly_change, bool)
@@ -144,7 +158,11 @@ def _search_markets(topic: str, limit: int) -> list[dict]:
             or any(not isinstance(market, dict) for market in event_markets)
         ):
             raise ProviderResponseError("Polymarket response schema was invalid")
-        markets.extend(_validated_market(market) for market in event_markets)
+        markets.extend(
+            validated
+            for validated in (_validated_market(market) for market in event_markets)
+            if validated is not None
+        )
     return markets
 
 

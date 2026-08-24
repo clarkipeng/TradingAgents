@@ -72,6 +72,33 @@ class PolymarketFilterTests(unittest.TestCase):
         self.assertIn("Open big?", out)
         self.assertNotIn("Open small?", out)
 
+    def test_null_volume_market_is_dormant_not_invalid(self):
+        # Observed live 2026-08-23: dormant markets carry volumeNum null,
+        # which aborted the whole response and failed every macro odds slot.
+        # Null volume means no volume - the market ranks last, everything
+        # else in the response survives. Wrong-typed volume still rejects.
+        search = copy.deepcopy(_SEARCH)
+        search["events"][0]["markets"].append(
+            _market("Dormant?", 0.53, volume=None, end_date="2030-12-31T00:00:00Z")
+        )
+        priceless = _market("Priceless?", 0.5, volume=0, end_date="2030-12-31T00:00:00Z")
+        priceless["outcomePrices"] = None
+        search["events"][0]["markets"].append(priceless)
+        with mock.patch.object(polymarket, "_request", return_value=search):
+            out = polymarket.get_prediction_markets("anything", limit=10)
+        self.assertIn("Open big?", out)
+        self.assertIn("Dormant?", out)
+        self.assertNotIn("Priceless?", out)  # no odds asserted - skipped
+        self.assertLess(out.index("Open small?"), out.index("Dormant?"))
+
+        wrong_typed = copy.deepcopy(_SEARCH)
+        wrong_typed["events"][0]["markets"].append(
+            _market("Broken?", 0.5, volume="lots", end_date="2030-12-31T00:00:00Z")
+        )
+        with mock.patch.object(polymarket, "_request", return_value=wrong_typed):
+            with self.assertRaises(ProviderResponseError):
+                polymarket.iter_forward_markets("anything", limit=10)
+
 
 @pytest.mark.unit
 class PolymarketFormatTests(unittest.TestCase):
