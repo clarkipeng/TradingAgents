@@ -171,7 +171,7 @@ GLOBAL_X_ADAPTER_POLICY = MappingProxyType({
 # Non-formal adapters are intentionally outside ``GLOBAL_X_ADAPTER_POLICY`` so
 # adding shadow telemetry cannot mutate the registered evidence identity.
 GLOBAL_X_SHADOW_ADAPTER_POLICY = MappingProxyType({
-    "version": "global-x-shadow-request-v1",
+    "version": "global-x-shadow-request-v2",
     "recent_counts": MappingProxyType({
         "endpoint": "https://api.x.com/2/tweets/counts/recent?{qs}",
         "query_contract": "same-language-and-exclusions-as-recent-search-v1",
@@ -185,7 +185,9 @@ GLOBAL_X_SHADOW_ADAPTER_POLICY = MappingProxyType({
         "maximum_query_chars": 512,
         "snapshot_availability": "terminal-fetch-receipt-only",
         "bin_availability": "descriptive-components-never-independent-observations",
-        "fields_parameter": "search_count.fields",
+        # The live endpoint rejects any search_count.fields value with HTTP
+        # 400, so the request names no field list; these are the fields the
+        # default response carries and the bin validator requires.
         "fields": ("start", "end", "tweet_count"),
     }),
 })
@@ -1363,7 +1365,6 @@ def fetch_x_recent_counts(
         "start_time": utc_text(start),
         "end_time": utc_text(end),
         "granularity": policy["granularity"],
-        policy["fields_parameter"]: ",".join(policy["fields"]),
     })
     response = _get_json(
         policy["endpoint"].format(qs=qs),

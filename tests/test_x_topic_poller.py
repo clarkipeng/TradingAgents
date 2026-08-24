@@ -2326,6 +2326,10 @@ def test_x_recent_counts_preserves_exact_window_and_decision_lineage(
     assert params["granularity"] == ["hour"]
     assert params["start_time"] == [iso(start)]
     assert params["end_time"] == [iso(end)]
+    # The live endpoint rejects any search_count.fields value with HTTP 400
+    # and already returns exactly start/end/tweet_count by default, so the
+    # request must not name the fields explicitly.
+    assert "search_count.fields" not in params
     snapshot = json.loads(rows[0]["body"])
     assert snapshot["discovery_decision_id"] == decision_id
     assert snapshot["discovery_decision_captured_utc"] == decision_captured
