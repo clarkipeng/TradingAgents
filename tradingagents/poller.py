@@ -98,6 +98,7 @@ from tradingagents.global_research import (
     _raw_content_id,
     is_formally_eligible_evidence,
 )
+from tradingagents.logging_utils import safe_exception_site as _exception_site
 from tradingagents.logging_utils import safe_exception_type as _exception_kind
 from tradingagents.operations import emit_alert, probe_alert_webhook
 from tradingagents.research_protocol import (
@@ -1126,7 +1127,7 @@ def _run_fetch(
             completed_utc=time.time(),
             item_count=0,
             inserted_count=0,
-            error=_exception_kind(exc),
+            error=_exception_site(exc),
             cost_units=cost_units,
             formal_eligible_item_count=None,
             formal_eligible_evidence_ids=None,
@@ -4548,7 +4549,7 @@ def _main_entrypoint() -> None:
     try:
         main()
     except Exception as exc:  # noqa: BLE001 - sanitize the executable boundary
-        logger.critical("Collector exited (%s)", _exception_kind(exc))
+        logger.critical("Collector exited (%s)", _exception_site(exc))
         raise SystemExit(1) from None
 
 

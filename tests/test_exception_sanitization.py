@@ -8,7 +8,7 @@ from cli import entrypoints, main as interactive_cli
 from tradingagents import backtest, walkforward
 from tradingagents.dataflows import yfinance_news
 from tradingagents.dataflows.errors import VendorError
-from tradingagents.logging_utils import safe_exception_type
+from tradingagents.logging_utils import safe_exception_site, safe_exception_type
 from tradingagents.research import cli as research_cli
 
 
@@ -19,6 +19,22 @@ def test_safe_exception_type_is_bounded_and_never_uses_the_message():
 
     unsafe_type = type(secret, (Exception,), {})
     assert safe_exception_type(unsafe_type("ignored")) == "Exception"
+
+
+@pytest.mark.unit
+def test_safe_exception_site_names_the_in_package_raise_site_without_the_message():
+    secret = "https://provider.invalid/?token=must-not-escape"
+    try:
+        safe_exception_site(None)  # raises inside tradingagents/logging_utils.py
+    except Exception as exc:
+        site = safe_exception_site(exc)
+    assert site.startswith("AttributeError@logging_utils.py:")
+    assert secret not in site
+
+    # An exception with no in-package frames degrades to the bare type name.
+    bare = ValueError(secret)
+    assert safe_exception_site(bare) == "ValueError"
+    assert secret not in safe_exception_site(bare)
 
 
 @pytest.mark.unit

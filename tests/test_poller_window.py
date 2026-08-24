@@ -120,7 +120,7 @@ def test_failed_and_empty_fetches_do_not_advance_independent_watermark(tmp_path)
     assert store.get_meta(poller._watermark_key("x", "global topic")) is None
     failed = store.fetch_runs(provider="x")[0]
     assert failed["status"] == "failed"
-    assert failed["error"] == "RuntimeError"
+    assert failed["error"].startswith("RuntimeError")
     assert "auth failed" not in failed["error"]
 
     count, inserted, status = poller._run_fetch(
@@ -255,7 +255,7 @@ def test_one_response_cannot_contain_conflicting_google_cluster_revisions(tmp_pa
     receipts = store.fetch_runs(provider="globalnews")
     assert len(receipts) == 1
     assert receipts[0]["status"] == "failed"
-    assert receipts[0]["error"] == "ValueError"
+    assert receipts[0]["error"].startswith("ValueError")
     store.close()
 
 
@@ -329,7 +329,9 @@ def test_globalnews_retry_is_bounded_and_reraises_final_exception(tmp_path, monk
     receipts = store.fetch_runs(provider="globalnews")
     assert len(receipts) == 3
     assert {receipt["status"] for receipt in receipts} == {"failed"}
-    assert {receipt["error"] for receipt in receipts} == {"ProviderTransientError"}
+    assert all(
+        receipt["error"].startswith("ProviderTransientError") for receipt in receipts
+    )
     store.close()
 
 
@@ -547,7 +549,7 @@ def test_lease_loss_after_provider_call_discards_rows_and_fails_receipt(tmp_path
 
     receipt = store.fetch_runs(provider="globalnews")[0]
     assert receipt["status"] == "failed"
-    assert receipt["error"] == "RuntimeError"
+    assert receipt["error"].startswith("RuntimeError")
     assert store.stats() == []
     store.close()
 
@@ -736,7 +738,7 @@ def test_cycle_alerts_for_each_missing_query_slot_without_leaking_payloads(
     runs = {run["query_key"]: run for run in store.fetch_runs()}
     assert runs[f"global:{safe_query}"]["status"] == "success"
     assert runs[f"global:{sensitive_query}"]["status"] == "failed"
-    assert runs[f"global:{sensitive_query}"]["error"] == "ProviderResponseError"
+    assert runs[f"global:{sensitive_query}"]["error"].startswith("ProviderResponseError")
     assert store.get_meta("poller:last_failure_utc") is not None
     assert store.get_meta("poller:last_success_utc") is None
 
@@ -3753,7 +3755,7 @@ def test_executable_boundary_exits_without_traceback_or_secret(monkeypatch, capl
         poller._main_entrypoint()
 
     assert stopped.value.code == 1
-    assert "Collector exited (RuntimeError)" in caplog.text
+    assert "Collector exited (RuntimeError" in caplog.text
     assert secret not in caplog.text
     assert "entrypoint-secret" not in caplog.text
     assert "Traceback" not in caplog.text
