@@ -1209,7 +1209,16 @@ def _fetch_x_search(query: str, label: str, now: float, limit: int,
             metrics = _normalize_x_metrics(user.get("public_metrics"), user_aliases)
         except ProviderResponseError:
             continue
-        users[user_id] = {**user, "public_metrics": metrics}
+        # Same drift class as the absent parody flag: X omits verified_type
+        # for some accounts even when requested. Absence asserts nothing,
+        # which is exactly what "none" names; wrong types still exclude the
+        # author downstream.
+        verified_type = user.get("verified_type")
+        users[user_id] = {
+            **user,
+            "public_metrics": metrics,
+            "verified_type": "none" if verified_type is None else verified_type,
+        }
     profiles = {}
     for tweet in tweets:
         user = users.get(str(tweet.get("author_id")))

@@ -233,6 +233,100 @@ def test_x_topic_excludes_an_author_with_incomplete_optional_screening(
     ) == []
 
 
+_ABSENT = object()
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("field", "value", "eligible"),
+    [
+        # Absent or null optional assertions are tolerated: absence asserts
+        # nothing, and the weakest value is assumed.
+        ("parody", _ABSENT, True),
+        ("parody", None, True),
+        ("is_identity_verified", _ABSENT, True),
+        ("is_identity_verified", None, True),
+        ("description", _ABSENT, True),
+        ("url", _ABSENT, True),
+        ("entities", _ABSENT, True),
+        ("verified_type", _ABSENT, True),
+        ("verified_type", None, True),
+        # Wrong-typed values are schema violations: the author is excluded.
+        ("parody", "yes", False),
+        ("is_identity_verified", 1, False),
+        ("description", None, False),
+        ("url", 42, False),
+        ("entities", [], False),
+        ("verified_type", "sarcastic", False),
+        # Missing identity or screening prerequisites exclude the author.
+        ("username", _ABSENT, False),
+        ("created_at", _ABSENT, False),
+        ("public_metrics", _ABSENT, False),
+        ("public_metrics", {"followers_count": 100}, False),
+    ],
+)
+def test_x_author_schema_drift_never_empties_the_batch(
+    monkeypatch, field, value, eligible,
+):
+    """One anomalous author must cost at most that author's posts.
+
+    X reshapes optional author fields per account (observed live: absent
+    parody). Whatever the anomaly, the fetch must neither raise nor discard
+    the healthy co-author's post - the failure mode that silently emptied
+    every capture until the flag defaults were fixed."""
+    monkeypatch.setenv("X_BEARER_TOKEN", "secret-test-token")
+
+    def author(author_id: str, username: str) -> dict:
+        return {
+            "id": author_id,
+            "username": username,
+            "name": "Example Person",
+            "parody": False,
+            "is_identity_verified": False,
+            "verified_type": "none",
+            "created_at": "2020-01-01T00:00:00Z",
+            "public_metrics": {
+                "followers_count": 100,
+                "following_count": 20,
+                "post_count": 500,
+            },
+        }
+
+    def post(post_id: str, author_id: str) -> dict:
+        return {
+            "id": post_id,
+            "author_id": author_id,
+            "created_at": "2026-07-22T12:00:00Z",
+            "text": "A substantive public reaction",
+            "public_metrics": {
+                "like_count": 1,
+                "reply_count": 0,
+                "repost_count": 0,
+                "quote_count": 0,
+            },
+        }
+
+    anomalous = author("501", "drifting_account")
+    if value is _ABSENT:
+        anomalous.pop(field, None)
+    else:
+        anomalous[field] = value
+    monkeypatch.setattr(
+        media_sources,
+        "_get_json",
+        lambda *_args, **_kwargs: {
+            "data": [post("drift-post", "501"), post("healthy-post", "502")],
+            "includes": {"users": [anomalous, author("502", "steady_account")]},
+        },
+    )
+
+    rows = media_sources.fetch_x_topic("trend_world", "major event", 1_800_000_000.0)
+
+    surviving = [row["external_id"] for row in rows]
+    assert "healthy-post" in surviving
+    assert ("drift-post" in surviving) == eligible
+
+
 @pytest.mark.unit
 def test_x_topic_defaults_absent_optional_flags_to_false(monkeypatch):
     """X omits the parody/is_identity_verified flags for some accounts;
@@ -434,10 +528,12 @@ def test_x_ineligible_author_does_not_discard_valid_sibling(monkeypatch):
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("verified_type", [None, "unknown-tier"])
+@pytest.mark.parametrize("verified_type", ["unknown-tier", 7])
 def test_x_unknown_verified_type_excludes_author(
     monkeypatch, verified_type,
 ):
+    # An absent verified_type defaults to "none" (same drift class as the
+    # absent parody flag); unknown or wrong-typed values still exclude.
     user = {
         "id": "202",
         "username": "public_user",
@@ -451,9 +547,8 @@ def test_x_unknown_verified_type_excludes_author(
             "following_count": 20,
             "tweet_count": 500,
         },
+        "verified_type": verified_type,
     }
-    if verified_type is not None:
-        user["verified_type"] = verified_type
     monkeypatch.setenv("X_BEARER_TOKEN", "secret-test-token")
     monkeypatch.setattr(
         media_sources,
