@@ -754,6 +754,44 @@ def _google_news_item(item: ET.Element) -> dict:
     }
 
 
+_GOOGLE_NEWS_VINTAGE_FIELDS = (
+    "external_id", "title", "body", "created_utc", "publisher", "metadata",
+)
+
+
+def _canonical_google_news_vintages(items: list[dict]) -> list[dict]:
+    """Resolve one content vintage per Google News cluster GUID per snapshot.
+
+    Google reuses a cluster GUID across story revisions, so a single fetch can
+    observe two renderings of the same GUID (the ranked discovery feeds overlap
+    and are read sequentially; a query feed can revise mid-listing). One fetch
+    is one snapshot, so every appearance is rewritten to the newest observed
+    vintage (latest ``created_utc``, ties broken by ``external_id``) while
+    appearance-level fields such as feed position are preserved. Without this,
+    the collector's provider-revision guard treats the skew as tampering and
+    aborts the whole receipt.
+    """
+    newest: dict[str, dict] = {}
+    for item in items:
+        guid = item["metadata"]["provider_external_id"]
+        current = newest.get(guid)
+        if current is None or (
+            (item["created_utc"], item["external_id"])
+            > (current["created_utc"], current["external_id"])
+        ):
+            newest[guid] = item
+    return [
+        {
+            **item,
+            **{
+                field: newest[item["metadata"]["provider_external_id"]][field]
+                for field in _GOOGLE_NEWS_VINTAGE_FIELDS
+            },
+        }
+        for item in items
+    ]
+
+
 def _ticker_news_item(item: ET.Element) -> dict:
     """Validate one generic company-news RSS item without partial salvage."""
     guid_el = item.find("guid")
@@ -1561,7 +1599,7 @@ def fetch_top_news_headlines(limit_per_feed: int = 12,
         )
     if observed_feed_count == 0:  # defensive: the frozen registry itself cannot be empty
         raise ProviderResponseError("top-news discovery has no configured feeds")
-    return headlines
+    return _canonical_google_news_vintages(headlines)
 
 
 def fetch_news(ticker: str, now: float, timeout: float = 10.0) -> list[dict]:
@@ -1671,8 +1709,10 @@ def fetch_global_news(query: str, now: float, theme: str,
             "global-news response schema was invalid; cursor was not advanced"
         ) from exc
     rows = []
-    for item in _rss_channel_items(channel)[:limit]:
-        normalized = _google_news_item(item)
+    normalized_items = _canonical_google_news_vintages(
+        [_google_news_item(item) for item in _rss_channel_items(channel)[:limit]]
+    )
+    for normalized in normalized_items:
         rows.append(_row(
             "globalnews", normalized["external_id"], f"@{theme}", now,
             author=normalized["publisher"],

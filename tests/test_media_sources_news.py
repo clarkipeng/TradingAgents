@@ -140,6 +140,69 @@ def test_top_news_discovery_uses_ranked_feeds_without_search_queries(monkeypatch
     )
 
 
+def _rss_items(*items):
+    """RSS body from explicit (guid, title, pubDate) items."""
+    rendered = "".join(
+        f"<item><guid>{guid}</guid><title>{title}</title>"
+        f"<link>https://news.google.com/articles/{guid}</link>"
+        f"<pubDate>{pub_date}</pubDate>"
+        "<source url='https://www.reuters.com/world/'>Reuters</source>"
+        "<description>summary</description></item>"
+        for guid, title, pub_date in items
+    )
+    channel = (
+        "<title>Google News</title>"
+        "<link>https://news.google.com/</link>"
+        "<description>Google News feed</description>"
+    )
+    return BytesIO(f"<rss><channel>{channel}{rendered}</channel></rss>".encode())
+
+
+@pytest.mark.unit
+def test_top_news_snapshot_resolves_cross_feed_revisions_to_one_vintage(monkeypatch):
+    """Google reuses a cluster GUID after revising a story, and the ranked
+    discovery feeds overlap, so one snapshot can observe two renderings of the
+    same GUID. Every appearance must resolve to the single newest vintage or
+    the collector's provider-revision guard aborts the whole paid X cycle."""
+    responses = iter(
+        [_rss_items(("cluster-1", "Original headline", "Wed, 22 Jul 2026 12:00:00 GMT"))]
+        + [
+            _rss_items(("cluster-1", "Revised headline", "Wed, 22 Jul 2026 13:00:00 GMT"))
+            for _ in range(8)
+        ]
+    )
+    monkeypatch.setattr(media_sources, "urlopen", lambda _request, timeout: next(responses))
+
+    rows = media_sources.fetch_top_news_headlines(limit_per_feed=1)
+
+    assert len(rows) == 9
+    assert {row["metadata"]["provider_external_id"] for row in rows} == {"cluster-1"}
+    assert {row["external_id"] for row in rows} == {rows[0]["external_id"]}
+    assert {row["title"] for row in rows} == {"Revised headline"}
+    assert {row["category"] for row in rows} == {
+        "general", "business", "technology", "us", "world",
+    }
+
+
+@pytest.mark.unit
+def test_global_news_snapshot_resolves_same_guid_revisions_to_one_vintage(monkeypatch):
+    monkeypatch.setattr(
+        media_sources,
+        "urlopen",
+        lambda _request, timeout: _rss_items(
+            ("cluster-9", "First rendering", "Wed, 22 Jul 2026 12:00:00 GMT"),
+            ("cluster-9", "Second rendering", "Wed, 22 Jul 2026 12:30:00 GMT"),
+        ),
+    )
+
+    rows = media_sources.fetch_global_news("global policy", 1.0, "world")
+
+    assert len(rows) == 2
+    assert {row["external_id"] for row in rows} == {rows[0]["external_id"]}
+    assert {row["title"] for row in rows} == {"Second rendering"}
+    assert {row["metadata"]["provider_external_id"] for row in rows} == {"cluster-9"}
+
+
 @pytest.mark.unit
 def test_top_news_total_upstream_failure_is_not_observed_absence(
     monkeypatch, caplog,
