@@ -478,15 +478,17 @@ class TemporalStore:
         all-pairs scan was O(N^2) SequenceMatcher calls and made every insert
         cost minutes on a grown corpus.
 
-        When ``target_keys`` is given, only those documents get their cluster
-        reassigned (pairs must touch one of them) - the per-insert path. A
-        ``None`` target is the full recomputation used by ``reindex_documents``;
-        callers writing single documents pass the new keys so inserts stay
-        incremental while ``temporal-reindex`` remains the authoritative
-        rebuild.
+        When ``target_keys`` is given (the per-insert path), similarity pairs
+        must touch one of them, stored assignments seed the union-find so
+        existing clusters keep their transitivity, and every document whose
+        root changes is rewritten - so an insert that attaches to or bridges
+        clusters lands on exactly the assignment a full rebuild would produce.
+        A ``None`` target is the full recomputation used by
+        ``reindex_documents``, which remains the authoritative rebuild.
         """
         rows = connection.execute(
-            "SELECT doc_key, title, canonical_url, source_domain FROM documents ORDER BY doc_key"
+            "SELECT doc_key, title, canonical_url, source_domain, cluster_key "
+            "FROM documents ORDER BY doc_key"
         ).fetchall()
         by_key = {row["doc_key"]: row for row in rows}
         parent = {row["doc_key"]: row["doc_key"] for row in rows}
@@ -501,6 +503,15 @@ class TemporalStore:
             left_root, right_root = find(left), find(right)
             if left_root != right_root:
                 parent[max(left_root, right_root)] = min(left_root, right_root)
+
+        if target_keys is not None:
+            # Seed transitivity from stored assignments so an insert that
+            # attaches to (or bridges) existing clusters converges to exactly
+            # the assignment a full rebuild would produce; only the new pairs
+            # below pay for similarity comparisons.
+            for row in rows:
+                if row["cluster_key"] in parent:
+                    union(row["doc_key"], row["cluster_key"])
 
         by_url: dict[str, list[str]] = {}
         tokens_by_key: dict[str, frozenset[str]] = {}
@@ -538,10 +549,13 @@ class TemporalStore:
                     if title_similarity(by_key[left]["title"], by_key[right]["title"]) >= 0.92:
                         union(left, right)
 
-        wanted = sorted(target_keys) if target_keys is not None else sorted(by_key)
         connection.executemany(
             "UPDATE documents SET cluster_key=? WHERE doc_key=?",
-            [(find(key), key) for key in wanted if key in parent],
+            [
+                (root, key)
+                for key in sorted(by_key)
+                if (root := find(key)) != by_key[key]["cluster_key"]
+            ],
         )
 
     def record_error(

@@ -73,6 +73,53 @@ def test_incremental_documents_deduplicate_and_reindex_idempotently(tmp_path):
         connection.close()
 
 
+def test_incremental_cluster_assignments_match_full_reindex(tmp_path):
+    """Per-insert clustering must agree with the authoritative rebuild.
+
+    If the incremental path assigns a new document a cluster key its
+    near-duplicate partners do not share, search-time deduplication differs
+    by code path and backtest results silently depend on how the corpus was
+    built. Both attach-to-existing-cluster and bridge-two-clusters shapes
+    must converge to the rebuild's assignment."""
+    store = TemporalStore(tmp_path)
+    titles = [
+        "Nvidia quarterly earnings beat expectations across data center segment",
+        "Nvidia quarterly earnings beat expectations across data center segments",
+        "Nvidia quarterly earnings beat expectations across data center segment today",
+    ]
+    for index, title in enumerate(titles):
+        store.record(
+            "corpus.document",
+            {"url": f"https://news.example/{index}"},
+            {
+                "text": f"{title}\n\nBody {index}",
+                "metadata": {
+                    "article": {
+                        "title": title,
+                        "url": f"https://news.example/article-{index}",
+                    }
+                },
+            },
+            available_at=at(9),
+            source=f"https://news.example/{index}",
+        )
+
+    def cluster_map() -> dict:
+        connection = sqlite3.connect(tmp_path / "temporal.sqlite3")
+        try:
+            return dict(connection.execute(
+                "select doc_key, cluster_key from documents"
+            ).fetchall())
+        finally:
+            connection.close()
+
+    incremental = cluster_map()
+    store.reindex_documents()
+    rebuilt = cluster_map()
+    assert len(set(rebuilt.values())) == 1  # the titles genuinely cluster
+    assert incremental == rebuilt
+
+
 def test_store_open_does_not_write_existing_database(tmp_path):
     store = TemporalStore(tmp_path)
     store.record("corpus.document", {"url": "https://example.com"}, {"text": "body", "metadata": {}}, available_at=at(9))
