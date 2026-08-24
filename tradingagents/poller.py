@@ -3845,6 +3845,17 @@ def _store_log_label(configured_url: str | None) -> str:
     return "configured database"
 
 
+def _running_build_identity() -> str:
+    """Name the build this process runs, so a daemon serving stale code is
+    visible from its first log line (receipts record the same identity)."""
+    try:
+        from tradingagents.research_protocol import build_identity
+
+        return build_identity()
+    except Exception:  # noqa: BLE001 - a startup log must never kill startup
+        return "unknown"
+
+
 def _configured_integer(values: Mapping[str, str], name: str) -> int | None:
     raw = values.get(name)
     if raw is None or not raw.strip():
@@ -4311,8 +4322,9 @@ def _run_supervised_daemon(
 
                 store_label = _store_log_label(db_url)
                 logger.info(
-                    "Store: %s · news themes: %d · news cadence: %ds · X cadence: %ds",
+                    "Store: %s · build: %s · news themes: %d · news cadence: %ds · X cadence: %ds",
                     store_label,
+                    _running_build_identity(),
                     len(macro_themes),
                     interval,
                     x_interval,
@@ -4474,8 +4486,9 @@ def main(argv: list[str] | None = None) -> None:
                     raise RuntimeError("another global collector owns the singleton lease")
                 store._collector_lease_guard = collector_lease
             logger.info(
-                "Store: %s · news themes: %d · news cadence: %ds · X cadence: %ds",
+                "Store: %s · build: %s · news themes: %d · news cadence: %ds · X cadence: %ds",
                 _store_log_label(args.db),
+                _running_build_identity(),
                 len(macro_themes),
                 args.interval,
                 args.x_interval,
