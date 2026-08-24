@@ -120,9 +120,11 @@ def main() -> int:
     )
     mirrored = 0
     for run_id in x_fetch_run_ids:
+        # Fetch-run IDs are unique tokens; match them alone so the check is
+        # independent of JSON separator style.
         mirrored += temporal_conn.execute(
             "SELECT COUNT(*) FROM evidence WHERE response_json LIKE ?",
-            (f'%"poller_fetch_run_id": "{run_id}"%',),
+            (f"%{run_id}%",),
         ).fetchone()[0]
     temporal_conn.close()
     check(
