@@ -221,6 +221,9 @@ def test_x_topic_excludes_an_author_with_incomplete_optional_screening(
                     "following_count": 20,
                     "post_count": 500,
                 },
+                # A wrong-typed optional flag is still schema-invalid and must
+                # exclude the author; absence alone defaults to False.
+                "parody": "not-a-bool",
             }]},
         },
     )
@@ -228,6 +231,47 @@ def test_x_topic_excludes_an_author_with_incomplete_optional_screening(
     assert media_sources.fetch_x_topic(
         "trend_world", "major event", 1_800_000_000.0
     ) == []
+
+
+@pytest.mark.unit
+def test_x_topic_defaults_absent_optional_flags_to_false(monkeypatch):
+    """X omits the parody/is_identity_verified flags for some accounts;
+    absence is treated as not asserted rather than discarding the author."""
+    monkeypatch.setenv("X_BEARER_TOKEN", "secret-test-token")
+    monkeypatch.setattr(
+        media_sources,
+        "_get_json",
+        lambda *_args, **_kwargs: {
+            "data": [{
+                "id": "absent-flag-post",
+                "author_id": "405",
+                "created_at": "2026-07-22T12:00:00Z",
+                "text": "A public reaction without optional flags",
+                "public_metrics": {
+                    "like_count": 1,
+                    "reply_count": 0,
+                    "repost_count": 0,
+                    "quote_count": 0,
+                },
+            }],
+            "includes": {"users": [{
+                "id": "405",
+                "username": "flagless_user",
+                "name": "Flagless Example",
+                "verified_type": "blue",
+                "created_at": "2020-01-01T00:00:00Z",
+                "public_metrics": {
+                    "followers_count": 100,
+                    "following_count": 20,
+                    "post_count": 500,
+                },
+            }]},
+        },
+    )
+
+    rows = media_sources.fetch_x_topic("trend_world", "major event", 1_800_000_000.0)
+    assert len(rows) == 1
+    assert rows[0]["metadata"]["author_parody"] is False
 
 
 @pytest.mark.unit
@@ -450,12 +494,18 @@ def test_x_profile_screen_is_complete_and_conservative():
         "organization_signals"
     ] == []
 
+    # Absent optional flags default to False (X omits them for some accounts).
     incomplete = dict(person)
     incomplete.pop("parody")
+    assert media_sources._x_author_profile(incomplete, policy)[
+        "organization_signals"
+    ] == []
+
+    wrong_typed = {**person, "parody": "yes"}
     with pytest.raises(
         media_sources.ProviderResponseError, match="author profile"
     ):
-        media_sources._x_author_profile(incomplete, policy)
+        media_sources._x_author_profile(wrong_typed, policy)
 
     invalid_description = {**person, "description": None}
     with pytest.raises(

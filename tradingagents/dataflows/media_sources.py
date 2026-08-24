@@ -857,6 +857,14 @@ def _x_author_profile(user: dict, policy: Mapping) -> dict:
     entities = user.get("entities")
     parody = user.get("parody")
     identity_verified = user.get("is_identity_verified")
+    # Schema-drift tolerance: X has omitted these optional flags entirely for
+    # some accounts. Absent or null means "not asserted", i.e. False; the
+    # strict-bool rejection here otherwise discarded every author and emptied
+    # whole searches.
+    if parody is None:
+        parody = False
+    if identity_verified is None:
+        identity_verified = False
     if (
         not isinstance(username, str)
         or not username.strip()
