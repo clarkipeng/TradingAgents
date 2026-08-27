@@ -288,6 +288,11 @@ _AMBIGUOUS_NEWS_IDENTITIES = {
     "T": ("AT&T",),
     "V": ("Visa",),
 }
+def ticker_identity_phrases(ticker: str) -> tuple[str, ...]:
+    """Company-name phrases that disambiguate a short ticker in news search."""
+    return _AMBIGUOUS_NEWS_IDENTITIES.get(ticker.strip().upper(), ())
+
+
 # Theme/macro news uses Google News search with the theme's free-text query.
 _GLOBAL_NEWS_RSS = "https://news.google.com/rss/search?q={q}&hl=en-US&gl=US&ceid=US:en"
 _CORPORATE_SOURCE_MARKERS = (

@@ -1538,6 +1538,101 @@ def temporal_gdelt_wayback_import(
         raise typer.Exit(code=1)
 
 
+@app.command("temporal-daily-discovery")
+def temporal_daily_discovery(
+    tickers: str = typer.Option(..., "--tickers", help="Comma-separated tickers to sweep."),  # noqa: B008
+    store: Path = typer.Option(  # noqa: B008
+        Path(".tradingagents/temporal"), "--store", help="Temporal evidence-store directory."
+    ),
+    date: str = typer.Option(  # noqa: B008
+        None, "--date", help="UTC day YYYY-MM-DD to capture (default: today)."
+    ),
+    group_size: int = typer.Option(  # noqa: B008
+        8, min=1, max=30, help="Tickers per OR-grouped GDELT query."
+    ),
+    max_records: int = typer.Option(  # noqa: B008
+        100, min=1, max=250, help="Maximum GDELT headline records per group query."
+    ),
+    body_max_records: int = typer.Option(  # noqa: B008
+        50, min=1, max=250, help="Maximum Wayback bodies to bridge per group query."
+    ),
+):
+    """Capture one day of GDELT discovery plus yesterday's Wayback bodies.
+
+    Headlines for the target day are cheap and fresh; article bodies bridge
+    through Wayback one day behind, when snapshots have had time to appear.
+    Tickers batch into OR-grouped queries because GDELT throttles per-ticker
+    sweeps into the ground; ambiguous short tickers contribute their
+    company-identity phrase instead. One group's provider failure never stops
+    the sweep; the exit code reports it.
+    """
+    import requests
+
+    from tradingagents.dataflows.media_sources import ticker_identity_phrases
+    from tradingagents.temporal import TemporalStore
+    from tradingagents.temporal_collectors import (
+        GdeltResponseError,
+        import_gdelt_articles,
+        import_gdelt_wayback_bodies,
+    )
+
+    symbols = [symbol.strip().upper() for symbol in tickers.split(",") if symbol.strip()]
+    if not symbols:
+        raise typer.BadParameter("at least one ticker is required")
+    try:
+        day = (
+            datetime.datetime.strptime(date, "%Y-%m-%d").date()
+            if date
+            else datetime.datetime.now(datetime.timezone.utc).date()
+        )
+    except ValueError:
+        raise typer.BadParameter("--date must be YYYY-MM-DD") from None
+    previous = day - datetime.timedelta(days=1)
+
+    def group_term(symbol: str) -> str:
+        identities = ticker_identity_phrases(symbol)
+        return f'"{identities[0]}"' if identities else symbol
+
+    groups = [
+        symbols[index:index + group_size]
+        for index in range(0, len(symbols), group_size)
+    ]
+    failed: list[str] = []
+    temporal_store = TemporalStore(store)
+    with temporal_store.write_lock():
+        for members in groups:
+            query = f"({' OR '.join(group_term(symbol) for symbol in members)})"
+            label = ",".join(members)
+            try:
+                headlines = import_gdelt_articles(
+                    temporal_store,
+                    query=query,
+                    start=str(day),
+                    end=str(day),
+                    max_records=max_records,
+                )
+                bodies = import_gdelt_wayback_bodies(
+                    temporal_store,
+                    query=query,
+                    start=str(previous),
+                    end=str(previous),
+                    max_records=body_max_records,
+                )
+            except (requests.RequestException, GdeltResponseError) as error:
+                failed.extend(members)
+                typer.echo(
+                    f"{label}: discovery failed ({type(error).__name__})", err=True
+                )
+                continue
+            typer.echo(
+                f"{label}: headlines {headlines.imported}/{headlines.requested} · "
+                f"bodies {bodies.imported}/{bodies.attempted}"
+            )
+    if failed:
+        typer.echo(f"{len(failed)} ticker(s) failed: {', '.join(failed)}", err=True)
+        raise typer.Exit(code=1)
+
+
 @app.command("temporal-hn-import")
 def temporal_hn_import(
     query: str = typer.Option(..., "--query", help="Hacker News text query."),  # noqa: B008

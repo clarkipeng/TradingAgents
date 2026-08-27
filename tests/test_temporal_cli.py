@@ -285,6 +285,83 @@ def test_temporal_gdelt_wayback_import_passes_a_bounded_bridge_request(tmp_path,
     assert "Recovered 1/2 Wayback bodies" in result.output
 
 
+def test_temporal_daily_discovery_sweeps_the_universe_under_one_lock(tmp_path, monkeypatch):
+    """One daily command: today's GDELT headlines plus yesterday's Wayback
+    bodies, tickers batched into OR-grouped queries (GDELT throttles
+    per-ticker sweeps into the ground - observed live 2026-08-24: 29/30
+    failed), ambiguous tickers anchored to company identity, the store write
+    lock held for the whole sweep, and one group's provider failure isolated
+    from the rest."""
+    calls = []
+    lock_state = {"held": False, "acquisitions": 0}
+
+    from contextlib import contextmanager
+
+    @contextmanager
+    def fake_write_lock(self):
+        lock_state["held"] = True
+        lock_state["acquisitions"] += 1
+        try:
+            yield
+        finally:
+            lock_state["held"] = False
+
+    monkeypatch.setattr(TemporalStore, "write_lock", fake_write_lock)
+
+    from tradingagents.temporal_collectors import GdeltResponseError
+
+    def fake_headlines(store, **kwargs):
+        calls.append(("headlines", kwargs["query"], kwargs["start"], kwargs["end"], lock_state["held"]))
+        if "AMD" in kwargs["query"]:
+            raise GdeltResponseError("rate limited")
+        return GdeltImportResult(
+            requested=3, imported=3, evidence_ids=("a", "b", "c"),
+            failures=(), response_artifact_hash="raw",
+        )
+
+    def fake_bodies(store, **kwargs):
+        calls.append(("bodies", kwargs["query"], kwargs["start"], kwargs["end"], lock_state["held"]))
+        return GdeltWaybackImportResult(
+            discovery=GdeltImportResult(
+                requested=2, imported=2, evidence_ids=("d1", "d2"),
+                failures=(), response_artifact_hash="raw",
+            ),
+            attempted=2, imported=1, evidence_ids=("body-1",), failures=(),
+        )
+
+    monkeypatch.setattr(
+        "tradingagents.temporal_collectors.import_gdelt_articles", fake_headlines
+    )
+    monkeypatch.setattr(
+        "tradingagents.temporal_collectors.import_gdelt_wayback_bodies", fake_bodies
+    )
+
+    result = CliRunner().invoke(
+        cli.app,
+        [
+            "temporal-daily-discovery",
+            "--tickers", "NVDA,V,AMD,GS",
+            "--date", "2026-08-23",
+            "--group-size", "2",
+            "--store", str(tmp_path),
+        ],
+    )
+
+    assert result.exit_code == 1, result.output  # AMD's group failed, other captured
+    assert lock_state["acquisitions"] == 1
+    assert all(held for *_rest, held in calls)
+    group_one = '(NVDA OR "Visa")'
+    group_two = '(AMD OR "Goldman Sachs")'
+    assert ("headlines", group_one, "2026-08-23", "2026-08-23", True) in calls
+    assert ("bodies", group_one, "2026-08-22", "2026-08-22", True) in calls
+    assert ("headlines", group_two, "2026-08-23", "2026-08-23", True) in calls
+    assert not any(
+        kind == "bodies" and "AMD" in query for kind, query, *_ in calls
+    )
+    assert "headlines 3/3" in result.output
+    assert "AMD" in result.output
+
+
 def test_temporal_hn_import_passes_a_bounded_archive_request(tmp_path, monkeypatch):
     captured = {}
 
