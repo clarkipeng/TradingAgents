@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.tradingagents.x-first-cycle-once</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/clarkpeng/conductor/workspaces/TradingAgents/london/scripts/run_media_poller.sh</string>
+        <string>--sources</string>
+        <string>x</string>
+        <string>--once</string>
+        <string>--no-trading-hours</string>
+    </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>TRADINGAGENTS_POLLER_X_IGNORE_START_WINDOW</key>
+        <string>1</string>
+    </dict>
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Month</key>
+        <integer>8</integer>
+        <key>Day</key>
+        <integer>24</integer>
+        <key>Hour</key>
+        <integer>17</integer>
+        <key>Minute</key>
+        <integer>5</integer>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.tradingagents/x-first-cycle.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.tradingagents/x-first-cycle.error.log</string>
+</dict>
+</plist>
