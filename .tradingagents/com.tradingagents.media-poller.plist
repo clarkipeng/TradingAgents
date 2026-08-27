@@ -2,27 +2,29 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>Label</key>
-    <string>com.tradingagents.media-poller</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>/Users/clarkpeng/conductor/workspaces/TradingAgents/london/scripts/run_media_poller.sh</string>
-    </array>
-    <key>EnvironmentVariables</key>
-    <dict>
-        <key>MEDIA_POLLER_TRADING_HOURS</key>
-        <string>true</string>
-    </dict>
-    <key>KeepAlive</key>
-    <dict>
-        <key>SuccessfulExit</key>
-        <false/>
-    </dict>
-    <key>RunAtLoad</key>
-    <true/>
-    <key>StandardOutPath</key>
-    <string>/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.tradingagents/media-poller.log</string>
-    <key>StandardErrorPath</key>
-    <string>/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.tradingagents/media-poller.error.log</string>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>MEDIA_POLLER_SOURCES</key>
+		<string>stocktwits,reddit,news</string>
+		<key>MEDIA_POLLER_TRADING_HOURS</key>
+		<string>true</string>
+	</dict>
+	<key>KeepAlive</key>
+	<dict>
+		<key>SuccessfulExit</key>
+		<false/>
+	</dict>
+	<key>Label</key>
+	<string>com.tradingagents.media-poller</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/Users/clarkpeng/conductor/workspaces/TradingAgents/london/scripts/run_media_poller.sh</string>
+	</array>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>StandardErrorPath</key>
+	<string>/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.tradingagents/media-poller.error.log</string>
+	<key>StandardOutPath</key>
+	<string>/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.tradingagents/media-poller.log</string>
 </dict>
 </plist>
