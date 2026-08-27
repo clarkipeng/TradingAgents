@@ -61,6 +61,7 @@ class TemporalStore:
         self.artifacts_dir = self.root / "artifacts"
         self.database_path = self.root / "temporal.sqlite3"
         self._eligible_index_cache: dict[tuple[str, str], EligibleChunkIndex] = {}
+        self._pending_cluster_keys: set[str] | None = None
         self.artifacts_dir.mkdir(parents=True, exist_ok=True)
         self._initialize()
         from .retriever import TemporalRetriever
@@ -401,10 +402,35 @@ class TemporalStore:
                     (record.evidence_id, response_json),
                 )
                 self._maintain_document(connection, record)
-                self._refresh_document_clusters(
-                    connection, {stable_doc_key(record.evidence_id, 0)}
-                )
+                doc_key = stable_doc_key(record.evidence_id, 0)
+                if self._pending_cluster_keys is not None:
+                    self._pending_cluster_keys.add(doc_key)
+                else:
+                    self._refresh_document_clusters(connection, {doc_key})
         return record
+
+    @contextmanager
+    def deferred_clustering(self):
+        """Batch cluster maintenance for bulk ingestion.
+
+        The per-insert cluster refresh scans every document row, which makes
+        bulk imports pay seconds per record on a grown corpus. Inside this
+        context, inserts only collect their new document keys; one shared
+        refresh at exit lands on exactly the assignments the per-row path
+        (or a full rebuild) would produce, because the refresh seeds from
+        stored state and rewrites every changed root.
+        """
+        if self._pending_cluster_keys is not None:
+            raise RuntimeError("deferred clustering does not nest")
+        self._pending_cluster_keys = set()
+        try:
+            yield
+            pending = self._pending_cluster_keys
+            if pending:
+                with self._connect() as connection:
+                    self._refresh_document_clusters(connection, pending)
+        finally:
+            self._pending_cluster_keys = None
 
     @staticmethod
     def _maintain_document(connection: sqlite3.Connection, record: EvidenceRecord) -> None:

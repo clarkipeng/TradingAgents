@@ -33,7 +33,7 @@ def mirror_poller_media_fetch(
         return 0
     store = TemporalStore(root)
     observed_at = datetime.fromtimestamp(received_utc, timezone.utc)
-    with store.write_lock():
+    with store.write_lock(), store.deferred_clustering():
         imported = 0
         for row in rows:
             evidence_id = _record_row(

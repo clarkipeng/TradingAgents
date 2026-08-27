@@ -120,6 +120,52 @@ def test_incremental_cluster_assignments_match_full_reindex(tmp_path):
     assert incremental == rebuilt
 
 
+def test_deferred_clustering_batches_the_refresh_and_matches_reindex(tmp_path, monkeypatch):
+    """Bulk imports must not pay a full-corpus cluster scan per row (measured
+    live: 8.7s/post at 17k documents). Inside deferred_clustering() inserts
+    skip the per-row refresh; one batch refresh at exit must land on exactly
+    the assignments a full rebuild would produce."""
+    store = TemporalStore(tmp_path)
+    refreshes = []
+    original = TemporalStore._refresh_document_clusters
+
+    def counting_refresh(connection, target_keys=None):
+        refreshes.append(target_keys if target_keys is None else set(target_keys))
+        return original(connection, target_keys)
+
+    monkeypatch.setattr(TemporalStore, "_refresh_document_clusters", staticmethod(counting_refresh))
+
+    titles = [
+        "Nvidia quarterly earnings beat expectations across data center segment",
+        "Nvidia quarterly earnings beat expectations across data center segments",
+        "Nvidia quarterly earnings beat expectations across data center segment today",
+    ]
+    with store.deferred_clustering():
+        for index, title in enumerate(titles):
+            store.record(
+                "corpus.document",
+                {"url": f"https://news.example/deferred-{index}"},
+                {"text": f"{title}\n\nBody {index}", "metadata": {
+                    "article": {"title": title, "url": f"https://news.example/article-d{index}"}
+                }},
+                available_at=at(9),
+                source=f"https://news.example/deferred-{index}",
+            )
+    assert len(refreshes) == 1  # one batch refresh, covering all three
+    assert len(refreshes[0]) == 3
+
+    def cluster_map():
+        connection = sqlite3.connect(tmp_path / "temporal.sqlite3")
+        try:
+            return dict(connection.execute("select doc_key, cluster_key from documents").fetchall())
+        finally:
+            connection.close()
+
+    batched = cluster_map()
+    store.reindex_documents()
+    assert cluster_map() == batched
+
+
 def test_store_open_does_not_write_existing_database(tmp_path):
     store = TemporalStore(tmp_path)
     store.record("corpus.document", {"url": "https://example.com"}, {"text": "body", "metadata": {}}, available_at=at(9))

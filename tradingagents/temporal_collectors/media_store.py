@@ -52,12 +52,17 @@ def import_media_store_posts(
 
     evidence_ids: list[str] = []
     failures: list[str] = []
-    for position, row in enumerate(rows, start=1):
-        evidence_id = _import_row(temporal_store, row)
-        if evidence_id is None:
-            failures.append(f"post-{position}:invalid-record")
-        else:
-            evidence_ids.append(evidence_id)
+    # The temporal store has one mutator at a time by invariant; without the
+    # lock this import deadlocks against the live poller mirror. Clustering
+    # defers to one batch refresh - per-row refreshes made bulk imports pay
+    # a full-corpus scan per record.
+    with temporal_store.write_lock(), temporal_store.deferred_clustering():
+        for position, row in enumerate(rows, start=1):
+            evidence_id = _import_row(temporal_store, row)
+            if evidence_id is None:
+                failures.append(f"post-{position}:invalid-record")
+            else:
+                evidence_ids.append(evidence_id)
     return MediaStoreImportResult(
         requested=len(rows),
         imported=len(evidence_ids),
