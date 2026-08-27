@@ -7,6 +7,7 @@ from tradingagents.agents.utils.agent_utils import (
     get_income_statement,
     get_instrument_context_from_state,
     get_language_instruction,
+    get_evidence_brief_guidance,
     get_temporal_search_guidance,
 )
 
@@ -29,6 +30,7 @@ def create_fundamentals_analyst(llm, *, extra_tools=()):
             + " Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."
             + " Use the available tools: `get_fundamentals` for comprehensive company analysis, `get_balance_sheet`, `get_cashflow`, and `get_income_statement` for specific financial statements."
             + get_temporal_search_guidance()
+            + get_evidence_brief_guidance(state)
             + get_language_instruction(),
         )
 

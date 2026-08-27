@@ -113,6 +113,24 @@ def get_temporal_search_guidance() -> str:
     )
 
 
+def get_evidence_brief_guidance(state) -> str:
+    """Present the run's injected evidence brief to an analyst, or empty.
+
+    The brief being in state is not enough: unless the system prompt presents
+    it with the citation contract, the model never reads it and the brief
+    arm measures nothing.
+    """
+    brief = state.get("evidence_brief") if hasattr(state, "get") else None
+    if not brief:
+        return ""
+    return (
+        " An evidence brief of the most relevant documents available at the"
+        " analysis time is provided below. Ground your report in it where"
+        " relevant and cite each item you rely on inline as [evidence:<id>]"
+        f" using its evidence id. Evidence brief: {brief}"
+    )
+
+
 def _clean_identity_value(value: Any) -> str | None:
     """Return a trimmed string, or None for empty / placeholder-ish values."""
     if not isinstance(value, str):

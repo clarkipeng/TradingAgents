@@ -7,7 +7,7 @@ from tradingagents.agents.utils.agent_states import (
     InvestDebateState,
     RiskDebateState,
 )
-from tradingagents.temporal import build_evidence_brief, current_context
+from tradingagents.temporal import build_evidence_brief, canonical_json, current_context
 
 
 class Propagator:
@@ -70,6 +70,7 @@ class Propagator:
             "sentiment_report": "",
             "news_report": "",
         }
+        state["evidence_brief"] = ""
         settings = self.config.get("temporal")
         context = current_context()
         if (
@@ -78,10 +79,16 @@ class Propagator:
             and context is not None
             and context.store is not None
         ):
-            state["evidence_brief"] = build_evidence_brief(
+            # Rendered as text so analyst prompts can present it verbatim;
+            # the run identity records the brief's manifest as a search trace
+            # so its evidence counts toward coverage like any agent search.
+            state["evidence_brief"] = canonical_json(build_evidence_brief(
                 context.store, company_name, context.clock.as_of,
                 int(settings.get("evidence_brief_k", 5)),
-            )
+                run_id=context.run_id,
+                scenario_id=context.scenario_id,
+                mode=context.mode.value,
+            ))
         return state
 
     def get_graph_args(self, callbacks: list | None = None) -> dict[str, Any]:

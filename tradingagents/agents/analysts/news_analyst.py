@@ -9,6 +9,7 @@ from tradingagents.agents.utils.agent_utils import (
     get_macro_indicators,
     get_news,
     get_prediction_markets,
+    get_evidence_brief_guidance,
     get_temporal_search_guidance,
 )
 from tradingagents.dataflows.config import get_config
@@ -74,6 +75,7 @@ def create_news_analyst(llm, *, extra_tools=()):
         if hacker_news_enabled:
             tool_guidance += " Use get_hacker_news() for the bounded public technology-community feed."
         tool_guidance += get_temporal_search_guidance()
+        tool_guidance += get_evidence_brief_guidance(state)
         system_message = (
             f"You are a news researcher tasked with analyzing recent news and trends over the past week. Please write a comprehensive report of the current state of the world that is relevant for trading and macroeconomics. {tool_guidance} {source_guidance} Provide specific, actionable insights with supporting evidence to help traders make informed decisions."
             + """ Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."""

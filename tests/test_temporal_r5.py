@@ -50,6 +50,50 @@ def _mcp_call(process, request_id, method, params=None):
     return json.loads(process.stdout.read(length))
 
 
+def test_brief_with_run_identity_records_a_search_trace(tmp_path):
+    """Evidence surfaced by the injected brief must count toward coverage
+    exactly like an agent-issued search - otherwise the brief arm's
+    evidence_coverage scores as if the run saw nothing."""
+    store, as_of = _fixture_store(tmp_path)
+
+    untraced = build_evidence_brief(store, "NVDA", as_of, 2)
+    assert store.list_search_traces("brief-run") == []
+
+    traced = build_evidence_brief(
+        store, "NVDA", as_of, 2,
+        run_id="brief-run", scenario_id=None, mode="replay",
+    )
+    assert traced == untraced  # identity never changes the payload
+    traces = store.list_search_traces("brief-run")
+    assert len(traces) == 1
+    assert traces[0].manifest.query == "NVDA"
+
+
+def test_initial_state_threads_the_brief_as_text_and_traces_it(tmp_path):
+    from tradingagents.graph.propagation import Propagator
+
+    store, as_of = _fixture_store(tmp_path)
+    context = TemporalContext.at(
+        TemporalMode.REPLAY, as_of, store=store, run_id="brief-arm-run"
+    )
+
+    with temporal_context(context):
+        disabled = Propagator(config={"temporal": {"mode": "replay"}}).create_initial_state(
+            "NVDA", "2026-08-18"
+        )
+        assert disabled["evidence_brief"] == ""
+
+        enabled = Propagator(
+            config={"temporal": {"mode": "replay", "evidence_brief": True, "evidence_brief_k": 2}}
+        ).create_initial_state("NVDA", "2026-08-18")
+
+    assert isinstance(enabled["evidence_brief"], str)
+    assert "evidence" in enabled["evidence_brief"]
+    traces = store.list_search_traces("brief-arm-run")
+    assert len(traces) == 1
+    assert traces[0].manifest.query == "NVDA"
+
+
 def test_tool_brief_and_retriever_share_identical_payload(tmp_path):
     store, as_of = _fixture_store(tmp_path)
     response = store.search("NVDA", as_of=as_of, limit=2)
