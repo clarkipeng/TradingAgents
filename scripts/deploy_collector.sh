@@ -1303,6 +1303,9 @@ before_rollback_from_version=$machine_rollback_from_version
 before_rollback_to_version=$machine_rollback_to_version
 before_config_fingerprint=$machine_config_fingerprint
 
+# flyctl (>= v0.4.x) refuses `config save -c PATH` unless PATH already exists;
+# pre-create the capture file so the baseline snapshot works on current CLIs.
+: > "$previous_config"
 fly config save -a "$app" -c "$previous_config" --yes >/dev/null
 capture_status "$previous_status"
 if ! read_started_app_machine "$previous_status"; then
