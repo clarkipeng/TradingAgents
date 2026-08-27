@@ -34,6 +34,11 @@ def create_temporal_search_tool(store: TemporalStore) -> StructuredTool:
     return _build_temporal_search_tool(store)
 
 
+def create_temporal_fetch_tool(store: TemporalStore) -> StructuredTool:
+    """Create the bounded normalized-document reader pinned to one store."""
+    return _build_temporal_fetch_tool(store)
+
+
 def create_contextual_temporal_search_tool() -> StructuredTool:
     """Create a graph-safe temporal search tool that resolves its store per run.
 
@@ -84,9 +89,14 @@ def _build_temporal_search_tool(expected_store: TemporalStore | None = None) -> 
                date_to: str | None = None, source: str | None = None,
                corpus_hash: str | None = None) -> str:
         context, store = _context_store(expected_store)
-        response = store.search(query, as_of=context.clock.as_of, limit=limit, page=page,
-                                date_from=date_from, date_to=date_to, source=source,
-                                corpus_hash_pin=corpus_hash)
+        try:
+            response = store.search(query, as_of=context.clock.as_of, limit=limit, page=page,
+                                    date_from=date_from, date_to=date_to, source=source,
+                                    corpus_hash_pin=corpus_hash)
+        except (KeyError, ValueError) as error:
+            # Same degrade contract as temporal_fetch: bad model arguments
+            # (malformed dates, stale corpus pins) come back as a payload.
+            return canonical_json({"error": str(error).strip("'\""), "query": query})
         if context.run_id is not None:
             store.record_search_trace(
                 run_id=context.run_id,
@@ -111,7 +121,18 @@ def _build_temporal_search_tool(expected_store: TemporalStore | None = None) -> 
 def _build_temporal_fetch_tool(expected_store: TemporalStore | None = None) -> StructuredTool:
     def fetch(doc_key: str, page: int = 1) -> str:
         context, store = _context_store(expected_store)
-        result = store.fetch_document(doc_key, as_of=context.clock.as_of, page=page)
+        try:
+            result = store.fetch_document(doc_key, as_of=context.clock.as_of, page=page)
+        except (KeyError, ValueError) as error:
+            # Model-supplied arguments can be wrong (hallucinated doc keys,
+            # out-of-range pages). That is a correctable tool outcome the
+            # model must see, never a run-fatal exception (observed live
+            # 2026-08-23: one bad key killed a whole replay run).
+            return canonical_json({
+                "error": str(error).strip("'\""),
+                "doc_key": doc_key,
+                "page": page,
+            })
         if context.run_id is not None:
             store.record_tool_trace(run_id=context.run_id, scenario_id=context.scenario_id,
                                     mode=context.mode.value, tool="temporal_fetch",

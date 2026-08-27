@@ -172,6 +172,32 @@ def test_temporal_search_tool_uses_context_time_and_returns_citations(tmp_path):
     )
 
 
+def test_fetch_tool_reports_bad_model_arguments_instead_of_crashing_the_run(tmp_path):
+    """Observed live 2026-08-23: an agent passed a hallucinated doc_key and
+    the raw KeyError killed the whole replay run mid-experiment. A tool error
+    caused by model input must come back as a bounded payload the model can
+    correct, exactly like a NO_DATA degrade."""
+    from tradingagents.temporal_adapters.langchain import create_temporal_fetch_tool
+
+    store = TemporalStore(tmp_path)
+    store.record(
+        "corpus.document",
+        {"url": "real"},
+        {"text": "NVDA supply constraints"},
+        available_at=datetime(2025, 1, 2, 9, tzinfo=UTC),
+    )
+    tool = create_temporal_fetch_tool(store)
+    context = TemporalContext.at(
+        TemporalMode.REPLAY, datetime(2025, 1, 2, 10, tzinfo=UTC), store=store
+    )
+
+    with temporal_context(context):
+        result = json.loads(tool.invoke({"doc_key": "ba56c0" + "0" * 58}))
+
+    assert "error" in result
+    assert "unknown or ineligible" in result["error"]
+
+
 def test_temporal_search_tool_returns_bounded_snippets_for_huge_documents(tmp_path):
     # A matched SEC filing can be tens of MB; shipping full documents as a
     # tool result blows the provider's request limit. The tool must return a

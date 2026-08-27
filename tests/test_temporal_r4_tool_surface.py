@@ -37,8 +37,16 @@ def test_fetch_enforces_available_at_and_records_trace(tmp_path):
                           available_at=datetime(2025, 1, 3, tzinfo=UTC))
     context = TemporalContext.at(TemporalMode.REPLAY, datetime(2025, 1, 2, tzinfo=UTC), store=store)
     fetch = create_contextual_temporal_fetch_tool()
-    with temporal_context(context), pytest.raises(KeyError, match="ineligible"):
-        fetch.invoke({"doc_key": stable_doc_key(future.evidence_id), "page": 1})
+    # An ineligible (future) document is refused as a correctable tool error
+    # the model can see - never as content, and never as a run-fatal raise.
+    with temporal_context(context):
+        refused = json.loads(
+            fetch.invoke({"doc_key": stable_doc_key(future.evidence_id), "page": 1})
+        )
+    assert "ineligible" in refused["error"]
+    assert "result" not in refused
+    assert "NVDA financials" not in json.dumps(refused)
+    assert store.list_tool_traces(context.run_id) == []
     store.record("corpus.document", {"url": "https://sec.gov/nvda"},
                  {"title": "10-Q", "text": "NVDA financials " * 500},
                  available_at=datetime(2025, 1, 1, tzinfo=UTC))
