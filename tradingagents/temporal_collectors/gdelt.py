@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, time, timezone
+from time import sleep as _default_sleep
 from typing import Any
 from urllib.parse import urlencode
 
@@ -12,6 +13,7 @@ from tradingagents.dataflows.gdelt_common import (
     GDELT_DOC_API_URL,
     article_list_params,
     normalize_gdelt_query,
+    pace_gdelt_request,
 )
 from tradingagents.dataflows.provider_http import get_json
 from tradingagents.temporal import TemporalStore, canonical_json, parse_timestamp
@@ -31,6 +33,33 @@ class GdeltImportResult:
     evidence_ids: tuple[str, ...]
     failures: tuple[str, ...]
     response_artifact_hash: str
+
+
+# GDELT 429s arrive in multi-request bursts even at a compliant cadence
+# (measured live 2026-08-23: alternating 200/429 runs at one request per 6s),
+# so retries escalate their wait instead of re-asking inside the same burst.
+_GDELT_RETRY_EXTRA_WAITS_SECONDS = (0.0, 30.0, 120.0)
+
+
+def _paced_doc_request(url: str, sleep: Any = _default_sleep) -> Any:
+    """Fetch one DOC API response with every attempt paced.
+
+    GDELT allows one request every 5 seconds and its 429s carry no
+    Retry-After, so an unpaced in-transport retry would itself violate the
+    quota and poison the window for the next query. Each attempt goes back
+    through the shared pace gate, with escalating extra waits to outlast
+    server-side 429 bursts.
+    """
+    last_error: ProviderTransientError | None = None
+    for extra_wait in _GDELT_RETRY_EXTRA_WAITS_SECONDS:
+        if extra_wait:
+            sleep(extra_wait)
+        pace_gdelt_request()
+        try:
+            return get_json(url, timeout=30, attempts=1, max_bytes=1_000_000)
+        except ProviderTransientError as error:
+            last_error = error
+    raise last_error
 
 
 def import_gdelt_articles(
@@ -65,15 +94,13 @@ def import_gdelt_articles(
     )
     if session is None:
         try:
-            payload = get_json(
-                f"{_DOC_API_URL}?{urlencode(sorted(params.items()))}",
-                timeout=30,
-                attempts=1,
-                max_bytes=1_000_000,
+            payload = _paced_doc_request(
+                f"{_DOC_API_URL}?{urlencode(sorted(params.items()))}"
             )
         except (ProviderResponseError, ProviderTransientError) as error:
             raise GdeltResponseError(str(error)) from error
     else:
+        pace_gdelt_request()
         response = session.get(_DOC_API_URL, params=params, timeout=30)
         response.raise_for_status()
         try:

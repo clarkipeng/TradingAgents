@@ -15,6 +15,7 @@ from tradingagents.dataflows.errors import ProviderResponseError
 from tradingagents.dataflows.gdelt_common import (
     GDELT_DOC_API_URL,
     article_list_params,
+    pace_gdelt_request,
 )
 from tradingagents.dataflows.media_sources import looks_company_authored
 from tradingagents.dataflows.provider_http import get_json
@@ -91,6 +92,7 @@ def fetch_gdelt_articles(
     deadline = time.monotonic() + float(
         GDELT_ADAPTER_POLICY["total_deadline_seconds_per_slot"]
     )
+    pace_gdelt_request()
     payload = get_json(
         f"{_API_URL}?{urlencode(sorted(params.items()))}",
         timeout=timeout,

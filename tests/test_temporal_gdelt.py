@@ -34,6 +34,82 @@ class _Session:
         return _Response(self.payload)
 
 
+def test_gdelt_requests_are_paced_across_calls(tmp_path, monkeypatch):
+    """GDELT's DOC API allows one request every 5 seconds; the daily sweep
+    makes ~60, so the pace must hold across import calls by construction."""
+    from tradingagents.dataflows import gdelt_common
+
+    clock = {"now": 500.0}
+    sleeps = []
+
+    def fake_sleep(seconds):
+        sleeps.append(seconds)
+        clock["now"] += seconds
+
+    monkeypatch.setattr(gdelt_common.time, "monotonic", lambda: clock["now"])
+    monkeypatch.setattr(gdelt_common.time, "sleep", fake_sleep)
+    monkeypatch.setattr(gdelt_common, "_gdelt_last_request_at", [float("-inf")])
+
+    store = TemporalStore(tmp_path)
+    session = _Session({"articles": []})
+    import_gdelt_articles(
+        store, query="NVDA", start="2024-02-01", end="2024-02-01", session=session
+    )
+    assert sleeps == []  # first request never waits
+    import_gdelt_articles(
+        store, query="NVDA", start="2024-02-02", end="2024-02-02", session=session
+    )
+    assert sleeps == [
+        pytest.approx(gdelt_common.GDELT_MIN_REQUEST_INTERVAL_SECONDS)
+    ]
+    assert len(session.calls) == 2
+
+
+def test_gdelt_retries_escalate_their_wait_to_outlast_429_bursts(monkeypatch):
+    """GDELT serves 429 bursts even at a compliant cadence; retrying inside
+    the same burst just burns attempts. Each retry pays a growing extra wait
+    and re-enters the shared pace gate."""
+    from tradingagents.dataflows import gdelt_common
+    from tradingagents.dataflows.errors import ProviderTransientError
+    from tradingagents.temporal_collectors import gdelt as gdelt_module
+
+    monkeypatch.setattr(gdelt_common, "_gdelt_last_request_at", [float("-inf")])
+    paces = []
+    monkeypatch.setattr(
+        gdelt_module, "pace_gdelt_request", lambda: paces.append(True)
+    )
+    extra_sleeps = []
+    attempts = []
+
+    def flaky_get_json(url, **kwargs):
+        attempts.append(url)
+        if len(attempts) < 3:
+            raise ProviderTransientError("burst")
+        return {"articles": []}
+
+    monkeypatch.setattr(gdelt_module, "get_json", flaky_get_json)
+
+    payload = gdelt_module._paced_doc_request("https://example.invalid", sleep=extra_sleeps.append)
+
+    assert payload == {"articles": []}
+    assert len(attempts) == 3
+    assert len(paces) == 3  # every attempt re-enters the pace gate
+    assert extra_sleeps == list(gdelt_module._GDELT_RETRY_EXTRA_WAITS_SECONDS[1:])
+
+    dead_attempts = []
+
+    def dead_get_json(url, **kwargs):
+        dead_attempts.append(url)
+        raise ProviderTransientError("still down")
+
+    monkeypatch.setattr(gdelt_module, "get_json", dead_get_json)
+    with pytest.raises(ProviderTransientError):
+        gdelt_module._paced_doc_request(
+            "https://always.invalid", sleep=extra_sleeps.append
+        )
+    assert len(dead_attempts) == 3  # hard-bounded; a dead provider fails the query
+
+
 def test_gdelt_import_preserves_query_artifact_and_uses_seen_clock(tmp_path):
     store = TemporalStore(tmp_path)
     session = _Session(
