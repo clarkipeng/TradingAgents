@@ -11,7 +11,9 @@ env_file=${TRADINGAGENTS_MEDIA_ENV_FILE:-"$project_dir/.env"}
 command_name=${TRADINGAGENTS_COMMAND:-"$project_dir/.venv/bin/tradingagents"}
 temporal_store=${TRADINGAGENTS_TEMPORAL_STORE:-"$HOME/.tradingagents/temporal"}
 cluster=${FLY_MPG_CLUSTER_ID:-9jknq03mm5no68w3}
-proxy_port=${FLY_MPG_PROXY_PORT:-16432}
+# A fresh port per invocation: back-to-back runs on one port connect to the
+# previous invocation's dying proxy and drop mid-import.
+proxy_port=${FLY_MPG_PROXY_PORT:-$((16400 + $$ % 200))}
 # Sources the cloud collector owns; the laptop's own poller covers the rest.
 sources=${CLOUD_MEDIA_SOURCES:-x,xtrend,trendnews,globalnews,hacker_news,gdelt}
 from_date=${1:-$(date -u -v-1d +%Y-%m-%d 2>/dev/null || date -u -d yesterday +%Y-%m-%d)}
