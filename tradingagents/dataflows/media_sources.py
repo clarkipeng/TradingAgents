@@ -1150,6 +1150,27 @@ def fetch_truthsocial(ticker: str, now: float, limit: int = 40,
     return rows
 
 
+def fetch_x_roster_slot(query_key: str, now: float, limit: int = 10,
+                        timeout: float = 10.0) -> list[dict]:
+    """Fetch one declared roster cashtag slot; arbitrary queries are refused."""
+    from tradingagents.dataflows.x_roster import X_ROSTER_TICKERS, X_ROSTER_V1_POLICY
+
+    if not isinstance(query_key, str) or not query_key.startswith("cashtag:"):
+        raise ValueError("X roster slot is not a cashtag query")
+    ticker = query_key.removeprefix("cashtag:")
+    if ticker not in X_ROSTER_TICKERS:
+        raise ValueError("X roster slot is not declared by the active policy")
+    return _fetch_x_search(
+        query=f"${ticker}",
+        label=ticker,
+        now=now,
+        limit=limit,
+        timeout=timeout,
+        sort_order=X_ROSTER_V1_POLICY["sort_order"],
+        store_query_context=False,
+    )
+
+
 def fetch_x(ticker: str, now: float, limit: int = 50,
             timeout: float = 10.0) -> list[dict]:
     """Ticker-specific X search, outside the global-event collection contract."""

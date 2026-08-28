@@ -84,6 +84,7 @@ def main() -> int:
         "search": int(evidence["max_x_search_requests_per_utc_day"]),
         "shadow_trend": int(poller.X_SHADOW_POLICY["max_trend_requests_per_utc_day"]),
         "count": int(poller.X_SHADOW_POLICY["max_count_requests_per_utc_day"]),
+        "roster": int(poller.X_ROSTER_V1_POLICY["max_requests_per_utc_day"]),
     }
     spent_by_category = dict(conn.execute(
         "SELECT json_extract(metadata_json, '$.budget_category'), "
@@ -97,6 +98,24 @@ def main() -> int:
         check(f"{category} spend within cap", spent <= cap, f"{spent}/{cap} units")
     unknown = set(spent_by_category) - set(caps)
     check("no uncapped budget categories", not unknown, f"unknown={sorted(unknown)}")
+
+    # 2b. Roster coverage: every declared cashtag slot attempted today.
+    roster_cycles = conn.execute(
+        "SELECT status FROM collection_cycles WHERE cycle_kind='x-roster-daily' "
+        "AND period_key=?",
+        (f"{day:%Y-%m-%d}",),
+    ).fetchall()
+    roster_attempted = conn.execute(
+        "SELECT COUNT(DISTINCT query_key) FROM fetch_runs WHERE provider='x' "
+        "AND query_key LIKE 'cashtag:%' AND started_utc >= ? AND started_utc < ?",
+        (day_start, day_end),
+    ).fetchone()[0]
+    roster_size = len(poller.X_ROSTER_STATIC_SLOTS)
+    check(
+        "roster cycle attempted every slot",
+        bool(roster_cycles) and roster_attempted == roster_size,
+        f"cycle={[row['status'] for row in roster_cycles]} slots={roster_attempted}/{roster_size}",
+    )
 
     # 3. X posts landed.
     posts = conn.execute(

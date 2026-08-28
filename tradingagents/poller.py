@@ -70,11 +70,19 @@ from tradingagents.dataflows.media_sources import (
     fetch_polymarket_odds,
     fetch_top_news_headlines,
     fetch_x_recent_counts,
+    fetch_x_roster_slot,
     fetch_x_topic,
     fetch_x_trends,
     looks_company_authored,
 )
 from tradingagents.dataflows.media_store import open_store
+from tradingagents.dataflows.x_roster import (
+    X_ROSTER_STATIC_SLOTS,
+    X_ROSTER_V1_COLLECTOR_SEMANTICS_ID,
+    X_ROSTER_V1_POLICY,
+    X_ROSTER_V1_PROTOCOL_ID,
+    x_roster_cycle_resolution,
+)
 from tradingagents.dataflows.shadow_sources import (
     SOURCE_SHADOW_STATIC_SLOTS,
     SOURCE_SHADOW_V1_COLLECTOR_SEMANTICS_ID,
@@ -2292,6 +2300,8 @@ def _x_request_budget_limits(category: str, now: float, request_key: str) -> dic
         limit = int(X_SHADOW_POLICY["max_trend_requests_per_utc_day"])
     elif category == "count":
         limit = int(X_SHADOW_POLICY["max_count_requests_per_utc_day"])
+    elif category == "roster":
+        limit = int(X_ROSTER_V1_POLICY["max_requests_per_utc_day"])
     else:
         raise ValueError("unknown X budget category")
     day = datetime.fromtimestamp(now, timezone.utc).strftime("%Y-%m-%d")
@@ -2953,6 +2963,100 @@ def poll_x_shadow_once(store, now: float, max_topics: int = _GLOBAL_X_TOPIC_LIMI
     return expected_slots
 
 
+def poll_x_roster_once(store, now: float) -> list[tuple[str, str]]:
+    """Capture the fixed cashtag roster once per UTC day.
+
+    The roster is the closed query universe the agent-facing X tool may
+    address, so capturing every slot every day makes replay coverage total
+    by construction. Slots fail independently; the cycle manifest records
+    exactly which subjects that day covered.
+    """
+    resolution = x_roster_cycle_resolution(store, now)
+    if resolution["state"] == "other_identity_already_attempted":
+        logger.info("X roster identity changed mid-day; waiting for UTC rollover")
+        return []
+    spec = resolution["spec"]
+    cycle_id = spec["collection_cycle_id"]
+    cycle = store.collection_cycle(cycle_id)
+    state = _shadow_cycle_state(spec, cycle)
+    if state == "running":
+        observed_utc = store.server_observed_utc()
+        started = cycle.get("server_started_utc")
+        stale_seconds = float(X_ROSTER_V1_POLICY["recovery_stale_seconds"])
+        if (
+            isinstance(started, bool)
+            or not isinstance(started, (int, float))
+            or not math.isfinite(float(started))
+        ):
+            raise ValueError("running X roster cycle lacks a server start observation")
+        if observed_utc - float(started) < stale_seconds:
+            return [
+                (slot["provider"], slot["query_key"])
+                for slot in store.collection_cycle_slots(cycle_id)
+            ]
+        cycle = store.recover_collection_cycle(
+            cycle_id,
+            recovered_utc=observed_utc,
+            minimum_age_seconds=stale_seconds,
+        )
+        state = _shadow_cycle_state(spec, cycle)
+    if state in {"complete", "incomplete"}:
+        return _cycle_manifest_slots(cycle)
+    if state != "missing":
+        raise ValueError("existing X roster collection cycle is invalid")
+
+    try:
+        store.start_collection_cycle(spec, started_utc=time.time())
+    except ValueError:
+        existing = store.collection_cycle(cycle_id)
+        if existing is None:
+            raise
+        return poll_x_roster_once(store, now)
+
+    post_create = x_roster_cycle_resolution(store, now)
+    if post_create["state"] != "ready":
+        store.finish_collection_cycle(cycle_id, completed_utc=time.time())
+        return []
+
+    results_per_query = int(X_ROSTER_V1_POLICY["results_per_query"])
+    try:
+        for provider, query_key in X_ROSTER_STATIC_SLOTS:
+            ticker = query_key.removeprefix("cashtag:")
+            try:
+                _run_fetch(
+                    store,
+                    provider=provider,
+                    query_key=query_key,
+                    fetch_fn=lambda captured, selected=query_key: fetch_x_roster_slot(
+                        selected, captured, limit=results_per_query
+                    ),
+                    labels=[ticker],
+                    cost_units=1.0,
+                    budget_limits=_x_request_budget_limits("roster", now, query_key),
+                    budget_metadata={"budget_category": "roster"},
+                    collection_cycle_id=cycle_id,
+                    protocol_id=X_ROSTER_V1_PROTOCOL_ID,
+                    collector_semantics_id=X_ROSTER_V1_COLLECTOR_SEMANTICS_ID,
+                )
+            except _FetchBudgetExceeded:
+                logger.info("X roster request budget already reserved; skipping %s", query_key)
+            except (ProviderTransientError, ProviderResponseError) as exc:
+                logger.info(
+                    "x roster slot %s unavailable (%s)",
+                    _query_slot_id(provider, query_key),
+                    _exception_kind(exc),
+                )
+    finally:
+        cycle = store.finish_collection_cycle(cycle_id, completed_utc=time.time())
+        logger.info(
+            "x-roster-cycle %s: %s · manifest=%s",
+            cycle_id,
+            cycle["status"],
+            cycle["manifest_id"],
+        )
+    return list(X_ROSTER_STATIC_SLOTS)
+
+
 def poll_source_shadow_once(store, now: float) -> list[tuple[str, str]]:
     """Collect one non-gating daily sample from each public shadow source."""
     resolution = source_shadow_cycle_resolution(store, now)
@@ -3559,6 +3663,13 @@ def poll_forever(
                 if lease_guard is not None:
                     lease_guard.assert_held()
                 poll_source_shadow_once(store, shadow_period_utc)
+                if lease_guard is not None:
+                    lease_guard.assert_held()
+            roster_enabled = (os.environ.get("MEDIA_POLLER_X_ROSTER") or "true").strip().lower() not in ("0", "false", "no", "off")
+            if x_enabled and roster_enabled:
+                if lease_guard is not None:
+                    lease_guard.assert_held()
+                poll_x_roster_once(store, shadow_period_utc)
                 if lease_guard is not None:
                     lease_guard.assert_held()
             _sleep(interval, stop, lease_guard=lease_guard)

@@ -2717,6 +2717,11 @@ def test_daemon_runs_x_shadow_only_after_core_health_is_terminal(monkeypatch):
     )
     monkeypatch.setattr(
         poller,
+        "poll_x_roster_once",
+        lambda *_args, **_kwargs: events.append("roster"),
+    )
+    monkeypatch.setattr(
+        poller,
         "_sleep",
         lambda _seconds, state, **_kwargs: state.__setitem__("flag", True),
     )
@@ -2725,7 +2730,7 @@ def test_daemon_runs_x_shadow_only_after_core_health_is_terminal(monkeypatch):
         health_state=Health(), stop=stop,
         on_cycle_terminal=lambda: events.append("terminal"),
     )
-    assert events == ["core", "health", "terminal", "shadow"]
+    assert events == ["core", "health", "terminal", "shadow", "roster"]
 
 
 @pytest.mark.unit
