@@ -1538,6 +1538,33 @@ def temporal_gdelt_wayback_import(
         raise typer.Exit(code=1)
 
 
+@app.command("temporal-portfolio-run")
+def temporal_portfolio_run(
+    tickers: str = typer.Option(..., "--tickers", help="Comma-separated tickers to research."),  # noqa: B008
+    date: str = typer.Option(..., "--date", help="Trading day YYYY-MM-DD."),  # noqa: B008
+    store: Path = typer.Option(  # noqa: B008
+        Path(".tradingagents/temporal"), "--store", help="Temporal evidence-store directory."
+    ),
+    deep_model: str = typer.Option("gpt-5.4", help="CIO model."),  # noqa: B008
+    sweep_model: str = typer.Option("gpt-5.4-mini", help="Per-ticker research model."),  # noqa: B008
+):
+    """Run one sealed portfolio day: sweep, CIO sizing, simulated fills."""
+    from tradingagents.portfolio_run import production_day_inputs, run_portfolio_day
+    from tradingagents.temporal import TemporalStore
+
+    symbols = [symbol.strip().upper() for symbol in tickers.split(",") if symbol.strip()]
+    if not symbols:
+        raise typer.BadParameter("at least one ticker is required")
+    temporal_store = TemporalStore(store)
+    inputs = production_day_inputs(
+        temporal_store, deep_model=deep_model, sweep_model=sweep_model
+    )
+    summary = run_portfolio_day(temporal_store, symbols, day=date, **inputs)
+    typer.echo(json.dumps(summary, indent=2, sort_keys=True))
+    if summary["failures"]:
+        typer.echo(f"failures: {', '.join(summary['failures'])}", err=True)
+
+
 @app.command("temporal-daily-discovery")
 def temporal_daily_discovery(
     tickers: str = typer.Option(..., "--tickers", help="Comma-separated tickers to sweep."),  # noqa: B008

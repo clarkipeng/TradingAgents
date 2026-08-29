@@ -54,15 +54,21 @@ def import_media_store_posts(
     failures: list[str] = []
     # The temporal store has one mutator at a time by invariant; without the
     # lock this import deadlocks against the live poller mirror. Clustering
-    # defers to one batch refresh - per-row refreshes made bulk imports pay
-    # a full-corpus scan per record.
-    with temporal_store.write_lock(), temporal_store.deferred_clustering():
-        for position, row in enumerate(rows, start=1):
-            evidence_id = _import_row(temporal_store, row)
-            if evidence_id is None:
-                failures.append(f"post-{position}:invalid-record")
-            else:
-                evidence_ids.append(evidence_id)
+    # defers to one batch refresh per chunk - per-row refreshes made bulk
+    # imports pay a full-corpus scan per record. The lock is taken per chunk,
+    # not per import, so a long backfill never starves live writers (observed
+    # live: a graph run lost a ticker to OperationalError while a backfill
+    # held the lock for minutes).
+    chunk_size = 500
+    for start_index in range(0, len(rows), chunk_size):
+        chunk = rows[start_index:start_index + chunk_size]
+        with temporal_store.write_lock(), temporal_store.deferred_clustering():
+            for offset, row in enumerate(chunk, start=start_index + 1):
+                evidence_id = _import_row(temporal_store, row)
+                if evidence_id is None:
+                    failures.append(f"post-{offset}:invalid-record")
+                else:
+                    evidence_ids.append(evidence_id)
     return MediaStoreImportResult(
         requested=len(rows),
         imported=len(evidence_ids),
