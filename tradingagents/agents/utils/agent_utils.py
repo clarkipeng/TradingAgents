@@ -110,6 +110,8 @@ def get_temporal_search_guidance() -> str:
         " sequentially for the bounded body text; corpus_overview provides source/date coverage."
         " For pagination, pass the prior manifest corpus_hash. Cite each result you rely on"
         " inline as [evidence:<id>] using the returned evidence id."
+        " x_posts(subject, days) returns captured X posts for a major ticker"
+        " symbol, newest first, restricted to the analysis time."
     )
 
 

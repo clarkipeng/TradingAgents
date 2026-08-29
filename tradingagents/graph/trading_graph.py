@@ -263,12 +263,14 @@ class TradingAgentsGraph:
             create_contextual_temporal_fetch_tool,
             create_contextual_temporal_overview_tool,
             create_contextual_temporal_search_tool,
+            create_contextual_x_posts_tool,
         )
 
         return (
             create_contextual_temporal_search_tool(),
             create_contextual_temporal_fetch_tool(),
             create_contextual_temporal_overview_tool(),
+            create_contextual_x_posts_tool(),
         )
 
     def _resolve_benchmark(self, ticker: str) -> str:

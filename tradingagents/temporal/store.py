@@ -9,7 +9,7 @@ import re
 import sqlite3
 from collections.abc import Iterable, Iterator, Mapping
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -1362,6 +1362,56 @@ class TemporalStore:
                 (run_id, sequence),
             ).fetchone()
         return self._tool_trace_from_row(row) if row is not None else None
+
+    def media_posts_asof(
+        self,
+        subject: str,
+        *,
+        as_of: datetime | str,
+        source: str = "x",
+        days: int = 3,
+        limit: int = 20,
+    ) -> list[dict]:
+        """Bounded point-in-time slice of captured media posts for one subject.
+
+        Deterministic by construction: newest-first by availability, filtered
+        to posts observable at ``as_of``, identical in live and replay because
+        both read the same sealed rows.
+        """
+        if not 1 <= int(days) <= 30 or isinstance(days, bool):
+            raise ValueError("days must be between 1 and 30")
+        if not 1 <= int(limit) <= 100 or isinstance(limit, bool):
+            raise ValueError("limit must be between 1 and 100")
+        cutoff = parse_timestamp(as_of)
+        window_start = cutoff - timedelta(days=int(days))
+        with self._connect() as connection:
+            rows = connection.execute(
+                """SELECT evidence_id, response_json, available_at, source_published_at
+                   FROM evidence
+                   WHERE tool = 'corpus.document' AND is_error = 0
+                     AND available_at <= ? AND available_at > ?
+                     AND json_extract(response_json, '$.metadata.media_post.source') = ?
+                     AND json_extract(response_json, '$.metadata.media_post.ticker') = ?
+                   ORDER BY available_at DESC, evidence_id LIMIT ?""",
+                (
+                    format_timestamp(cutoff),
+                    format_timestamp(window_start),
+                    source,
+                    subject,
+                    int(limit),
+                ),
+            ).fetchall()
+        posts = []
+        for row in rows:
+            media = json.loads(row["response_json"])["metadata"]["media_post"]
+            posts.append({
+                "evidence_id": row["evidence_id"],
+                "author": media.get("author"),
+                "body": (media.get("body") or media.get("title") or "")[:600],
+                "published_at": row["source_published_at"],
+                "available_at": row["available_at"],
+            })
+        return posts
 
     def list_search_traces(self, run_id: str) -> list[SearchTraceRecord]:
         with self._connect() as connection:

@@ -59,6 +59,56 @@ def create_contextual_temporal_overview_tool() -> StructuredTool:
     return _build_temporal_overview_tool()
 
 
+def create_contextual_x_posts_tool() -> StructuredTool:
+    """Create the X tool over the closed roster universe.
+
+    The roster collector captures every subject every UTC day, so this tool
+    answers identically in live and replay: it always reads the sealed corpus
+    at the run's as_of, never the network. Subjects outside the roster are a
+    correctable tool outcome that advertises the closed universe.
+    """
+    def x_posts(subject: str, days: int = 3) -> str:
+        from tradingagents.dataflows.x_roster import X_ROSTER_TICKERS
+
+        context, store = _context_store(None)
+        normalized = (subject or "").strip().upper().lstrip("$")
+        if normalized not in X_ROSTER_TICKERS:
+            return canonical_json({
+                "error": "subject is outside the captured X roster",
+                "subjects": list(X_ROSTER_TICKERS),
+            })
+        if isinstance(days, bool) or not isinstance(days, int) or not 1 <= days <= 30:
+            return canonical_json({
+                "error": "days must be an integer between 1 and 30",
+                "subject": normalized,
+            })
+        posts = store.media_posts_asof(
+            normalized, as_of=context.clock.as_of, days=days
+        )
+        if context.run_id is not None:
+            for post in posts:
+                store.record_tool_trace(
+                    run_id=context.run_id,
+                    scenario_id=context.scenario_id,
+                    mode=context.mode.value,
+                    tool="x_posts",
+                    request={"subject": normalized, "days": days},
+                    evidence_id=post["evidence_id"],
+                    invoked_at=context.clock.as_of,
+                )
+        return canonical_json({"subject": normalized, "days": days, "posts": posts})
+
+    return StructuredTool.from_function(
+        x_posts,
+        name="x_posts",
+        description=(
+            "Captured X posts about one roster subject (major ticker symbol),"
+            " newest first, restricted to what was available at the analysis"
+            " time. Cite posts you rely on as [evidence:<id>]."
+        ),
+    )
+
+
 # A matched document can be a full SEC filing (tens of MB); tool results feed
 # straight into an LLM request, so each result carries a bounded snippet and a
 # citation id instead of the whole document.
