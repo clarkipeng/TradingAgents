@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.tradingagents.portfolio-day</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/clarkpeng/conductor/workspaces/TradingAgents/london/scripts/run_portfolio_day.sh</string>
+    </array>
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>17</integer>
+        <key>Minute</key>
+        <integer>45</integer>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.tradingagents/portfolio-day.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.tradingagents/portfolio-day.error.log</string>
+</dict>
+</plist>
