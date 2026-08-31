@@ -115,7 +115,7 @@ def test_lazy_entrypoint_sanitizes_import_time_configuration_failure():
 
     assert completed.returncode == 1
     assert completed.stdout == ""
-    assert completed.stderr == "Backtest failed.\n"
+    assert completed.stderr.startswith("Backtest failed. (")
     assert secret not in completed.stderr
 
 
@@ -133,5 +133,5 @@ def test_lazy_entrypoint_sanitizes_target_import_failure(monkeypatch, capsys):
     output = capsys.readouterr()
     assert captured.value.code == 1
     assert output.out == ""
-    assert output.err == "Collector exited.\n"
+    assert output.err.startswith("Collector exited. (")
     assert secret not in output.err

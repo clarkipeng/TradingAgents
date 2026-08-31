@@ -2048,7 +2048,9 @@ def _main_entrypoint() -> None:
     try:
         app()
     except Exception as exc:  # noqa: BLE001 - sanitize the executable boundary
-        typer.echo(f"Command failed ({safe_exception_type(exc)}).", err=True)
+        from tradingagents.logging_utils import safe_exception_site
+
+        typer.echo(f"Command failed ({safe_exception_site(exc)}).", err=True)
         raise SystemExit(1) from None
 
 

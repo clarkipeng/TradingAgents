@@ -27,8 +27,14 @@ def _run(module_name: str, function_name: str, failure: str) -> None:
         module = importlib.import_module(module_name)
         function: Callable[[], object] = getattr(module, function_name)
         function()
-    except Exception:  # noqa: BLE001 - executable boundaries must not print secrets
-        print(failure, file=sys.stderr)
+    except SystemExit:
+        raise
+    except Exception as exc:  # noqa: BLE001 - executable boundaries must not print secrets
+        from tradingagents.logging_utils import safe_exception_site
+
+        # The in-package raise site is credential-free by construction and
+        # turns an otherwise unactionable failure line into a pointer.
+        print(f"{failure} ({safe_exception_site(exc)})", file=sys.stderr)
         raise SystemExit(1) from None
 
 
