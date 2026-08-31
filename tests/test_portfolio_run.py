@@ -121,6 +121,27 @@ def test_run_portfolio_day_seals_state_and_next_day_reads_it(tmp_path):
 
 
 @pytest.mark.unit
+def test_run_portfolio_day_skips_an_already_sealed_day_without_spending(tmp_path):
+    store = TemporalStore(tmp_path)
+    store.seal_scenario(
+        "portfolio-2026-08-31",
+        as_of=datetime(2026, 8, 31, 21, 30, tzinfo=UTC),
+        basis="forward-captured",
+    )
+
+    result = portfolio_run.run_portfolio_day(
+        store,
+        ["NVDA"],
+        day="2026-08-31",
+        research_fn=lambda *a: pytest.fail("a sealed day must not research"),
+        complete_llm=lambda *a: pytest.fail("a sealed day must not call the CIO"),
+        quote_fn=lambda *a: pytest.fail("a sealed day must not fetch quotes"),
+    )
+    assert result["skipped"] == "day already sealed"
+    assert result["scenario_id"] == "portfolio-2026-08-31"
+
+
+@pytest.mark.unit
 def test_portfolio_report_tracks_equity_by_day_and_benchmark(tmp_path):
     store = TemporalStore(tmp_path)
     for day, equity, cash in [

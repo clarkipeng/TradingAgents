@@ -184,6 +184,13 @@ def run_portfolio_day(
     from tradingagents.temporal import TemporalContext, TemporalMode, temporal_context
     from tradingagents.temporal.simulation import MarketQuote, PortfolioSimulator
 
+    scenario_id = f"portfolio-{day}"
+    if store.get_scenario(scenario_id) is not None:
+        # Sealed days are immutable; a retry (manual overlap, a scheduler
+        # re-fire after machine sleep) is a quiet no-op, never a crash and
+        # never a second spend.
+        return {"skipped": "day already sealed", "scenario_id": scenario_id, "day": day}
+
     as_of = parse_timestamp(f"{day}T21:30:00Z")
     context = TemporalContext.at(
         TemporalMode.LIVE_CAPTURE, as_of, store=store,
@@ -257,7 +264,6 @@ def run_portfolio_day(
             available_at=as_of,
         )
 
-    scenario_id = f"portfolio-{day}"
     store.seal_scenario(
         scenario_id,
         as_of=as_of,
