@@ -285,6 +285,76 @@ def run_portfolio_day(
     return summary
 
 
+def portfolio_report(
+    store: TemporalStore,
+    *,
+    benchmark_closes: dict[str, float] | None = None,
+) -> dict:
+    """Summarize every sealed portfolio day: equity path, returns, positions.
+
+    Reads only sealed state evidence, so the report is identical whenever it
+    is generated. Benchmark closes are caller-supplied (first and last day
+    are enough) because the report itself must not fetch anything.
+    """
+    with store._connect() as connection:
+        rows = connection.execute(
+            """SELECT request_json, response_json FROM evidence
+               WHERE tool = ? AND is_error = 0
+               ORDER BY available_at, evidence_id""",
+            (_STATE_TOOL,),
+        ).fetchall()
+    by_day: dict[str, dict] = {}
+    for row in rows:
+        day = json.loads(row["request_json"])["portfolio_day"]
+        by_day[day] = json.loads(row["response_json"])  # last write per day wins
+
+    days = []
+    previous_equity: Decimal | None = None
+    for day in sorted(by_day):
+        state = by_day[day]
+        equity = Decimal(str(state["equity"])) if state.get("equity") else None
+        daily = (
+            float((equity - previous_equity) / previous_equity * 100)
+            if equity is not None and previous_equity
+            else None
+        )
+        days.append({
+            "day": day,
+            "equity": state.get("equity"),
+            "cash": state.get("cash"),
+            "position_count": len(state.get("positions", {})),
+            "daily_return_pct": daily,
+        })
+        if equity is not None:
+            previous_equity = equity
+
+    total_return = None
+    first = next((d for d in days if d["equity"]), None)
+    last = next((d for d in reversed(days) if d["equity"]), None)
+    if first and last and first is not last:
+        start = Decimal(str(first["equity"]))
+        total_return = float((Decimal(str(last["equity"])) - start) / start * 100)
+
+    benchmark_return = None
+    if benchmark_closes and first and last:
+        start_close = benchmark_closes.get(first["day"])
+        end_close = benchmark_closes.get(last["day"])
+        if start_close and end_close:
+            benchmark_return = (end_close - start_close) / start_close * 100
+
+    latest_state = by_day[sorted(by_day)[-1]] if by_day else None
+    return {
+        "days": days,
+        "total_return_pct": total_return,
+        "benchmark_return_pct": benchmark_return,
+        "latest": {
+            "positions": latest_state.get("positions", {}),
+            "cash": latest_state.get("cash"),
+            "equity": latest_state.get("equity"),
+        } if latest_state else None,
+    }
+
+
 def production_day_inputs(store: TemporalStore, *, deep_model: str = "gpt-5.4",
                           sweep_model: str = "gpt-5.4-mini") -> dict:
     """Real research, CIO, and quote callables for one captured portfolio day.

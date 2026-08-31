@@ -1565,6 +1565,52 @@ def temporal_portfolio_run(
         typer.echo(f"failures: {', '.join(summary['failures'])}", err=True)
 
 
+@app.command("temporal-portfolio-report")
+def temporal_portfolio_report(
+    store: Path = typer.Option(  # noqa: B008
+        Path(".tradingagents/temporal"), "--store", help="Temporal evidence-store directory."
+    ),
+    benchmark: str = typer.Option("SPY", help="Benchmark ticker for comparison."),  # noqa: B008
+):
+    """Show the sealed paper-portfolio track record and current positions."""
+    from tradingagents.portfolio_run import _last_close, portfolio_report
+    from tradingagents.temporal import TemporalStore
+
+    temporal_store = TemporalStore(store)
+    report = portfolio_report(temporal_store)
+    if not report["days"]:
+        typer.echo("No sealed portfolio days yet.")
+        return
+
+    closes: dict[str, float] = {}
+    first_day, last_day = report["days"][0]["day"], report["days"][-1]["day"]
+    try:
+        from tradingagents.dataflows.interface import route_to_vendor
+
+        for day in (first_day, last_day):
+            close = _last_close(route_to_vendor("get_stock_data", benchmark, first_day, day))
+            if close is not None:
+                closes[day] = float(close)
+        report = portfolio_report(temporal_store, benchmark_closes=closes)
+    except Exception:  # noqa: BLE001 - the benchmark is decoration, never a blocker
+        pass
+
+    for row in report["days"]:
+        daily = f"{row['daily_return_pct']:+.2f}%" if row["daily_return_pct"] is not None else "     -"
+        typer.echo(
+            f"{row['day']}  equity ${float(row['equity']):>12,.2f}  cash ${float(row['cash']):>12,.2f}"
+            f"  positions {row['position_count']:>2}  day {daily}"
+        )
+    if report["total_return_pct"] is not None:
+        line = f"total {report['total_return_pct']:+.2f}%"
+        if report["benchmark_return_pct"] is not None:
+            line += f"  vs {benchmark} {report['benchmark_return_pct']:+.2f}%"
+        typer.echo(line)
+    latest = report["latest"]
+    holdings = ", ".join(f"{sym} x{qty}" for sym, qty in sorted(latest["positions"].items())) or "none"
+    typer.echo(f"holdings: {holdings}")
+
+
 @app.command("temporal-daily-discovery")
 def temporal_daily_discovery(
     tickers: str = typer.Option(..., "--tickers", help="Comma-separated tickers to sweep."),  # noqa: B008

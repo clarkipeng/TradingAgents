@@ -121,6 +121,36 @@ def test_run_portfolio_day_seals_state_and_next_day_reads_it(tmp_path):
 
 
 @pytest.mark.unit
+def test_portfolio_report_tracks_equity_by_day_and_benchmark(tmp_path):
+    store = TemporalStore(tmp_path)
+    for day, equity, cash in [
+        ("2026-08-28", "100000", "100000"),
+        ("2026-08-31", "101500", "70000"),
+        ("2026-09-01", "99800", "70000"),
+    ]:
+        portfolio_run.record_portfolio_state(
+            store,
+            {"cash": cash, "positions": {"NVDA": "43"} if cash != "100000" else {}, "equity": equity},
+            day=day,
+            available_at=datetime.fromisoformat(f"{day}T21:30:00+00:00"),
+        )
+
+    report = portfolio_run.portfolio_report(
+        store, benchmark_closes={"2026-08-28": 640.0, "2026-09-01": 646.4},
+    )
+
+    assert [row["day"] for row in report["days"]] == ["2026-08-28", "2026-08-31", "2026-09-01"]
+    assert report["days"][1]["daily_return_pct"] == pytest.approx(1.5)
+    assert report["total_return_pct"] == pytest.approx(-0.2)
+    assert report["benchmark_return_pct"] == pytest.approx(1.0)
+    assert report["latest"]["positions"] == {"NVDA": "43"}
+    assert report["latest"]["equity"] == "99800"
+
+    empty = portfolio_run.portfolio_report(TemporalStore(tmp_path / "empty"))
+    assert empty["days"] == []
+
+
+@pytest.mark.unit
 def test_last_close_parses_csv_and_degrades_on_garbage():
     csv_payload = "Date,Open,High,Low,Close,Volume\n2026-08-27,1,2,0,499.5,10\n2026-08-28,2,3,1,505.25,12\n"
     assert portfolio_run._last_close(csv_payload) == Decimal("505.25")
