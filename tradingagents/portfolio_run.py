@@ -506,6 +506,14 @@ def production_day_inputs(store: TemporalStore, *, deep_model: str = "gpt-5.4",
         final_state, _signal = worker_graph().propagate(
             ticker, context.clock.as_of.date().isoformat(), temporal=worker_context
         )
+        # A worker tape failure latches only the worker's child context; the
+        # day's parent context must inherit it or a truncated tape could seal
+        # (round-two re-audit, finding 8 parallel escape).
+        try:
+            worker_context.ensure_valid()
+        except Exception:
+            context.invalidate()
+            raise
         reports = {
             key.removesuffix("_report"): final_state.get(key, "")
             for key in ("market_report", "sentiment_report", "news_report", "fundamentals_report")
