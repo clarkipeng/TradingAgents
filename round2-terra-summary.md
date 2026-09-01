@@ -36,19 +36,21 @@ The literal `python -m pytest -q` command is unavailable because this workspace 
 
 `uv run python -m pytest -q` is the locked-environment equivalent.
 
-## Deferred Stream A: atomic portfolio day and bounded sweep
+## Stream A: atomic portfolio day and bounded sweep
 
-Findings 1, 2, 5, and 6 are deferred because every delivered candidate violates the required single atomic completion boundary.
+Integrated as `7e2a07e fix: atomically seal portfolio day lifecycle`, `59d62c5 fix: distinguish portfolio deadline breaches`, and `15b6d40 fix: preserve latched portfolio run failures`.
 
-Candidate `7c47776` records state and registers a completed legacy day before the claim-owned scenario and research-run transaction.
+The final design gives a portfolio day one durable, atomic claim-to-completion owner.
 
-Candidate `d1f6559` likewise marks the day complete through a direct state-recording path and also leaves an undefined CIO recorder reference.
+State evidence, scenario seal, research-run record, and completed status publish together from an active claim.
 
-The visible Stream A worker is offline, so the corrective handoff could not be delivered.
+Failed claims remain resumable and portfolio projections read completed days only.
 
-Do not merge either candidate.
+The analysts-only sweep uses at most four worker-local graph and tape identities, applies the checked-in deadline, call ceiling, 0.8 coverage, and held-quote policy, and emits fixed failure outcomes plus coverage, call count, and elapsed-time summary fields.
 
-The required repair is one claim-owned transaction that publishes state evidence, scenario seal, research-run record, and completed day status together, with no legacy production visibility bypass.
+Focused Stream A worker verification passed with 17 tests.
+
+The final combined integration verification passed with 48 tests.
 
 ## Exact verification commands
 
