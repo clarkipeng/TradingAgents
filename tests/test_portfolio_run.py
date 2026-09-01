@@ -161,6 +161,45 @@ def test_run_portfolio_day_skips_an_already_sealed_day_without_spending(tmp_path
 
 
 @pytest.mark.unit
+def test_run_portfolio_day_skips_before_llm_budget_is_exceeded(tmp_path, monkeypatch, caplog):
+    store = TemporalStore(tmp_path)
+    monkeypatch.setattr(portfolio_run, "MAX_LLM_CALLS_PER_PORTFOLIO_DAY", 1)
+
+    result = portfolio_run.run_portfolio_day(
+        store,
+        ["NVDA"],
+        day="2026-08-31",
+        research_fn=lambda *a: pytest.fail("budget must stop research"),
+        complete_llm=lambda *a: pytest.fail("budget must stop CIO"),
+        quote_fn=lambda *a: pytest.fail("budget must stop quote fetch"),
+    )
+
+    assert result["skipped"] == "LLM call budget exceeded"
+    assert result["llm_call_budget"] == 1
+    assert "LLM call budget exceeded" in caplog.text
+    assert store.get_scenario("portfolio-2026-08-31") is None
+
+
+@pytest.mark.unit
+def test_run_portfolio_day_skips_without_sealing_when_all_quotes_are_missing(tmp_path, caplog):
+    store = TemporalStore(tmp_path)
+
+    result = portfolio_run.run_portfolio_day(
+        store,
+        ["NVDA"],
+        day="2026-08-31",
+        research_fn=lambda ticker, context: {"rating": "Buy", "brief": "brief"},
+        complete_llm=lambda *a: pytest.fail("missing quotes must skip CIO"),
+        quote_fn=lambda *a: None,
+    )
+
+    assert result["skipped"] == "all quotes missing"
+    assert result["failures"] == ["NVDA: no quote"]
+    assert "all quotes missing" in caplog.text
+    assert store.get_scenario("portfolio-2026-08-31") is None
+
+
+@pytest.mark.unit
 def test_portfolio_report_tracks_equity_by_day_and_benchmark(tmp_path):
     store = TemporalStore(tmp_path)
     for day, equity, cash in [

@@ -9,6 +9,7 @@ next day reads exactly what this day produced, and any day replays exactly.
 from __future__ import annotations
 
 import json
+import logging
 import math
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -24,6 +25,12 @@ DEFAULT_CONSTRAINTS = {
     "max_weight": 0.10,
     "initial_cash": "100000",
 }
+
+# A portfolio day is deliberately bounded before any provider work starts.
+# Research is one logical call per ticker and CIO sizing is one additional call.
+MAX_LLM_CALLS_PER_PORTFOLIO_DAY = 25
+
+logger = logging.getLogger(__name__)
 
 _STATE_TOOL = "portfolio.state"
 
@@ -169,18 +176,52 @@ def run_portfolio_day(
         # never a second spend.
         return {"skipped": "day already sealed", "scenario_id": scenario_id, "day": day}
 
+    planned_llm_calls = len(tickers) + 1
+    if planned_llm_calls > MAX_LLM_CALLS_PER_PORTFOLIO_DAY:
+        logger.warning(
+            "LLM call budget exceeded for portfolio day %s: planned=%d cap=%d; skipping",
+            day, planned_llm_calls, MAX_LLM_CALLS_PER_PORTFOLIO_DAY,
+        )
+        return {
+            "skipped": "LLM call budget exceeded",
+            "scenario_id": scenario_id,
+            "day": day,
+            "llm_call_budget": MAX_LLM_CALLS_PER_PORTFOLIO_DAY,
+            "planned_llm_calls": planned_llm_calls,
+        }
+
     as_of = parse_timestamp(f"{day}T21:30:00Z")
     context = TemporalContext.at(
         TemporalMode.LIVE_CAPTURE, as_of, store=store,
         run_id=run_id or str(uuid.uuid4()),
     )
     with temporal_context(context):
+        llm_calls = 0
+
+        def call_llm(callable_, *args):
+            nonlocal llm_calls
+            if llm_calls >= MAX_LLM_CALLS_PER_PORTFOLIO_DAY:
+                logger.warning(
+                    "LLM call budget exceeded for portfolio day %s: calls=%d cap=%d; skipping",
+                    day, llm_calls, MAX_LLM_CALLS_PER_PORTFOLIO_DAY,
+                )
+                return None
+            llm_calls += 1
+            return callable_(*args)
+
         ratings: dict[str, str] = {}
         briefs: dict[str, str] = {}
         failures: list[str] = []
         for ticker in tickers:
             try:
-                research = research_fn(ticker, context)
+                research = call_llm(research_fn, ticker, context)
+                if research is None:
+                    return {
+                        "skipped": "LLM call budget exceeded",
+                        "scenario_id": scenario_id,
+                        "day": day,
+                        "llm_call_budget": MAX_LLM_CALLS_PER_PORTFOLIO_DAY,
+                    }
                 ratings[ticker] = research["rating"]
                 briefs[ticker] = research.get("brief", "")
             except Exception as error:  # noqa: BLE001 - one ticker never kills the day
@@ -198,9 +239,22 @@ def run_portfolio_day(
             else:
                 quotes[symbol] = Decimal(str(price))
 
+        if not quotes:
+            logger.warning(
+                "all quotes missing for portfolio day %s; skipping without sealing",
+                day,
+            )
+            return {
+                "skipped": "all quotes missing",
+                "scenario_id": scenario_id,
+                "day": day,
+                "failures": failures,
+            }
+
         plan = cio_allocate(
             {t: r for t, r in ratings.items() if t in quotes},
-            briefs=briefs, constraints=constraints, complete_llm=complete_llm,
+            briefs=briefs, constraints=constraints,
+            complete_llm=lambda prompt: call_llm(complete_llm, prompt),
         )
         orders = rebalance_orders(prior, plan["weights"], quotes, submitted_at=as_of)
 
