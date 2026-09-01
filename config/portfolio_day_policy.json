@@ -1,0 +1,7 @@
+{
+  "wall_clock_seconds": 900,
+  "max_research_calls": 40,
+  "minimum_ticker_coverage": 0.8,
+  "max_workers": 4,
+  "complete_held_quote_coverage": true
+}
