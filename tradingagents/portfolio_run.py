@@ -57,29 +57,7 @@ def portfolio_state_asof(
     initial_cash: str = DEFAULT_CONSTRAINTS["initial_cash"],
 ) -> dict:
     """Read the latest sealed portfolio state observable at ``as_of``."""
-    cutoff = format_timestamp(parse_timestamp(as_of))
-    with store._connect() as connection:
-        row = connection.execute(
-            """SELECT request_json, response_json FROM evidence
-               WHERE tool = ? AND is_error = 0 AND available_at <= ?
-               ORDER BY available_at DESC, evidence_id LIMIT 1""",
-            (_STATE_TOOL, cutoff),
-        ).fetchone()
-    if row is None:
-        return {
-            "portfolio_day": None,
-            "cash": initial_cash,
-            "positions": {},
-            "equity": None,
-        }
-    request = json.loads(row["request_json"])
-    response = json.loads(row["response_json"])
-    return {
-        "portfolio_day": request["portfolio_day"],
-        "cash": response["cash"],
-        "positions": dict(response["positions"]),
-        "equity": response.get("equity"),
-    }
+    return store.portfolio_state_asof(as_of, initial_cash=initial_cash)
 
 
 def cio_allocate(
@@ -302,17 +280,9 @@ def portfolio_report(
     is generated. Benchmark closes are caller-supplied (first and last day
     are enough) because the report itself must not fetch anything.
     """
-    with store._connect() as connection:
-        rows = connection.execute(
-            """SELECT request_json, response_json FROM evidence
-               WHERE tool = ? AND is_error = 0
-               ORDER BY available_at, evidence_id""",
-            (_STATE_TOOL,),
-        ).fetchall()
     by_day: dict[str, dict] = {}
-    for row in rows:
-        day = json.loads(row["request_json"])["portfolio_day"]
-        by_day[day] = json.loads(row["response_json"])  # last write per day wins
+    for state in store.portfolio_states():
+        by_day[state["portfolio_day"]] = state
 
     days = []
     previous_equity: Decimal | None = None
@@ -470,10 +440,10 @@ def rebalance_orders(
             deltas.append((symbol, change))
 
     orders = []
-    sequence = 0
-    for symbol, change in sorted(deltas, key=lambda item: item[1] > 0):
+    for sequence, (symbol, change) in enumerate(
+        sorted(deltas, key=lambda item: item[1] > 0), start=1
+    ):
         side = OrderSide.BUY if change > 0 else OrderSide.SELL
-        sequence += 1
         orders.append(Order(
             f"rebalance-{submitted_at:%Y%m%d}-{sequence}",
             symbol,
