@@ -39,10 +39,11 @@ class TemporalRetriever:
         if start and end and start > end:
             raise ValueError("date_from must be on or before date_to")
         cutoff = format_timestamp(parsed_as_of)
+        generation_id = self.store.active_generation_id()
         corpus_hash = self.store.corpus_hash(as_of=parsed_as_of)
         if page > 1 and corpus_hash_pin != corpus_hash:
             raise ValueError("page > 1 requires a matching page-1 corpus_hash pin")
-        cache_key = (corpus_hash, cutoff)
+        cache_key = (generation_id, corpus_hash, cutoff)
         index = self.store._eligible_index_cache.get(cache_key)
         if index is None:
             with self.store._connect() as connection:
@@ -128,7 +129,7 @@ class TemporalRetriever:
             query=query, as_of=parsed_as_of, ranker_version=RANKER_VERSION,
             corpus_hash=corpus_hash, evidence_ids=tuple(item.evidence.evidence_id for item in results),
             index_state_hash=index.index_state_hash, page=page, limit=limit,
-            date_from=start, date_to=end, source=source,
+            date_from=start, date_to=end, source=source, generation_id=generation_id,
         ))
 
     @staticmethod
@@ -155,6 +156,7 @@ def search_payload(response: TemporalSearchResponse) -> dict[str, Any]:
             "index_state_hash": manifest.index_state_hash, "tie_break": manifest.tie_break,
             "page": manifest.page, "limit": manifest.limit, "date_from": manifest.date_from,
             "date_to": manifest.date_to, "source": manifest.source,
+            "generation_id": manifest.generation_id,
         },
     }
     return json.loads(canonical_json(payload))
