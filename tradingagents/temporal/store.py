@@ -188,6 +188,15 @@ class TemporalStore:
                 );
                 CREATE INDEX IF NOT EXISTS research_runs_scenario
                 ON research_runs(scenario_id, completed_at, run_id);
+                CREATE TABLE IF NOT EXISTS portfolio_days (
+                    day TEXT PRIMARY KEY,
+                    claim_id TEXT NOT NULL,
+                    status TEXT NOT NULL CHECK (status IN ('claimed', 'completed', 'failed')),
+                    claimed_at TEXT NOT NULL,
+                    completed_at TEXT,
+                    failed_at TEXT,
+                    failure_code TEXT
+                );
                 CREATE VIRTUAL TABLE IF NOT EXISTS evidence_fts USING fts5(
                     evidence_id UNINDEXED,
                     content
@@ -253,6 +262,7 @@ class TemporalStore:
                 ON search_traces(run_id, sequence);
                 """
             )
+
             columns = {row["name"] for row in connection.execute("PRAGMA table_info(evidence)")}
             if "is_error" not in columns:
                 connection.execute(
@@ -301,6 +311,52 @@ class TemporalStore:
                 "ON llm_calls(temporal_run_id, temporal_sequence) "
                 "WHERE temporal_run_id IS NOT NULL"
             )
+
+    def claim_portfolio_day(self, day: str, claim_id: str, *, claimed_at: datetime) -> dict:
+        stamp = format_timestamp(parse_timestamp(claimed_at))
+        with self.write_lock(), self._connect() as connection:
+            row = connection.execute("SELECT * FROM portfolio_days WHERE day = ?", (day,)).fetchone()
+            if row is None:
+                connection.execute("INSERT INTO portfolio_days(day, claim_id, status, claimed_at) VALUES (?, ?, 'claimed', ?)", (day, claim_id, stamp))
+                return {"day": day, "claim_id": claim_id, "status": "claimed"}
+            if row["status"] != "failed":
+                return {"day": day, "claim_id": row["claim_id"], "status": row["status"]}
+            connection.execute("UPDATE portfolio_days SET claim_id = ?, status = 'claimed', claimed_at = ?, failed_at = NULL, failure_code = NULL WHERE day = ?", (claim_id, stamp, day))
+            return {"day": day, "claim_id": claim_id, "status": "claimed"}
+
+    def fail_portfolio_day(self, day: str, claim_id: str, failure_code: str) -> None:
+        with self.write_lock(), self._connect() as connection:
+            connection.execute("UPDATE portfolio_days SET status = 'failed', failed_at = ?, failure_code = ? WHERE day = ? AND claim_id = ? AND status = 'claimed'", (format_timestamp(datetime.now(timezone.utc)), failure_code, day, claim_id))
+
+    def portfolio_day(self, day: str) -> dict | None:
+        """Return the durable claim state for one portfolio day."""
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM portfolio_days WHERE day = ?", (day,)
+            ).fetchone()
+        return dict(row) if row is not None else None
+
+    def complete_portfolio_day(self, day: str, claim_id: str, *, as_of: datetime, state: Mapping[str, Any], scenario_metadata: Mapping[str, Any], capture_run_id: str, decision: str, report: str) -> str:
+        definition_time = parse_timestamp(as_of)
+        scenario_id = f"portfolio-{day}"
+        response_json = canonical_json({"cash": str(state["cash"]), "positions": {k: str(v) for k, v in state["positions"].items()}, "equity": str(state["equity"]) if state.get("equity") is not None else None})
+        request_json = canonical_json({"portfolio_day": day})
+        state_artifact = self.put_artifact(response_json.encode("utf-8"))
+        identity = {"tool": "portfolio.state", "request_key": request_key("portfolio.state", {"portfolio_day": day}), "artifact_hash": state_artifact, "available_at": format_timestamp(definition_time), "observed_at": format_timestamp(definition_time), "fidelity": "forward-captured", "source": "portfolio-simulator", "is_error": False}
+        evidence_id = hashlib.sha256(canonical_json(identity).encode("utf-8")).hexdigest()
+        metadata_json = canonical_json(dict(scenario_metadata))
+        scenario_artifact = self.put_artifact(metadata_json.encode("utf-8"))
+        report_hash = self.put_artifact(report.encode("utf-8"), media_type="text/markdown")
+        now = format_timestamp(datetime.now(timezone.utc))
+        with self.write_lock(), self._connect() as connection:
+            claim = connection.execute("SELECT status, claim_id FROM portfolio_days WHERE day = ?", (day,)).fetchone()
+            if claim is None or claim["claim_id"] != claim_id or claim["status"] != "claimed":
+                raise RuntimeError("portfolio day claim is not active")
+            connection.execute("INSERT OR IGNORE INTO evidence(evidence_id, tool, request_key, request_json, response_json, artifact_hash, available_at, observed_at, ingested_at, fidelity, source, is_error) VALUES (?, 'portfolio.state', ?, ?, ?, ?, ?, ?, ?, 'forward-captured', 'portfolio-simulator', 0)", (evidence_id, identity["request_key"], request_json, response_json, state_artifact, format_timestamp(definition_time), format_timestamp(definition_time), now))
+            connection.execute("INSERT INTO scenarios(scenario_id, as_of, basis, metadata_json, corpus_hash, artifact_hash, created_at, capture_run_id) VALUES (?, ?, 'forward-captured', ?, ?, ?, ?, ?)", (scenario_id, format_timestamp(definition_time), metadata_json, self.corpus_hash(as_of=definition_time), scenario_artifact, now, capture_run_id))
+            connection.execute("INSERT INTO research_runs(run_id, scenario_id, decision, report_artifact_hash, completed_at) VALUES (?, ?, ?, ?, ?)", (capture_run_id, scenario_id, decision, report_hash, now))
+            connection.execute("UPDATE portfolio_days SET status = 'completed', completed_at = ? WHERE day = ? AND claim_id = ?", (now, day, claim_id))
+        return evidence_id
 
     def put_artifact(self, content: bytes, media_type: str = "application/json") -> str:
         """Persist content once and return its SHA-256 address."""
@@ -1526,6 +1582,7 @@ class TemporalStore:
             row = connection.execute(
                 """SELECT request_json, response_json FROM evidence
                    WHERE tool = 'portfolio.state' AND is_error = 0
+                     AND EXISTS (SELECT 1 FROM portfolio_days d WHERE d.day = json_extract(evidence.request_json, '$.portfolio_day') AND d.status = 'completed')
                      AND available_at <= ?
                    ORDER BY available_at DESC, evidence_id LIMIT 1""",
                 (cutoff,),
@@ -1545,6 +1602,7 @@ class TemporalStore:
             rows = connection.execute(
                 """SELECT request_json, response_json FROM evidence
                    WHERE tool = 'portfolio.state' AND is_error = 0
+                     AND EXISTS (SELECT 1 FROM portfolio_days d WHERE d.day = json_extract(evidence.request_json, '$.portfolio_day') AND d.status = 'completed')
                    ORDER BY available_at, evidence_id"""
             ).fetchall()
         return [self._portfolio_state_from_row(row) for row in rows]
