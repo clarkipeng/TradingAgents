@@ -185,6 +185,7 @@ class SearchManifest:
     date_from: str | None = None
     date_to: str | None = None
     source: str | None = None
+    generation_id: int = 0
 
 
 @dataclass(frozen=True)

@@ -63,7 +63,7 @@ class TemporalStore:
         self.root = Path(root)
         self.artifacts_dir = self.root / "artifacts"
         self.database_path = self.root / "temporal.sqlite3"
-        self._eligible_index_cache: dict[tuple[str, str], EligibleChunkIndex] = {}
+        self._eligible_index_cache: dict[tuple[object, ...], EligibleChunkIndex] = {}
         self._pending_cluster_keys: set[str] | None = None
         self.artifacts_dir.mkdir(parents=True, exist_ok=True)
         self._initialize()
@@ -101,6 +101,13 @@ class TemporalStore:
         finally:
             fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
             handle.close()
+
+    def active_generation_id(self) -> int:
+        """Return the complete document generation currently visible to readers."""
+        with self._connect() as connection:
+            return connection.execute(
+                "SELECT active_generation FROM temporal_index_state WHERE singleton=1"
+            ).fetchone()[0]
 
     def _initialize(self) -> None:
         with self._connect() as connection:
@@ -239,6 +246,7 @@ class TemporalStore:
                     corpus_hash TEXT NOT NULL,
                     evidence_ids_json TEXT NOT NULL,
                     invoked_at TEXT NOT NULL,
+                    generation_id INTEGER NOT NULL DEFAULT 0,
                     UNIQUE(run_id, sequence)
                 );
                 CREATE INDEX IF NOT EXISTS search_traces_run
@@ -259,6 +267,16 @@ class TemporalStore:
                 connection.execute("ALTER TABLE search_traces ADD COLUMN index_state_hash TEXT NOT NULL DEFAULT ''")
             if "tie_break" not in search_columns:
                 connection.execute("ALTER TABLE search_traces ADD COLUMN tie_break TEXT NOT NULL DEFAULT 'evidence_id/doc_key'")
+            if "generation_id" not in search_columns:
+                connection.execute("ALTER TABLE search_traces ADD COLUMN generation_id INTEGER NOT NULL DEFAULT 0")
+            connection.execute(
+                "CREATE TABLE IF NOT EXISTS temporal_index_state "
+                "(singleton INTEGER PRIMARY KEY CHECK (singleton=1), active_generation INTEGER NOT NULL, evidence_high_water INTEGER NOT NULL)"
+            )
+            connection.execute(
+                "INSERT OR IGNORE INTO temporal_index_state(singleton, active_generation, evidence_high_water) "
+                "VALUES (1, 0, COALESCE((SELECT MAX(rowid) FROM evidence), 0))"
+            )
             scenario_columns = {row["name"] for row in connection.execute("PRAGMA table_info(scenarios)")}
             if "corpus_hash" not in scenario_columns:
                 connection.execute("ALTER TABLE scenarios ADD COLUMN corpus_hash TEXT NOT NULL DEFAULT ''")
@@ -442,7 +460,17 @@ class TemporalStore:
             self._pending_cluster_keys = None
 
     @staticmethod
-    def _maintain_document(connection: sqlite3.Connection, record: EvidenceRecord) -> None:
+    def _maintain_document(
+        connection: sqlite3.Connection,
+        record: EvidenceRecord,
+        *,
+        documents_table: str = "documents",
+        chunks_table: str = "document_chunks",
+        fts_table: str = "document_chunks_fts",
+    ) -> None:
+        for table in (documents_table, chunks_table, fts_table):
+            if not re.fullmatch(r"[A-Za-z0-9_]+", table):
+                raise ValueError("unsafe index table name")
         extracted = extract_document({
             "tool": record.tool, "request": record.request, "response": record.response,
             "source": record.source, "available_at": format_timestamp(record.available_at),
@@ -453,7 +481,7 @@ class TemporalStore:
         if extracted is None:
             return
         doc_key = stable_doc_key(record.evidence_id, 0)
-        connection.execute("""INSERT OR IGNORE INTO documents
+        connection.execute(f"""INSERT OR IGNORE INTO {documents_table}
             (doc_key,parent_evidence_id,logical_position,title,body,source_domain,canonical_url,published_at,
              available_at,doc_kind,extractor_version,cluster_key)
             VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""", (
@@ -462,27 +490,83 @@ class TemporalStore:
             extracted["extractor_version"], doc_key))
         for index, (start, end, body) in enumerate(chunks(extracted["body"])):
             chunk_id = stable_chunk_id(doc_key, index)
-            inserted = connection.execute("""INSERT OR IGNORE INTO document_chunks
+            inserted = connection.execute(f"""INSERT OR IGNORE INTO {chunks_table}
                 (chunk_id,doc_key,chunk_index,token_start,token_end,body) VALUES (?,?,?,?,?,?)""",
                 (chunk_id, doc_key, index, start, end, body)).rowcount
             if inserted:
-                rowid = connection.execute("SELECT rowid FROM document_chunks WHERE chunk_id = ?", (chunk_id,)).fetchone()[0]
-                connection.execute("INSERT INTO document_chunks_fts(rowid, body) VALUES (?, ?)", (rowid, body))
+                rowid = connection.execute(f"SELECT rowid FROM {chunks_table} WHERE chunk_id = ?", (chunk_id,)).fetchone()[0]
+                connection.execute(f"INSERT INTO {fts_table}(rowid, body) VALUES (?, ?)", (rowid, body))
 
     def reindex_documents(self) -> int:
-        """Idempotently rebuild only the derivative document layer."""
+        """Rebuild documents and chunks in a private generation, then atomically publish it."""
         with self._connect() as connection:
-            connection.execute("DELETE FROM document_chunks_fts")
-            connection.execute("DELETE FROM document_chunks")
-            connection.execute("DELETE FROM documents")
-            for row in connection.execute("SELECT * FROM evidence WHERE tool='corpus.document' AND is_error=0 ORDER BY evidence_id"):
-                self._maintain_document(connection, self._record_from_row(row))
-            self._refresh_document_clusters(connection)
-            self._migrate_rubric_document_keys(connection)
-            return connection.execute("SELECT COUNT(*) FROM documents").fetchone()[0]
+            high_water = connection.execute("SELECT COALESCE(MAX(rowid), 0) FROM evidence").fetchone()[0]
+            generation = connection.execute(
+                "SELECT active_generation FROM temporal_index_state WHERE singleton=1"
+            ).fetchone()[0] + 1
+        suffix = f"_g{generation}"
+        documents_table, chunks_table, fts_table = f"documents{suffix}", f"document_chunks{suffix}", f"document_chunks_fts{suffix}"
+        with self._connect() as connection:
+            connection.executescript(f"""
+                CREATE TABLE {documents_table} (
+                    doc_key TEXT PRIMARY KEY, parent_evidence_id TEXT NOT NULL, logical_position INTEGER NOT NULL,
+                    title TEXT NOT NULL, body TEXT NOT NULL, source_domain TEXT NOT NULL, canonical_url TEXT,
+                    published_at TEXT, available_at TEXT NOT NULL, doc_kind TEXT NOT NULL,
+                    extractor_version TEXT NOT NULL, cluster_key TEXT NOT NULL, UNIQUE(parent_evidence_id, logical_position)
+                );
+                CREATE INDEX {documents_table}_available ON {documents_table}(available_at, doc_key);
+                CREATE TABLE {chunks_table} (
+                    chunk_id TEXT PRIMARY KEY, doc_key TEXT NOT NULL, chunk_index INTEGER NOT NULL,
+                    token_start INTEGER NOT NULL, token_end INTEGER NOT NULL, body TEXT NOT NULL,
+                    UNIQUE(doc_key, chunk_index)
+                );
+                CREATE VIRTUAL TABLE {fts_table} USING fts5(body, content='{chunks_table}', content_rowid='rowid');
+            """)
+        last_rowid = 0
+        batch_size = 500
+        while True:
+            with self._connect() as connection:
+                rows = connection.execute(
+                    "SELECT rowid, * FROM evidence WHERE rowid > ? AND rowid <= ? "
+                    "AND tool='corpus.document' AND is_error=0 ORDER BY rowid LIMIT ?",
+                    (last_rowid, high_water, batch_size),
+                ).fetchall()
+                if not rows:
+                    break
+                for row in rows:
+                    self._maintain_document(connection, self._record_from_row(row), documents_table=documents_table, chunks_table=chunks_table, fts_table=fts_table)
+                last_rowid = rows[-1]["rowid"]
+        with self._connect() as connection:
+            self._refresh_document_clusters(connection, table=documents_table)
+        # Catch-up and publication share one transaction. New evidence arriving
+        # after BEGIN IMMEDIATE waits briefly, then lands in the next rebuild.
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            rows = connection.execute(
+                "SELECT rowid, * FROM evidence WHERE rowid > ? AND tool='corpus.document' AND is_error=0 ORDER BY rowid",
+                (high_water,),
+            ).fetchall()
+            for row in rows:
+                self._maintain_document(connection, self._record_from_row(row), documents_table=documents_table, chunks_table=chunks_table, fts_table=fts_table)
+            if rows:
+                self._refresh_document_clusters(connection, table=documents_table)
+            self._migrate_rubric_document_keys(connection, documents_table=documents_table)
+            old_suffix = f"_old{generation}"
+            connection.executescript(f"""
+                ALTER TABLE documents RENAME TO documents{old_suffix};
+                ALTER TABLE document_chunks RENAME TO document_chunks{old_suffix};
+                ALTER TABLE document_chunks_fts RENAME TO document_chunks_fts{old_suffix};
+                ALTER TABLE {documents_table} RENAME TO documents;
+                ALTER TABLE {chunks_table} RENAME TO document_chunks;
+                ALTER TABLE {fts_table} RENAME TO document_chunks_fts;
+                UPDATE temporal_index_state SET active_generation={generation}, evidence_high_water=(SELECT COALESCE(MAX(rowid), 0) FROM evidence) WHERE singleton=1;
+            """)
+            count = connection.execute("SELECT COUNT(*) FROM documents").fetchone()[0]
+        self._eligible_index_cache.clear()
+        return count
 
     @staticmethod
-    def _migrate_rubric_document_keys(connection: sqlite3.Connection) -> None:
+    def _migrate_rubric_document_keys(connection: sqlite3.Connection, *, documents_table: str = "documents") -> None:
         """Backfill document-key labels for R1 rubrics during an explicit reindex."""
         rows = connection.execute("SELECT * FROM scenario_rubrics").fetchall()
         for row in rows:
@@ -491,7 +575,7 @@ class TemporalStore:
             mapping = {
                 r["parent_evidence_id"]: r["doc_key"]
                 for r in connection.execute(
-                    "SELECT parent_evidence_id, doc_key FROM documents WHERE parent_evidence_id IN ({})".format(",".join("?" for _ in useful)),
+                    f"SELECT parent_evidence_id, doc_key FROM {documents_table} WHERE parent_evidence_id IN ({','.join('?' for _ in useful)})",
                     useful,
                 ).fetchall()
             } if useful else {}
@@ -505,6 +589,7 @@ class TemporalStore:
     def _refresh_document_clusters(
         connection: sqlite3.Connection,
         target_keys: set[str] | None = None,
+        table: str = "documents",
     ) -> None:
         """Cluster syndicated duplicates by canonical URL or near-identical titles.
 
@@ -523,7 +608,7 @@ class TemporalStore:
         """
         rows = connection.execute(
             "SELECT doc_key, title, canonical_url, source_domain, cluster_key "
-            "FROM documents ORDER BY doc_key"
+            f"FROM {table} ORDER BY doc_key"
         ).fetchall()
         by_key = {row["doc_key"]: row for row in rows}
         parent = {row["doc_key"]: row["doc_key"] for row in rows}
@@ -585,7 +670,7 @@ class TemporalStore:
                         union(left, right)
 
         connection.executemany(
-            "UPDATE documents SET cluster_key=? WHERE doc_key=?",
+            f"UPDATE {table} SET cluster_key=? WHERE doc_key=?",
             [
                 (root, key)
                 for key in sorted(by_key)
@@ -1322,14 +1407,15 @@ class TemporalStore:
                 "evidence_ids": manifest.evidence_ids,
                 "index_state_hash": manifest.index_state_hash,
                 "tie_break": manifest.tie_break,
+                "generation_id": manifest.generation_id,
             }
             trace_id = hashlib.sha256(canonical_json(identity).encode("utf-8")).hexdigest()
             connection.execute(
                 """
                 INSERT INTO search_traces(
                     trace_id, run_id, sequence, scenario_id, mode, query, as_of, ranker_version,
-                    corpus_hash, evidence_ids_json, index_state_hash, tie_break, invoked_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    corpus_hash, evidence_ids_json, index_state_hash, tie_break, invoked_at, generation_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     trace_id,
@@ -1345,6 +1431,7 @@ class TemporalStore:
                     manifest.index_state_hash,
                     manifest.tie_break,
                     format_timestamp(invoked),
+                    manifest.generation_id,
                 ),
             )
         return SearchTraceRecord(
@@ -1584,6 +1671,7 @@ class TemporalStore:
             evidence_ids=tuple(json.loads(row["evidence_ids_json"])),
             index_state_hash=row["index_state_hash"] if "index_state_hash" in trace_columns else "",
             tie_break=row["tie_break"] if "tie_break" in trace_columns else "evidence_id/doc_key",
+            generation_id=row["generation_id"] if "generation_id" in trace_columns else 0,
         )
         return SearchTraceRecord(
             trace_id=row["trace_id"],
