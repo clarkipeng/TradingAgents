@@ -15,6 +15,15 @@ UTC = timezone.utc
 DAY_END = datetime(2026, 8, 28, 21, 30, tzinfo=UTC)
 
 
+def complete_fixture_day(store, day, state, run_id):
+    store.claim_portfolio_day(day, f"claim-{run_id}", claimed_at=DAY_END)
+    return store.complete_portfolio_day(
+        day, f"claim-{run_id}", as_of=DAY_END, state=state,
+        scenario_metadata={"kind": "portfolio-day", "fixture": True},
+        capture_run_id=run_id, decision="{}", report="{}",
+    )
+
+
 @pytest.mark.unit
 def test_portfolio_state_seals_and_reads_point_in_time(tmp_path):
     store = TemporalStore(tmp_path)
@@ -27,11 +36,9 @@ def test_portfolio_state_seals_and_reads_point_in_time(tmp_path):
         "equity": None,
     }
 
-    portfolio_run.record_portfolio_state(
-        store,
+    complete_fixture_day(store, "2026-08-28",
         {"cash": "60000", "positions": {"NVDA": "200"}, "equity": "104000"},
-        day="2026-08-28",
-        available_at=DAY_END,
+        "state-1",
     )
 
     later = portfolio_run.portfolio_state_asof(store, DAY_END)
@@ -47,11 +54,9 @@ def test_portfolio_state_seals_and_reads_point_in_time(tmp_path):
 @pytest.mark.unit
 def test_temporal_store_owns_portfolio_state_projections(tmp_path):
     store = TemporalStore(tmp_path)
-    portfolio_run.record_portfolio_state(
-        store,
+    complete_fixture_day(store, "2026-08-28",
         {"cash": "60000", "positions": {"NVDA": "20"}, "equity": "70000"},
-        day="2026-08-28",
-        available_at=DAY_END,
+        "state-2",
     )
 
     assert store.portfolio_state_asof(DAY_END)["portfolio_day"] == "2026-08-28"
@@ -101,7 +106,8 @@ def test_cio_accepts_valid_llm_weights_within_constraints():
 @pytest.mark.unit
 def test_run_portfolio_day_seals_state_and_next_day_reads_it(tmp_path):
     store = TemporalStore(tmp_path)
-    quotes = {"NVDA": Decimal("500"), "MSFT": Decimal("400")}
+    tickers = ["NVDA", "MSFT", "AAPL", "AMZN", "META"]
+    quotes = {ticker: Decimal("500") for ticker in tickers}
 
     def research(ticker, context):
         assert context.mode.value == "live_capture"
@@ -114,7 +120,7 @@ def test_run_portfolio_day_seals_state_and_next_day_reads_it(tmp_path):
 
     result = portfolio_run.run_portfolio_day(
         store,
-        ["NVDA", "MSFT"],
+        tickers,
         day="2026-08-28",
         research_fn=research,
         complete_llm=llm,
@@ -232,16 +238,14 @@ def test_run_portfolio_day_skips_without_sealing_when_all_quotes_are_missing(tmp
 @pytest.mark.unit
 def test_portfolio_report_tracks_equity_by_day_and_benchmark(tmp_path):
     store = TemporalStore(tmp_path)
-    for day, equity, cash in [
+    for index, (day, equity, cash) in enumerate([
         ("2026-08-28", "100000", "100000"),
         ("2026-08-31", "101500", "70000"),
         ("2026-09-01", "99800", "70000"),
-    ]:
-        portfolio_run.record_portfolio_state(
-            store,
+    ]):
+        complete_fixture_day(store, day,
             {"cash": cash, "positions": {"NVDA": "43"} if cash != "100000" else {}, "equity": equity},
-            day=day,
-            available_at=datetime.fromisoformat(f"{day}T21:30:00+00:00"),
+            f"report-state-{index}",
         )
 
     report = portfolio_run.portfolio_report(

@@ -17,7 +17,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 from tradingagents.portfolio_backtest import rating_score, target_weights
-from tradingagents.temporal import TemporalStore
+from tradingagents.temporal import TemporalRunInvalidError, TemporalStore
 from tradingagents.temporal.clock import format_timestamp, parse_timestamp
 from tradingagents.temporal.simulation import Order, OrderSide
 
@@ -177,6 +177,9 @@ def run_portfolio_day(store: TemporalStore, tickers: list[str], **kwargs) -> dic
         if result.get("status") == "failed_unsealed":
             store.fail_portfolio_day(day, claim_id, result["reason"])
         return result
+    except TemporalRunInvalidError:
+        store.fail_portfolio_day(day, claim_id, "temporal_run_invalid")
+        raise
     except Exception:  # noqa: BLE001 - failure is the recovery boundary
         store.fail_portfolio_day(day, claim_id, "execution_error")
         return {"status": "failed_unsealed", "reason": "execution_error", "scenario_id": f"portfolio-{day}", "day": day}
@@ -258,7 +261,11 @@ def _run_portfolio_day(
         failures: list[str] = []
         def research_one(ticker):
             try:
-                research = budgeted_call(research_fn, ticker, context)
+                # ContextVars do not cross executor threads automatically.
+                # Install the day context around each worker call so tape
+                # failures invalidate the claim-owned run consistently.
+                with temporal_context(context):
+                    research = budgeted_call(research_fn, ticker, context)
                 if research is None:
                     reason = "deadline_exceeded" if deadline_breached else "research_call_ceiling"
                     return ticker, None, None, reason
