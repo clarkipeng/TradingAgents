@@ -36,6 +36,10 @@ from .ranking import RANKER_VERSION, EligibleChunkIndex, build_eligible_index, r
 # Long enough to outlast a mirror batch's cluster refresh on a grown corpus
 # (observed live at ~110k documents: >30s per batch cost concurrent graph
 # runs their writes). Writers wait; they must never lose work to a peer.
+# A portfolio-day claim older than this is abandoned: the deadline policy
+# bounds a healthy run to a fraction of it, so only a dead owner exceeds it.
+PORTFOLIO_CLAIM_STALE_SECONDS = 3600.0
+
 _SQLITE_BUSY_TIMEOUT_SECONDS = 180.0
 
 _TITLE_TOKEN_MIN_LENGTH = 4
@@ -195,7 +199,8 @@ class TemporalStore:
                     claimed_at TEXT NOT NULL,
                     completed_at TEXT,
                     failed_at TEXT,
-                    failure_code TEXT
+                    failure_code TEXT,
+                    state_evidence_id TEXT
                 );
                 CREATE VIRTUAL TABLE IF NOT EXISTS evidence_fts USING fts5(
                     evidence_id UNINDEXED,
@@ -272,6 +277,9 @@ class TemporalStore:
                 connection.execute("ALTER TABLE evidence ADD COLUMN event_at TEXT")
             if "source_published_at" not in columns:
                 connection.execute("ALTER TABLE evidence ADD COLUMN source_published_at TEXT")
+            portfolio_columns = {row[1] for row in connection.execute("PRAGMA table_info(portfolio_days)")}
+            if portfolio_columns and "state_evidence_id" not in portfolio_columns:
+                connection.execute("ALTER TABLE portfolio_days ADD COLUMN state_evidence_id TEXT")
             search_columns = {row["name"] for row in connection.execute("PRAGMA table_info(search_traces)")}
             if "index_state_hash" not in search_columns:
                 connection.execute("ALTER TABLE search_traces ADD COLUMN index_state_hash TEXT NOT NULL DEFAULT ''")
@@ -319,7 +327,14 @@ class TemporalStore:
             if row is None:
                 connection.execute("INSERT INTO portfolio_days(day, claim_id, status, claimed_at) VALUES (?, ?, 'claimed', ?)", (day, claim_id, stamp))
                 return {"day": day, "claim_id": claim_id, "status": "claimed"}
-            if row["status"] != "failed":
+            if row["status"] == "claimed":
+                claimed_at = parse_timestamp(row["claimed_at"])
+                age = (parse_timestamp(stamp) - claimed_at).total_seconds()
+                if age <= PORTFOLIO_CLAIM_STALE_SECONDS:
+                    return {"day": day, "claim_id": row["claim_id"], "status": row["status"]}
+                # The prior owner died without failing its claim; a claim this
+                # old is abandoned and the day must not stay unrerunnable.
+            elif row["status"] != "failed":
                 return {"day": day, "claim_id": row["claim_id"], "status": row["status"]}
             connection.execute("UPDATE portfolio_days SET claim_id = ?, status = 'claimed', claimed_at = ?, failed_at = NULL, failure_code = NULL WHERE day = ?", (claim_id, stamp, day))
             return {"day": day, "claim_id": claim_id, "status": "claimed"}
@@ -355,7 +370,7 @@ class TemporalStore:
             connection.execute("INSERT OR IGNORE INTO evidence(evidence_id, tool, request_key, request_json, response_json, artifact_hash, available_at, observed_at, ingested_at, fidelity, source, is_error) VALUES (?, 'portfolio.state', ?, ?, ?, ?, ?, ?, ?, 'forward-captured', 'portfolio-simulator', 0)", (evidence_id, identity["request_key"], request_json, response_json, state_artifact, format_timestamp(definition_time), format_timestamp(definition_time), now))
             connection.execute("INSERT INTO scenarios(scenario_id, as_of, basis, metadata_json, corpus_hash, artifact_hash, created_at, capture_run_id) VALUES (?, ?, 'forward-captured', ?, ?, ?, ?, ?)", (scenario_id, format_timestamp(definition_time), metadata_json, self.corpus_hash(as_of=definition_time), scenario_artifact, now, capture_run_id))
             connection.execute("INSERT INTO research_runs(run_id, scenario_id, decision, report_artifact_hash, completed_at) VALUES (?, ?, ?, ?, ?)", (capture_run_id, scenario_id, decision, report_hash, now))
-            connection.execute("UPDATE portfolio_days SET status = 'completed', completed_at = ? WHERE day = ? AND claim_id = ?", (now, day, claim_id))
+            connection.execute("UPDATE portfolio_days SET status = 'completed', completed_at = ?, state_evidence_id = ? WHERE day = ? AND claim_id = ?", (now, evidence_id, day, claim_id))
         return evidence_id
 
     def put_artifact(self, content: bytes, media_type: str = "application/json") -> str:
@@ -594,18 +609,40 @@ class TemporalStore:
                 last_rowid = rows[-1]["rowid"]
         with self._connect() as connection:
             self._refresh_document_clusters(connection, table=documents_table)
-        # Catch-up and publication share one transaction. New evidence arriving
-        # after BEGIN IMMEDIATE waits briefly, then lands in the next rebuild.
+        # Drain the delta outside any long transaction first: the shadow
+        # tables are private to this rebuild, so clustering them holds no
+        # writer lock anyone else waits on. The publication transaction then
+        # sees only the handful of rows that arrived during this drain.
+        delta_rowid = high_water
+        while True:
+            with self._connect() as connection:
+                rows = connection.execute(
+                    "SELECT rowid, * FROM evidence WHERE rowid > ? "
+                    "AND tool='corpus.document' AND is_error=0 ORDER BY rowid LIMIT 500",
+                    (delta_rowid,),
+                ).fetchall()
+                if not rows:
+                    break
+                keys = set()
+                for row in rows:
+                    self._maintain_document(connection, self._record_from_row(row), documents_table=documents_table, chunks_table=chunks_table, fts_table=fts_table)
+                    keys.add(stable_doc_key(row["evidence_id"], 0))
+                self._refresh_document_clusters(connection, keys, table=documents_table)
+                delta_rowid = rows[-1]["rowid"]
+        # Publication drains only the remainder with a targeted refresh, so
+        # the writer lock is held for a bounded, near-empty transaction.
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             rows = connection.execute(
                 "SELECT rowid, * FROM evidence WHERE rowid > ? AND tool='corpus.document' AND is_error=0 ORDER BY rowid",
-                (high_water,),
+                (delta_rowid,),
             ).fetchall()
+            remainder_keys = set()
             for row in rows:
                 self._maintain_document(connection, self._record_from_row(row), documents_table=documents_table, chunks_table=chunks_table, fts_table=fts_table)
-            if rows:
-                self._refresh_document_clusters(connection, table=documents_table)
+                remainder_keys.add(stable_doc_key(row["evidence_id"], 0))
+            if remainder_keys:
+                self._refresh_document_clusters(connection, remainder_keys, table=documents_table)
             self._migrate_rubric_document_keys(connection, documents_table=documents_table)
             old_suffix = f"_old{generation}"
             connection.executescript(f"""
@@ -1582,7 +1619,7 @@ class TemporalStore:
             row = connection.execute(
                 """SELECT request_json, response_json FROM evidence
                    WHERE tool = 'portfolio.state' AND is_error = 0
-                     AND EXISTS (SELECT 1 FROM portfolio_days d WHERE d.day = json_extract(evidence.request_json, '$.portfolio_day') AND d.status = 'completed')
+                     AND evidence_id IN (SELECT d.state_evidence_id FROM portfolio_days d WHERE d.status = 'completed')
                      AND available_at <= ?
                    ORDER BY available_at DESC, evidence_id LIMIT 1""",
                 (cutoff,),
@@ -1602,7 +1639,7 @@ class TemporalStore:
             rows = connection.execute(
                 """SELECT request_json, response_json FROM evidence
                    WHERE tool = 'portfolio.state' AND is_error = 0
-                     AND EXISTS (SELECT 1 FROM portfolio_days d WHERE d.day = json_extract(evidence.request_json, '$.portfolio_day') AND d.status = 'completed')
+                     AND evidence_id IN (SELECT d.state_evidence_id FROM portfolio_days d WHERE d.status = 'completed')
                    ORDER BY available_at, evidence_id"""
             ).fetchall()
         return [self._portfolio_state_from_row(row) for row in rows]

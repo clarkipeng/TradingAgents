@@ -31,6 +31,28 @@ class TemporalRetriever:
         date_from: str | None = None, date_to: str | None = None,
         source: str | None = None, corpus_hash_pin: str | None = None,
     ) -> TemporalSearchResponse:
+        """One search, pinned to a single document generation.
+
+        The read phases use separate connections, so a generation swap
+        landing mid-search could mix index and hydration from different
+        generations; when the active generation moved during the read, one
+        retry re-runs the whole search against the settled generation.
+        """
+        for _attempt in range(2):
+            generation_before = self.store.active_generation_id()
+            response = self._search_once(
+                query, as_of=as_of, limit=limit, page=page, date_from=date_from,
+                date_to=date_to, source=source, corpus_hash_pin=corpus_hash_pin,
+            )
+            if self.store.active_generation_id() == generation_before:
+                return response
+        return response
+
+    def _search_once(
+        self, query: str, *, as_of: datetime, limit: int = 10, page: int = 1,
+        date_from: str | None = None, date_to: str | None = None,
+        source: str | None = None, corpus_hash_pin: str | None = None,
+    ) -> TemporalSearchResponse:
         if limit < 1 or page < 1:
             raise ValueError("limit and page must be positive")
         parsed_as_of = parse_timestamp(as_of)

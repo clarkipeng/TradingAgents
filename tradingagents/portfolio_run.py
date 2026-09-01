@@ -19,6 +19,7 @@ from decimal import Decimal
 from tradingagents.portfolio_backtest import rating_score, target_weights
 from tradingagents.temporal import TemporalRunInvalidError, TemporalStore
 from tradingagents.temporal.clock import format_timestamp, parse_timestamp
+from tradingagents.temporal.store import PORTFOLIO_CLAIM_STALE_SECONDS
 from tradingagents.temporal.simulation import Order, OrderSide
 
 DEFAULT_CONSTRAINTS = {
@@ -272,15 +273,25 @@ def _run_portfolio_day(
                 return ticker, research["rating"], research.get("brief", ""), None
             except Exception as error:  # noqa: BLE001 - one ticker never kills the day
                 return ticker, None, None, f"{ticker}: {type(error).__name__}"
-        with ThreadPoolExecutor(max_workers=MAX_RESEARCH_WORKERS) as pool:
-            futures = [pool.submit(research_one, ticker) for ticker in tickers]
-            for future in as_completed(futures):
+        pool = ThreadPoolExecutor(max_workers=MAX_RESEARCH_WORKERS)
+        futures = [pool.submit(research_one, ticker) for ticker in tickers]
+        try:
+            remaining = PORTFOLIO_DAY_DEADLINE_SECONDS - (time.monotonic() - started)
+            for future in as_completed(futures, timeout=max(remaining, 0.1)):
                 ticker, rating, brief, failure = future.result()
                 if rating is not None:
                     ratings[ticker] = rating
                     briefs[ticker] = brief
                 if failure:
                     failures.append(failure)
+        except TimeoutError:
+            # A hung provider call must not hold the day open; unfinished
+            # workers are abandoned (their threads die with the process) and
+            # the day fails on the deadline like any other breach.
+            deadline_breached = True
+            failures.append("research pool: deadline_exceeded")
+        finally:
+            pool.shutdown(wait=False, cancel_futures=True)
 
         coverage = len(ratings) / len(tickers) if tickers else 0.0
         if deadline_breached:
@@ -315,6 +326,13 @@ def _run_portfolio_day(
                 "elapsed_seconds": round(time.monotonic() - started, 3),
                 "failures": failures,
             }
+
+        quoted = [ticker for ticker in ratings if ticker in quotes]
+        quoted_coverage = len(quoted) / len(tickers) if tickers else 0.0
+        if quoted_coverage < MIN_TICKER_COVERAGE:
+            # A researched ticker without a quote is missing from the CIO
+            # universe; silently shrinking that universe is not allowed.
+            return {"status": "failed_unsealed", "reason": "quote_coverage", "scenario_id": scenario_id, "day": day, "coverage": quoted_coverage, "research_call_count": research_calls, "elapsed_seconds": round(time.monotonic() - started, 3), "failures": failures}
 
         if set(prior["positions"]) - set(quotes):
             return {"status": "failed_unsealed", "reason": "held_quote_coverage", "scenario_id": scenario_id, "day": day, "coverage": coverage, "research_call_count": research_calls, "elapsed_seconds": round(time.monotonic() - started, 3), "failures": failures}
