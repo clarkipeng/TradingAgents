@@ -48,3 +48,17 @@ def test_policy_breach_is_fixed_vocabulary_and_unsealed(tmp_path, monkeypatch):
     assert result["status"] == "failed_unsealed"
     assert result["reason"] == "research_call_ceiling"
     assert store.get_scenario("portfolio-2026-09-01") is None
+
+
+def test_deadline_breach_has_distinct_fixed_outcome(tmp_path, monkeypatch):
+    store = TemporalStore(tmp_path)
+    monkeypatch.setattr(portfolio_run, "PORTFOLIO_DAY_DEADLINE_SECONDS", 0)
+    result = portfolio_run.run_portfolio_day(
+        store, ["A"], day="2026-09-01",
+        research_fn=lambda *_: {"rating": "Buy"},
+        complete_llm=lambda *_: "{}",
+        quote_fn=lambda *_: Decimal("1"),
+    )
+    assert result["status"] == "failed_unsealed"
+    assert result["reason"] == "deadline_exceeded"
+    assert store.get_scenario("portfolio-2026-09-01") is None
