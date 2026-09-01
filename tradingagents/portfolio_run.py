@@ -243,13 +243,14 @@ def _run_portfolio_day(
         deadline_breached = False
 
         def budgeted_call(callable_, *args):
-            nonlocal research_calls
+            nonlocal research_calls, deadline_breached
             with call_lock:
+                if time.monotonic() - started >= PORTFOLIO_DAY_DEADLINE_SECONDS:
+                    deadline_breached = True
+                    return None
                 if research_calls >= MAX_RESEARCH_CALLS_PER_PORTFOLIO_DAY:
                     return None
                 research_calls += 1
-            if time.monotonic() - started >= PORTFOLIO_DAY_DEADLINE_SECONDS:
-                return None
             return callable_(*args)
 
         ratings: dict[str, str] = {}
@@ -259,7 +260,8 @@ def _run_portfolio_day(
             try:
                 research = budgeted_call(research_fn, ticker, context)
                 if research is None:
-                    return ticker, None, None, "research_call_ceiling"
+                    reason = "deadline_exceeded" if deadline_breached else "research_call_ceiling"
+                    return ticker, None, None, reason
                 return ticker, research["rating"], research.get("brief", ""), None
             except Exception as error:  # noqa: BLE001 - one ticker never kills the day
                 return ticker, None, None, f"{ticker}: {type(error).__name__}"
@@ -275,7 +277,7 @@ def _run_portfolio_day(
 
         coverage = len(ratings) / len(tickers) if tickers else 0.0
         if deadline_breached:
-            return {"status": "failed_unsealed", "reason": "deadline_or_call_ceiling", "skipped": "policy breach", "scenario_id": scenario_id, "day": day, "coverage": coverage, "research_call_count": research_calls, "elapsed_seconds": round(time.monotonic() - started, 3), "failures": failures}
+            return {"status": "failed_unsealed", "reason": "deadline_exceeded", "skipped": "policy breach", "scenario_id": scenario_id, "day": day, "coverage": coverage, "research_call_count": research_calls, "elapsed_seconds": round(time.monotonic() - started, 3), "failures": failures}
         if coverage < MIN_TICKER_COVERAGE:
             return {"status": "failed_unsealed", "reason": "minimum_ticker_coverage", "scenario_id": scenario_id, "day": day, "coverage": coverage, "research_call_count": research_calls, "elapsed_seconds": round(time.monotonic() - started, 3), "failures": failures}
 
@@ -316,7 +318,7 @@ def _run_portfolio_day(
             complete_llm=lambda prompt: budgeted_call(complete_llm, prompt),
         )
         if deadline_breached:
-            return {"status": "failed_unsealed", "reason": "deadline_or_call_ceiling", "skipped": "policy breach", "scenario_id": scenario_id, "day": day, "coverage": coverage, "research_call_count": research_calls, "elapsed_seconds": round(time.monotonic() - started, 3), "failures": failures}
+            return {"status": "failed_unsealed", "reason": "deadline_exceeded", "skipped": "policy breach", "scenario_id": scenario_id, "day": day, "coverage": coverage, "research_call_count": research_calls, "elapsed_seconds": round(time.monotonic() - started, 3), "failures": failures}
         orders = rebalance_orders(prior, plan["weights"], quotes, submitted_at=as_of)
 
         simulator = PortfolioSimulator(
