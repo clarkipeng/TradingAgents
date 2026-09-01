@@ -1,0 +1,7 @@
+{
+  "deadline_seconds": 900,
+  "max_calls": 40,
+  "min_ticker_coverage": 0.8,
+  "max_workers": 4,
+  "require_held_quotes": true
+}

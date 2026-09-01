@@ -179,6 +179,16 @@ class TemporalStore:
                     report_artifact_hash TEXT REFERENCES artifacts(content_hash),
                     completed_at TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS portfolio_days (
+                    day TEXT PRIMARY KEY,
+                    scenario_id TEXT NOT NULL UNIQUE,
+                    run_id TEXT NOT NULL,
+                    status TEXT NOT NULL CHECK(status IN ('claimed', 'completed', 'failed')),
+                    claimed_at TEXT NOT NULL,
+                    completed_at TEXT,
+                    failure_outcome TEXT
+                );
+                CREATE INDEX IF NOT EXISTS portfolio_days_status ON portfolio_days(status, day);
                 CREATE INDEX IF NOT EXISTS research_runs_scenario
                 ON research_runs(scenario_id, completed_at, run_id);
                 CREATE VIRTUAL TABLE IF NOT EXISTS evidence_fts USING fts5(
@@ -1432,8 +1442,9 @@ class TemporalStore:
         cutoff = format_timestamp(parse_timestamp(as_of))
         with self._connect() as connection:
             row = connection.execute(
-                """SELECT request_json, response_json FROM evidence
-                   WHERE tool = 'portfolio.state' AND is_error = 0
+                """SELECT e.request_json, e.response_json FROM evidence e
+                   JOIN portfolio_days d ON d.day = json_extract(e.request_json, '$.portfolio_day')
+                   WHERE e.tool = 'portfolio.state' AND e.is_error = 0 AND d.status = 'completed'
                      AND available_at <= ?
                    ORDER BY available_at DESC, evidence_id LIMIT 1""",
                 (cutoff,),
@@ -1451,11 +1462,85 @@ class TemporalStore:
         """Return all captured portfolio states in deterministic evidence order."""
         with self._connect() as connection:
             rows = connection.execute(
-                """SELECT request_json, response_json FROM evidence
-                   WHERE tool = 'portfolio.state' AND is_error = 0
+                """SELECT e.request_json, e.response_json FROM evidence e
+                   JOIN portfolio_days d ON d.day = json_extract(e.request_json, '$.portfolio_day')
+                   WHERE e.tool = 'portfolio.state' AND e.is_error = 0 AND d.status = 'completed'
                    ORDER BY available_at, evidence_id"""
             ).fetchall()
         return [self._portfolio_state_from_row(row) for row in rows]
+
+    def claim_portfolio_day(self, day: str, scenario_id: str, run_id: str,
+                            *, claimed_at: datetime | None = None) -> str:
+        """Atomically claim a day; failed claims are the only resumable claims."""
+        claimed = format_timestamp(parse_timestamp(claimed_at or datetime.now(timezone.utc)))
+        with self.write_lock(), self._connect() as connection:
+            row = connection.execute("SELECT status FROM portfolio_days WHERE day = ?", (day,)).fetchone()
+            if row is None:
+                if connection.execute("SELECT 1 FROM scenarios WHERE scenario_id = ?", (scenario_id,)).fetchone():
+                    return "completed"
+                connection.execute(
+                    "INSERT INTO portfolio_days(day, scenario_id, run_id, status, claimed_at) VALUES (?, ?, ?, 'claimed', ?)",
+                    (day, scenario_id, run_id, claimed),
+                )
+                return "claimed"
+            if row["status"] == "failed":
+                connection.execute(
+                    "UPDATE portfolio_days SET scenario_id=?, run_id=?, status='claimed', claimed_at=?, completed_at=NULL, failure_outcome=NULL WHERE day=?",
+                    (scenario_id, run_id, claimed, day),
+                )
+                return "claimed"
+            return "busy" if row["status"] == "claimed" else row["status"]
+
+    def fail_portfolio_day(self, day: str, outcome: str) -> None:
+        """Leave a bounded, fixed-vocabulary failure that a later run can resume."""
+        allowed = {"deadline_exceeded", "call_budget_exceeded", "coverage_below_minimum",
+                   "held_quote_missing", "execution_failed"}
+        if outcome not in allowed:
+            raise ValueError("unknown portfolio failure outcome")
+        with self.write_lock(), self._connect() as connection:
+            connection.execute("UPDATE portfolio_days SET status='failed', failure_outcome=? WHERE day=? AND status='claimed'", (outcome, day))
+
+    def portfolio_day(self, day: str) -> dict | None:
+        with self._connect() as connection:
+            row = connection.execute("SELECT * FROM portfolio_days WHERE day=?", (day,)).fetchone()
+        return dict(row) if row else None
+
+    def register_legacy_portfolio_state(self, day: str, scenario_id: str) -> None:
+        """Register standalone state fixtures as completed observations."""
+        with self.write_lock(), self._connect() as connection:
+            connection.execute(
+                "INSERT OR IGNORE INTO portfolio_days(day,scenario_id,run_id,status,claimed_at,completed_at) VALUES(?,?,?,'completed',?,?)",
+                (day, scenario_id, f"legacy-{day}", format_timestamp(datetime.now(timezone.utc)),
+                 format_timestamp(datetime.now(timezone.utc))),
+            )
+
+    def complete_portfolio_day(self, day: str, *, scenario_id: str, run_id: str,
+                               as_of: datetime, metadata: Mapping[str, Any],
+                               decision: str, report: str) -> None:
+        """Atomically publish the scenario, research run, and day visibility."""
+        definition_time = parse_timestamp(as_of)
+        created = datetime.now(timezone.utc)
+        metadata_json = canonical_json(dict(metadata))
+        report_hash = self.put_artifact(report.encode("utf-8"), media_type="text/markdown")
+        scenario_hash = self.put_artifact(metadata_json.encode("utf-8"))
+        corpus_hash = self.corpus_hash(as_of=definition_time)
+        with self.write_lock(), self._connect() as connection:
+            claim = connection.execute("SELECT * FROM portfolio_days WHERE day=?", (day,)).fetchone()
+            if claim is None or claim["status"] != "claimed" or claim["run_id"] != run_id:
+                raise ValueError("portfolio day is not owned by this run")
+            connection.execute(
+                "INSERT INTO scenarios(scenario_id,as_of,basis,metadata_json,corpus_hash,artifact_hash,created_at,capture_run_id) VALUES(?,?,?,?,?,?,?,?)",
+                (scenario_id, format_timestamp(definition_time), "forward-captured", metadata_json,
+                 corpus_hash, scenario_hash, format_timestamp(created), run_id),
+            )
+            connection.execute(
+                "INSERT INTO research_runs(run_id,scenario_id,decision,report_artifact_hash,completed_at) VALUES(?,?,?,?,?)",
+                (run_id, scenario_id, decision, report_hash, format_timestamp(created)),
+            )
+            connection.execute(
+                "UPDATE portfolio_days SET status='completed', completed_at=? WHERE day=? AND status='claimed'",
+                (format_timestamp(created), day),
+            )
 
     @staticmethod
     def _portfolio_state_from_row(row: sqlite3.Row) -> dict:

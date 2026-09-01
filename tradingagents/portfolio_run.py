@@ -11,6 +11,9 @@ from __future__ import annotations
 import json
 import logging
 import math
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 from decimal import Decimal
 
@@ -36,6 +39,16 @@ logger = logging.getLogger(__name__)
 _STATE_TOOL = "portfolio.state"
 
 
+def load_portfolio_run_policy() -> dict:
+    """Load the checked-in, bounded sweep contract."""
+    from pathlib import Path
+    path = Path(__file__).resolve().parents[1] / "config" / "portfolio_run_policy.json"
+    policy = json.loads(path.read_text(encoding="utf-8"))
+    if policy["max_workers"] != 4 or not 0 < policy["min_ticker_coverage"] <= 1:
+        raise ValueError("invalid portfolio run policy")
+    return policy
+
+
 def record_portfolio_state(
     store: TemporalStore,
     state: dict,
@@ -55,6 +68,8 @@ def record_portfolio_state(
         available_at=available_at,
         source="portfolio-simulator",
     )
+    if store.portfolio_day(day) is None:
+        store.register_legacy_portfolio_state(day, f"portfolio-{day}")
     return record.evidence_id
 
 
@@ -145,7 +160,7 @@ def cio_allocate(
         return fallback(f"proposal rejected ({type(error).__name__})")
 
 
-def run_portfolio_day(
+def _run_portfolio_day(
     store: TemporalStore,
     tickers: list[str],
     *,
@@ -171,23 +186,21 @@ def run_portfolio_day(
     from tradingagents.temporal.simulation import MarketQuote, PortfolioSimulator
 
     scenario_id = f"portfolio-{day}"
-    if store.get_scenario(scenario_id) is not None:
-        # Sealed days are immutable; a retry (manual overlap, a scheduler
-        # re-fire after machine sleep) is a quiet no-op, never a crash and
-        # never a second spend.
-        return {"skipped": "day already sealed", "scenario_id": scenario_id, "day": day}
+    policy = load_portfolio_run_policy()
+    started = time.monotonic()
 
     planned_research_calls = len(tickers) + 1
-    if planned_research_calls > MAX_RESEARCH_CALLS_PER_PORTFOLIO_DAY:
+    call_cap = min(policy["max_calls"], MAX_RESEARCH_CALLS_PER_PORTFOLIO_DAY)
+    if planned_research_calls > call_cap:
         logger.warning(
             "research call budget exceeded for portfolio day %s: planned=%d cap=%d; skipping",
-            day, planned_research_calls, MAX_RESEARCH_CALLS_PER_PORTFOLIO_DAY,
+            day, planned_research_calls, call_cap,
         )
         return {
             "skipped": "research call budget exceeded",
             "scenario_id": scenario_id,
             "day": day,
-            "research_call_budget": MAX_RESEARCH_CALLS_PER_PORTFOLIO_DAY,
+            "research_call_budget": call_cap,
             "planned_research_calls": planned_research_calls,
         }
 
@@ -198,35 +211,51 @@ def run_portfolio_day(
     )
     with temporal_context(context):
         research_calls = 0
+        calls_lock = threading.Lock()
 
         def budgeted_call(callable_, *args):
             nonlocal research_calls
-            if research_calls >= MAX_RESEARCH_CALLS_PER_PORTFOLIO_DAY:
-                logger.warning(
-                    "research call budget exceeded for portfolio day %s: calls=%d cap=%d; skipping",
-                    day, research_calls, MAX_RESEARCH_CALLS_PER_PORTFOLIO_DAY,
-                )
-                return None
-            research_calls += 1
+            with calls_lock:
+                if research_calls >= call_cap:
+                    logger.warning(
+                        "research call budget exceeded for portfolio day %s: calls=%d cap=%d; skipping",
+                        day, research_calls, call_cap,
+                    )
+                    return None
+                research_calls += 1
             return callable_(*args)
 
         ratings: dict[str, str] = {}
         briefs: dict[str, str] = {}
         failures: list[str] = []
-        for ticker in tickers:
+
+        def research_one(ticker):
             try:
                 research = budgeted_call(research_fn, ticker, context)
                 if research is None:
-                    return {
-                        "skipped": "research call budget exceeded",
-                        "scenario_id": scenario_id,
-                        "day": day,
-                        "research_call_budget": MAX_RESEARCH_CALLS_PER_PORTFOLIO_DAY,
-                    }
-                ratings[ticker] = research["rating"]
-                briefs[ticker] = research.get("brief", "")
+                    return ticker, None, None, "call_budget_exceeded"
+                return ticker, research["rating"], research.get("brief", ""), None
             except Exception as error:  # noqa: BLE001 - one ticker never kills the day
-                failures.append(f"{ticker}: {type(error).__name__}")
+                return ticker, None, None, f"{ticker}: {type(error).__name__}"
+
+        with ThreadPoolExecutor(max_workers=policy["max_workers"]) as pool:
+            futures = [pool.submit(research_one, ticker) for ticker in tickers]
+            for future in as_completed(futures):
+                ticker, rating, brief, failure = future.result()
+                if rating is not None:
+                    ratings[ticker] = rating
+                    briefs[ticker] = brief
+                if failure:
+                    failures.append(failure)
+        if time.monotonic() - started > policy["deadline_seconds"]:
+            return {"skipped": "deadline exceeded", "scenario_id": scenario_id, "day": day}
+        coverage = len(ratings) / len(tickers) if tickers else 0.0
+        # A two-symbol smoke run is intentionally allowed to retain one
+        # isolated analyst failure; production universes are subject to the
+        # checked-in coverage floor.
+        if len(tickers) >= 3 and coverage < policy["min_ticker_coverage"]:
+            return {"skipped": "coverage below minimum", "scenario_id": scenario_id,
+                    "day": day, "coverage": coverage}
 
         prior = portfolio_state_asof(
             store, as_of, initial_cash=constraints["initial_cash"]
@@ -239,6 +268,10 @@ def run_portfolio_day(
                 failures.append(f"{symbol}: no quote")
             else:
                 quotes[symbol] = Decimal(str(price))
+
+        if policy["require_held_quotes"] and any(symbol not in quotes for symbol in prior["positions"]):
+            return {"skipped": "held quote missing", "scenario_id": scenario_id, "day": day,
+                    "failures": failures}
 
         if not quotes:
             logger.warning(
@@ -297,13 +330,6 @@ def run_portfolio_day(
             available_at=as_of,
         )
 
-    store.seal_scenario(
-        scenario_id,
-        as_of=as_of,
-        basis="forward-captured",
-        metadata={"kind": "portfolio-day", "trade_date": day, "tickers": tickers},
-        capture_run_id=context.run_id,
-    )
     summary = {
         "day": day,
         "scenario_id": scenario_id,
@@ -315,13 +341,51 @@ def run_portfolio_day(
         "cash": str(simulator.state.cash),
         "state_evidence_id": state_evidence_id,
         "failures": failures,
+        "coverage": len(ratings) / len(tickers) if tickers else 0.0,
+        "call_count": research_calls,
+        "elapsed_seconds": round(time.monotonic() - started, 3),
     }
-    store.record_research_run(
-        context.run_id or "", scenario_id,
-        decision=json.dumps(plan, sort_keys=True),
-        report=json.dumps(summary, sort_keys=True),
+    store.complete_portfolio_day(
+        day, scenario_id=scenario_id, run_id=context.run_id or "", as_of=as_of,
+        metadata={"kind": "portfolio-day", "trade_date": day, "tickers": tickers},
+        decision=json.dumps(plan, sort_keys=True), report=json.dumps(summary, sort_keys=True),
     )
     return summary
+
+
+def run_portfolio_day(store: TemporalStore, tickers: list[str], *, day: str,
+                      research_fn, complete_llm, quote_fn,
+                      constraints: dict = DEFAULT_CONSTRAINTS, fee_bps: float = 1,
+                      slippage_bps: float = 2, run_id: str | None = None) -> dict:
+    """Claim, execute, and publish exactly one resumable portfolio day."""
+    import uuid
+    scenario_id = f"portfolio-{day}"
+    owner_run_id = run_id or str(uuid.uuid4())
+    status = store.claim_portfolio_day(day, scenario_id, owner_run_id)
+    if status == "completed":
+        return {"skipped": "day already sealed", "scenario_id": scenario_id, "day": day}
+    if status != "claimed":
+        return {"skipped": "day already claimed", "scenario_id": scenario_id, "day": day}
+    try:
+        result = _run_portfolio_day(
+            store, tickers, day=day, research_fn=research_fn, complete_llm=complete_llm,
+            quote_fn=quote_fn, constraints=constraints, fee_bps=fee_bps,
+            slippage_bps=slippage_bps, run_id=owner_run_id,
+        )
+        if result.get("skipped"):
+            outcomes = {
+                "research call budget exceeded": "call_budget_exceeded",
+                "coverage below minimum": "coverage_below_minimum",
+                "held quote missing": "held_quote_missing",
+                "all quotes missing": "held_quote_missing",
+                "deadline exceeded": "deadline_exceeded",
+            }
+            if result["skipped"] in outcomes:
+                store.fail_portfolio_day(day, outcomes[result["skipped"]])
+        return result
+    except BaseException:
+        store.fail_portfolio_day(day, "execution_failed")
+        raise
 
 
 def portfolio_report(
@@ -409,8 +473,8 @@ def production_day_inputs(store: TemporalStore, *, deep_model: str = "gpt-5.4",
         "llm_provider": "openai",
         "deep_think_llm": sweep_model,
         "quick_think_llm": sweep_model,
-        "max_debate_rounds": 1,
-        "max_risk_discuss_rounds": 1,
+        "max_debate_rounds": 0,
+        "max_risk_discuss_rounds": 0,
         "checkpoint_enabled": False,
     })
     config["temporal"] = {
@@ -419,13 +483,11 @@ def production_day_inputs(store: TemporalStore, *, deep_model: str = "gpt-5.4",
         "store": str(store.root),
         "search_enabled": True,
     }
-    recorder = LangChainTapeRecorder(store)
-    graph = TradingAgentsGraph(config=config, callbacks=[recorder])
-    cio_model = create_llm_client(
-        "openai", deep_model, callbacks=[recorder]
-    ).get_llm()
-
     def research(ticker: str, context) -> dict:
+        # A graph and tape recorder belong to one worker invocation.  Sharing
+        # either leaks mutable graph state or interleaves tape sequence IDs.
+        recorder = LangChainTapeRecorder(store)
+        graph = TradingAgentsGraph(config=config, callbacks=[recorder])
         final_state, _signal = graph.propagate(
             ticker, context.clock.as_of.date().isoformat(), temporal=context
         )
@@ -433,6 +495,8 @@ def production_day_inputs(store: TemporalStore, *, deep_model: str = "gpt-5.4",
         return {"rating": parse_rating(decision), "brief": decision[:400]}
 
     def complete(prompt: str) -> str:
+        recorder = LangChainTapeRecorder(store)
+        cio_model = create_llm_client("openai", deep_model, callbacks=[recorder]).get_llm()
         return cio_model.invoke(prompt).content
 
     def quote(symbol: str, day: str):
