@@ -115,6 +115,22 @@ def import_gdelt_articles(
 
     evidence_ids: list[str] = []
     failures: list[str] = []
+    # Clustering waits for the nightly rebuild; per-insert refreshes scan the
+    # whole corpus and cannot be paid inside a paced nightly sweep.
+    with store.deferred_clustering(flush=False):
+        _import_gdelt_article_rows(
+            store, payload, query, raw_response_artifact_hash, evidence_ids, failures
+        )
+    return GdeltImportResult(
+        requested=len(payload["articles"]),
+        imported=len(evidence_ids),
+        evidence_ids=tuple(evidence_ids),
+        failures=tuple(failures),
+        response_artifact_hash=raw_response_artifact_hash,
+    )
+
+
+def _import_gdelt_article_rows(store, payload, query, raw_response_artifact_hash, evidence_ids, failures):
     for position, article in enumerate(payload["articles"], start=1):
         if not isinstance(article, dict):
             failures.append(f"article-{position}:invalid-record")
@@ -149,13 +165,6 @@ def import_gdelt_articles(
             source=url,
         )
         evidence_ids.append(record.evidence_id)
-    return GdeltImportResult(
-        requested=len(payload["articles"]),
-        imported=len(evidence_ids),
-        evidence_ids=tuple(evidence_ids),
-        failures=tuple(failures),
-        response_artifact_hash=raw_response_artifact_hash,
-    )
 
 
 def _boundary(value: str | datetime, *, is_end: bool) -> datetime:

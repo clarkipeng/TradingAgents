@@ -33,7 +33,10 @@ from .models import (
 )
 from .ranking import RANKER_VERSION, EligibleChunkIndex, build_eligible_index, rank
 
-_SQLITE_BUSY_TIMEOUT_SECONDS = 30.0
+# Long enough to outlast a mirror batch's cluster refresh on a grown corpus
+# (observed live at ~110k documents: >30s per batch cost concurrent graph
+# runs their writes). Writers wait; they must never lose work to a peer.
+_SQLITE_BUSY_TIMEOUT_SECONDS = 180.0
 
 _TITLE_TOKEN_MIN_LENGTH = 4
 _STOPWORDS = frozenset(
@@ -410,7 +413,7 @@ class TemporalStore:
         return record
 
     @contextmanager
-    def deferred_clustering(self):
+    def deferred_clustering(self, *, flush: bool = True):
         """Batch cluster maintenance for bulk ingestion.
 
         The per-insert cluster refresh scans every document row, which makes
@@ -419,6 +422,12 @@ class TemporalStore:
         refresh at exit lands on exactly the assignments the per-row path
         (or a full rebuild) would produce, because the refresh seeds from
         stored state and rewrites every changed root.
+
+        ``flush=False`` skips even the exit refresh: new documents stay
+        self-clustered until ``reindex_documents`` runs. Continuous ingestion
+        uses this - on a grown corpus one refresh scans everything and holds
+        the write lock for minutes, starving concurrent writers; the nightly
+        rebuild is the clustering authority instead.
         """
         if self._pending_cluster_keys is not None:
             raise RuntimeError("deferred clustering does not nest")
@@ -426,7 +435,7 @@ class TemporalStore:
         try:
             yield
             pending = self._pending_cluster_keys
-            if pending:
+            if flush and pending:
                 with self._connect() as connection:
                     self._refresh_document_clusters(connection, pending)
         finally:

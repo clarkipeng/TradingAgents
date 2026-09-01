@@ -62,7 +62,7 @@ def import_media_store_posts(
     chunk_size = 500
     for start_index in range(0, len(rows), chunk_size):
         chunk = rows[start_index:start_index + chunk_size]
-        with temporal_store.write_lock(), temporal_store.deferred_clustering():
+        with temporal_store.write_lock(), temporal_store.deferred_clustering(flush=False):
             for offset, row in enumerate(chunk, start=start_index + 1):
                 evidence_id = _import_row(temporal_store, row)
                 if evidence_id is None:

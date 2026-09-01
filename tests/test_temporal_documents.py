@@ -166,6 +166,50 @@ def test_deferred_clustering_batches_the_refresh_and_matches_reindex(tmp_path, m
     assert cluster_map() == batched
 
 
+def test_unflushed_deferred_clustering_leaves_singletons_until_reindex(tmp_path, monkeypatch):
+    """Continuous ingestion must not pay any per-batch cluster refresh - at
+    ~170k documents one refresh scans the whole corpus and holds the write
+    lock for minutes (observed live: hourly mirror batches starved a running
+    portfolio day). flush=False skips the refresh entirely; the nightly
+    reindex is the authority that assigns clusters."""
+    store = TemporalStore(tmp_path)
+    refreshes = []
+    original = TemporalStore._refresh_document_clusters
+    monkeypatch.setattr(
+        TemporalStore, "_refresh_document_clusters",
+        staticmethod(lambda connection, target_keys=None: refreshes.append(True) or original(connection, target_keys)),
+    )
+
+    title = "Nvidia quarterly earnings beat expectations across data center segment"
+    with store.deferred_clustering(flush=False):
+        for index in range(2):
+            store.record(
+                "corpus.document",
+                {"url": f"https://news.example/nf-{index}"},
+                {"text": f"{title}{'s' * index}\n\nBody {index}", "metadata": {
+                    "article": {"title": f"{title}{'s' * index}", "url": f"https://news.example/a-{index}"}
+                }},
+                available_at=at(9),
+                source=f"https://news.example/nf-{index}",
+            )
+    assert refreshes == []  # ingestion never refreshed
+
+    connection = sqlite3.connect(tmp_path / "temporal.sqlite3")
+    try:
+        clusters = [row[0] for row in connection.execute("select distinct cluster_key from documents")]
+    finally:
+        connection.close()
+    assert len(clusters) == 2  # self-clustered singletons until the rebuild
+
+    store.reindex_documents()
+    connection = sqlite3.connect(tmp_path / "temporal.sqlite3")
+    try:
+        clusters = [row[0] for row in connection.execute("select distinct cluster_key from documents")]
+    finally:
+        connection.close()
+    assert len(clusters) == 1  # the nightly authority merges them
+
+
 def test_store_open_does_not_write_existing_database(tmp_path):
     store = TemporalStore(tmp_path)
     store.record("corpus.document", {"url": "https://example.com"}, {"text": "body", "metadata": {}}, available_at=at(9))

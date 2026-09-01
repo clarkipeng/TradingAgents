@@ -1323,7 +1323,9 @@ def temporal_reindex(
     """Rebuild normalized documents and external-content chunks idempotently."""
     from tradingagents.temporal import TemporalStore
 
-    count = TemporalStore(store).reindex_documents()
+    temporal_store = TemporalStore(store)
+    with temporal_store.write_lock():
+        count = temporal_store.reindex_documents()
     typer.echo(f"Reindexed {count} documents in {store}")
 
 
