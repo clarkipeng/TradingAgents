@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from decimal import Decimal
+from uuid import uuid4
 
 import pytest
 
 from tradingagents import portfolio_run
-from tradingagents.temporal import TemporalStore
+from tradingagents.temporal import TemporalRunInvalidError, TemporalStore
 
 UTC = timezone.utc
 DAY_END = datetime(2026, 8, 28, 21, 30, tzinfo=UTC)
@@ -137,6 +138,35 @@ def test_run_portfolio_day_seals_state_and_next_day_reads_it(tmp_path):
     )
     assert next_day["portfolio_day"] == "2026-08-28"
     assert next_day["positions"] == {"NVDA": "20"}
+
+
+@pytest.mark.unit
+def test_run_portfolio_day_does_not_seal_when_tape_persistence_latches_run(tmp_path, monkeypatch):
+    store = TemporalStore(tmp_path)
+    from tradingagents.temporal_adapters.langchain import LangChainTapeRecorder
+
+    recorder = LangChainTapeRecorder(store)
+
+    def fail(*args, **kwargs):
+        raise RuntimeError("storage detail must not escape")
+
+    monkeypatch.setattr(store, "begin_llm_call", fail)
+
+    def research(ticker, context):
+        recorder.on_llm_start({"name": "test-model"}, [ticker], run_id=uuid4())
+        return {"rating": "Buy", "brief": "brief"}
+
+    with pytest.raises(TemporalRunInvalidError, match="^temporal run is invalid$"):
+        portfolio_run.run_portfolio_day(
+            store,
+            ["NVDA"],
+            day="2026-08-28",
+            research_fn=research,
+            complete_llm=lambda prompt: '{"weights": {"NVDA": 0.10}}',
+            quote_fn=lambda symbol, day: Decimal("500"),
+        )
+
+    assert store.get_scenario("portfolio-2026-08-28") is None
 
 
 @pytest.mark.unit

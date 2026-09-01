@@ -15,7 +15,11 @@ from .models import TemporalMode
 from .store import TemporalStore
 
 
-@dataclass(frozen=True)
+class TemporalRunInvalidError(RuntimeError):
+    """The active temporal run cannot produce a sealed result."""
+
+
+@dataclass
 class TemporalContext:
     mode: TemporalMode
     clock: VirtualClock
@@ -23,6 +27,15 @@ class TemporalContext:
     store: TemporalStore | None = None
     run_id: str | None = None
     source_run_id: str | None = None
+    _invalid: bool = False
+
+    def invalidate(self) -> None:
+        """Latch this run invalid; the latch is intentionally irreversible."""
+        self._invalid = True
+
+    def ensure_valid(self) -> None:
+        if self._invalid:
+            raise TemporalRunInvalidError("temporal run is invalid")
 
     @classmethod
     def at(

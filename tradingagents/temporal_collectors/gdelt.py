@@ -107,6 +107,7 @@ def import_gdelt_articles(
             payload = response.json()
         except ValueError as error:
             raise GdeltResponseError("GDELT returned a non-JSON response (often a rate-limit message)") from error
+    fetch_receipt = datetime.now(timezone.utc)
     if not isinstance(payload, dict) or not isinstance(payload.get("articles"), list):
         raise GdeltResponseError("GDELT response has no article list")
     raw_response_artifact_hash = store.put_artifact(
@@ -119,7 +120,7 @@ def import_gdelt_articles(
     # whole corpus and cannot be paid inside a paced nightly sweep.
     with store.deferred_clustering(flush=False):
         _import_gdelt_article_rows(
-            store, payload, query, raw_response_artifact_hash, evidence_ids, failures
+            store, payload, query, raw_response_artifact_hash, fetch_receipt, evidence_ids, failures
         )
     return GdeltImportResult(
         requested=len(payload["articles"]),
@@ -130,7 +131,9 @@ def import_gdelt_articles(
     )
 
 
-def _import_gdelt_article_rows(store, payload, query, raw_response_artifact_hash, evidence_ids, failures):
+def _import_gdelt_article_rows(
+    store, payload, query, raw_response_artifact_hash, fetch_receipt, evidence_ids, failures
+):
     for position, article in enumerate(payload["articles"], start=1):
         if not isinstance(article, dict):
             failures.append(f"article-{position}:invalid-record")
@@ -147,20 +150,21 @@ def _import_gdelt_article_rows(store, payload, query, raw_response_artifact_hash
                 "source": "gdelt-doc-2",
                 "query": query,
                 "url": url,
-                "seendate": article["seendate"],
             },
             {
                 "text": title,
                 "metadata": {
-                    "article": article,
+                    "article": {key: value for key, value in article.items() if key != "seendate"},
                     "query": query,
                     "raw_response_artifact_hash": raw_response_artifact_hash,
-                    "availability_basis": "gdelt-seendate",
+                    "available_at_policy": "fetch-receipt",
+                    "availability_basis": "gdelt-fetch-receipt",
+                    "provider_available_at_estimate": seen_at.isoformat(),
                     "original_content": "not-fetched",
                 },
             },
-            available_at=seen_at,
-            observed_at=seen_at,
+            available_at=fetch_receipt,
+            observed_at=fetch_receipt,
             fidelity="archive-reconstructed",
             source=url,
         )
