@@ -61,7 +61,8 @@ class GraphSetup:
         self.analyst_extra_tools = analyst_extra_tools
 
     def setup_graph(
-        self, selected_analysts=("market", "social", "news", "fundamentals")
+        self, selected_analysts=("market", "social", "news", "fundamentals"),
+        *, analysts_only: bool = False,
     ):
         """Set up and compile the agent workflow graph.
 
@@ -107,6 +108,21 @@ class GraphSetup:
             workflow.add_node(spec.agent_node, analyst_factories[spec.key]())
             workflow.add_node(spec.clear_node, create_msg_delete())
             workflow.add_node(spec.tool_node, self.tool_nodes[spec.key])
+
+        if analysts_only:
+            workflow.add_edge(START, plan.specs[0].agent_node)
+            for i, spec in enumerate(plan.specs):
+                workflow.add_conditional_edges(
+                    spec.agent_node,
+                    getattr(self.conditional_logic, f"should_continue_{spec.key}"),
+                    [spec.tool_node, spec.clear_node],
+                )
+                workflow.add_edge(spec.tool_node, spec.agent_node)
+                workflow.add_edge(
+                    spec.clear_node,
+                    END if i == len(plan.specs) - 1 else plan.specs[i + 1].agent_node,
+                )
+            return workflow
 
         # Add other nodes
         workflow.add_node("Bull Researcher", bull_researcher_node)

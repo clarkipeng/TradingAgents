@@ -166,7 +166,10 @@ class TradingAgentsGraph:
         self.selected_analysts = tuple(selected_analysts)
 
         # Set up the graph: keep the workflow for recompilation with a checkpointer.
-        self.workflow = self.graph_setup.setup_graph(selected_analysts)
+        self.workflow = self.graph_setup.setup_graph(
+            selected_analysts,
+            analysts_only=bool(self.config.get("analysts_only", False)),
+        )
         self.graph = self.workflow.compile()
         self._checkpointer_ctx = None
 
@@ -635,6 +638,11 @@ class TradingAgentsGraph:
                 final_state.update(chunk)
         else:
             final_state = self.graph.invoke(init_agent_state, **args)
+
+        if self.config.get("analysts_only"):
+            # Portfolio sweeps stop at analyst reports.  The CIO outside this
+            # graph is the sole cross-sectional judge.
+            return final_state, "Hold"
 
         # Store current state for reflection.
         self.curr_state = final_state
