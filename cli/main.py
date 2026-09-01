@@ -1320,13 +1320,16 @@ def temporal_import(
 def temporal_reindex(
     store: Path = typer.Option(Path(".tradingagents/temporal"), "--store", help="Temporal evidence-store directory."),  # noqa: B008
 ):
-    """Rebuild normalized documents and external-content chunks idempotently."""
+    """Rebuild normalized documents through an atomic generational swap."""
     from tradingagents.temporal import TemporalStore
 
     temporal_store = TemporalStore(store)
     with temporal_store.write_lock():
         count = temporal_store.reindex_documents()
-    typer.echo(f"Reindexed {count} documents in {store}")
+    typer.echo(
+        f"Reindexed {count} documents in {store} (generation {temporal_store.active_generation_id()}). "
+        "The 21:30 launchd job remains unloaded until the owner re-arms it."
+    )
 
 
 @app.command("temporal-capture")

@@ -120,6 +120,18 @@ def test_incremental_cluster_assignments_match_full_reindex(tmp_path):
     assert incremental == rebuilt
 
 
+def test_reindex_publishes_a_complete_generation_and_traces_it(tmp_path):
+    store = TemporalStore(tmp_path)
+    store.record("corpus.document", {"url": "https://example.com/a"}, {"text": "alpha", "metadata": {}}, available_at=at(9))
+    assert store.active_generation_id() == 0
+    store.reindex_documents()
+    generation = store.active_generation_id()
+    assert generation == 1
+    response = store.search("alpha", as_of=at(10))
+    assert response.manifest.generation_id == generation
+    assert response.manifest.index_state_hash
+
+
 def test_deferred_clustering_batches_the_refresh_and_matches_reindex(tmp_path, monkeypatch):
     """Bulk imports must not pay a full-corpus cluster scan per row (measured
     live: 8.7s/post at 17k documents). Inside deferred_clustering() inserts
@@ -129,9 +141,9 @@ def test_deferred_clustering_batches_the_refresh_and_matches_reindex(tmp_path, m
     refreshes = []
     original = TemporalStore._refresh_document_clusters
 
-    def counting_refresh(connection, target_keys=None):
+    def counting_refresh(connection, target_keys=None, table="documents"):
         refreshes.append(target_keys if target_keys is None else set(target_keys))
-        return original(connection, target_keys)
+        return original(connection, target_keys, table)
 
     monkeypatch.setattr(TemporalStore, "_refresh_document_clusters", staticmethod(counting_refresh))
 
@@ -177,7 +189,7 @@ def test_unflushed_deferred_clustering_leaves_singletons_until_reindex(tmp_path,
     original = TemporalStore._refresh_document_clusters
     monkeypatch.setattr(
         TemporalStore, "_refresh_document_clusters",
-        staticmethod(lambda connection, target_keys=None: refreshes.append(True) or original(connection, target_keys)),
+        staticmethod(lambda connection, target_keys=None, table="documents": refreshes.append(True) or original(connection, target_keys, table)),
     )
 
     title = "Nvidia quarterly earnings beat expectations across data center segment"
