@@ -652,6 +652,42 @@ class TemporalStore:
             raise KeyError(f"unknown evidence: {evidence_id}")
         return self._record_from_row(row)
 
+    def latest_portfolio_state(
+        self, as_of: datetime, *, tool: str = "portfolio.state"
+    ) -> tuple[dict[str, Any], dict[str, Any]] | None:
+        """Return the latest captured portfolio state visible at ``as_of``.
+
+        Portfolio consumers should use this boundary instead of depending on
+        the store's SQLite connection or evidence-table layout.
+        """
+        cutoff = format_timestamp(parse_timestamp(as_of))
+        with self._connect() as connection:
+            row = connection.execute(
+                """SELECT request_json, response_json FROM evidence
+                   WHERE tool = ? AND is_error = 0 AND available_at <= ?
+                   ORDER BY available_at DESC, evidence_id LIMIT 1""",
+                (tool, cutoff),
+            ).fetchone()
+        if row is None:
+            return None
+        return json.loads(row["request_json"]), json.loads(row["response_json"])
+
+    def list_portfolio_states(
+        self, *, tool: str = "portfolio.state"
+    ) -> list[tuple[dict[str, Any], dict[str, Any]]]:
+        """Return all captured portfolio states in deterministic write order."""
+        with self._connect() as connection:
+            rows = connection.execute(
+                """SELECT request_json, response_json FROM evidence
+                   WHERE tool = ? AND is_error = 0
+                   ORDER BY available_at, evidence_id""",
+                (tool,),
+            ).fetchall()
+        return [
+            (json.loads(row["request_json"]), json.loads(row["response_json"]))
+            for row in rows
+        ]
+
     def corpus_hash(self, *, as_of: datetime) -> str:
         """Digest the exact evidence corpus eligible at one virtual time."""
         cutoff = format_timestamp(parse_timestamp(as_of))

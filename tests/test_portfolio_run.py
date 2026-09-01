@@ -42,6 +42,17 @@ def test_portfolio_state_seals_and_reads_point_in_time(tmp_path):
     )
     assert earlier["portfolio_day"] is None
 
+    assert store.latest_portfolio_state(DAY_END) == (
+        {"portfolio_day": "2026-08-28"},
+        {"cash": "60000", "positions": {"NVDA": "200"}, "equity": "104000"},
+    )
+    assert store.list_portfolio_states() == [
+        (
+            {"portfolio_day": "2026-08-28"},
+            {"cash": "60000", "positions": {"NVDA": "200"}, "equity": "104000"},
+        )
+    ]
+
 
 @pytest.mark.unit
 def test_cio_falls_back_to_deterministic_weights_on_invalid_output():

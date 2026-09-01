@@ -57,23 +57,15 @@ def portfolio_state_asof(
     initial_cash: str = DEFAULT_CONSTRAINTS["initial_cash"],
 ) -> dict:
     """Read the latest sealed portfolio state observable at ``as_of``."""
-    cutoff = format_timestamp(parse_timestamp(as_of))
-    with store._connect() as connection:
-        row = connection.execute(
-            """SELECT request_json, response_json FROM evidence
-               WHERE tool = ? AND is_error = 0 AND available_at <= ?
-               ORDER BY available_at DESC, evidence_id LIMIT 1""",
-            (_STATE_TOOL, cutoff),
-        ).fetchone()
-    if row is None:
+    state = store.latest_portfolio_state(as_of, tool=_STATE_TOOL)
+    if state is None:
         return {
             "portfolio_day": None,
             "cash": initial_cash,
             "positions": {},
             "equity": None,
         }
-    request = json.loads(row["request_json"])
-    response = json.loads(row["response_json"])
+    request, response = state
     return {
         "portfolio_day": request["portfolio_day"],
         "cash": response["cash"],
@@ -302,17 +294,9 @@ def portfolio_report(
     is generated. Benchmark closes are caller-supplied (first and last day
     are enough) because the report itself must not fetch anything.
     """
-    with store._connect() as connection:
-        rows = connection.execute(
-            """SELECT request_json, response_json FROM evidence
-               WHERE tool = ? AND is_error = 0
-               ORDER BY available_at, evidence_id""",
-            (_STATE_TOOL,),
-        ).fetchall()
     by_day: dict[str, dict] = {}
-    for row in rows:
-        day = json.loads(row["request_json"])["portfolio_day"]
-        by_day[day] = json.loads(row["response_json"])  # last write per day wins
+    for request, response in store.list_portfolio_states(tool=_STATE_TOOL):
+        by_day[request["portfolio_day"]] = response  # last write per day wins
 
     days = []
     previous_equity: Decimal | None = None
