@@ -7,7 +7,13 @@ from langchain_core.messages import AIMessage, HumanMessage, message_to_dict
 from langchain_core.outputs import ChatGeneration, LLMResult
 from pydantic import BaseModel
 
-from tradingagents.temporal import TemporalContext, TemporalMode, TemporalStore, temporal_context
+from tradingagents.temporal import (
+    TemporalContext,
+    TemporalMode,
+    TemporalRunInvalidError,
+    TemporalStore,
+    temporal_context,
+)
 from tradingagents.temporal_adapters.langchain import (
     LangChainTapeRecorder,
     TapeChatModel,
@@ -62,6 +68,21 @@ def test_langchain_recorder_persists_errors(tmp_path):
     call = store.get_llm_call(str(run_id))
     assert call.response is None
     assert call.error == {"error_type": "ValueError", "message": "provider unavailable"}
+
+
+def test_langchain_persistence_failure_latches_active_run_with_sanitized_error(tmp_path, monkeypatch):
+    store = TemporalStore(tmp_path)
+    recorder = LangChainTapeRecorder(store)
+    context = TemporalContext.at(TemporalMode.LIVE_CAPTURE, datetime.now(UTC), store=store)
+
+    def fail(*args, **kwargs):
+        raise RuntimeError("storage detail must not escape")
+
+    monkeypatch.setattr(store, "begin_llm_call", fail)
+    with temporal_context(context):
+        recorder.on_llm_start({"name": "test-model"}, ["hello"], run_id=uuid4())
+        with pytest.raises(TemporalRunInvalidError, match="^temporal run is invalid$"):
+            context.ensure_valid()
 
 
 def _taped_chat_call(store, prompt, response, run_id, *, temporal_run_id=None, scenario_id=None):

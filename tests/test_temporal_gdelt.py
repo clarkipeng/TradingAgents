@@ -127,6 +127,7 @@ def test_gdelt_import_preserves_query_artifact_and_uses_seen_clock(tmp_path):
         }
     )
 
+    before_fetch = datetime.now(UTC)
     result = import_gdelt_articles(
         store,
         query="NVDA",
@@ -139,9 +140,16 @@ def test_gdelt_import_preserves_query_artifact_and_uses_seen_clock(tmp_path):
     assert result.imported == 1
     assert result.failures == ("article-2:missing-url-title-or-seendate",)
     record = store.get_evidence(result.evidence_ids[0])
-    assert record.available_at == datetime(2024, 2, 21, 17, 2, 3, tzinfo=UTC)
+    after_fetch = datetime.now(UTC)
+    assert before_fetch <= record.available_at <= after_fetch
+    assert record.observed_at == record.available_at
     assert record.source == "https://news.example/nvda"
-    assert record.response["metadata"]["availability_basis"] == "gdelt-seendate"
+    metadata = record.response["metadata"]
+    assert metadata["available_at_policy"] == "fetch-receipt"
+    assert metadata["availability_basis"] == "gdelt-fetch-receipt"
+    assert metadata["provider_available_at_estimate"] == "2024-02-21T17:02:03+00:00"
+    assert "seendate" not in record.request
+    assert "seendate" not in metadata["article"]
     assert record.response["metadata"]["original_content"] == "not-fetched"
     assert store.read_artifact(result.response_artifact_hash)
     params = session.calls[0][1]["params"]

@@ -793,6 +793,11 @@ class TemporalStore:
         capture_run_id: str | None = None,
     ) -> ScenarioDefinition:
         """Seal the identity of one reproducible historical environment."""
+        from .runtime import current_context
+
+        active_context = current_context()
+        if active_context is not None:
+            active_context.ensure_valid()
         if not scenario_id or not basis:
             raise ValueError("scenario_id and basis are required")
         definition_time = parse_timestamp(as_of)

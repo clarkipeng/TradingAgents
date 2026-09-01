@@ -308,7 +308,9 @@ class LangChainTapeRecorder(BaseCallbackHandler):
                 temporal_run_id=context.run_id if context else None,
             )
         except Exception:
-            logger.exception("failed to persist temporal LLM request")
+            if context is not None:
+                context.invalidate()
+            logger.warning("failed to persist temporal LLM request; run invalidated")
 
     def _finish(
         self,
@@ -325,7 +327,10 @@ class LangChainTapeRecorder(BaseCallbackHandler):
                 completed_at=datetime.now(timezone.utc),
             )
         except Exception:
-            logger.exception("failed to persist temporal LLM response")
+            context = current_context()
+            if context is not None:
+                context.invalidate()
+            logger.warning("failed to persist temporal LLM response; run invalidated")
 
 
 class TapeMismatchError(RuntimeError):

@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 import requests
@@ -73,7 +73,15 @@ def import_gdelt_wayback_bodies(
         if not isinstance(url, str) or not url:
             failures.append(f"{discovery_id}:missing-url")
             continue
-        capture_start = record.available_at
+        provider_estimate = record.response["metadata"].get("provider_available_at_estimate")
+        if not isinstance(provider_estimate, str):
+            failures.append(f"{discovery_id}:missing-provider-availability-estimate")
+            continue
+        try:
+            capture_start = datetime.fromisoformat(provider_estimate)
+        except ValueError:
+            failures.append(f"{discovery_id}:invalid-provider-availability-estimate")
+            continue
         capture_end = capture_start + timedelta(days=max_capture_lag_days)
         try:
             recovered = import_wayback_captures(

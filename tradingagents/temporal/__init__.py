@@ -42,7 +42,7 @@ from .models import (
     request_key,
 )
 from .retriever import TemporalRetriever
-from .runtime import TemporalContext, current_context, temporal_context
+from .runtime import TemporalContext, TemporalRunInvalidError, current_context, temporal_context
 from .simulation import (
     Fill,
     InsufficientBuyingPowerError,
@@ -79,6 +79,7 @@ __all__ = [
     "ScenarioRubricRecord",
     "ReplayedToolError",
     "TemporalContext",
+    "TemporalRunInvalidError",
     "TemporalDocument",
     "TemporalGateway",
     "TemporalMode",

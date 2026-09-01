@@ -297,6 +297,8 @@ def run_portfolio_day(
             available_at=as_of,
         )
 
+        context.ensure_valid()
+
     store.seal_scenario(
         scenario_id,
         as_of=as_of,
