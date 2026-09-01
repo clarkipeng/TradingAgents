@@ -44,6 +44,25 @@ def test_portfolio_state_seals_and_reads_point_in_time(tmp_path):
 
 
 @pytest.mark.unit
+def test_temporal_store_owns_portfolio_state_projections(tmp_path):
+    store = TemporalStore(tmp_path)
+    portfolio_run.record_portfolio_state(
+        store,
+        {"cash": "60000", "positions": {"NVDA": "20"}, "equity": "70000"},
+        day="2026-08-28",
+        available_at=DAY_END,
+    )
+
+    assert store.portfolio_state_asof(DAY_END)["portfolio_day"] == "2026-08-28"
+    assert store.portfolio_states() == [{
+        "portfolio_day": "2026-08-28",
+        "cash": "60000",
+        "positions": {"NVDA": "20"},
+        "equity": "70000",
+    }]
+
+
+@pytest.mark.unit
 def test_cio_falls_back_to_deterministic_weights_on_invalid_output():
     ratings = {"NVDA": "Overweight", "TSLA": "Sell", "MSFT": "Hold"}
 
