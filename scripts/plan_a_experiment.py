@@ -106,7 +106,9 @@ def main() -> int:
         return 2
 
     store = TemporalStore(STORE_PATH)
-    store.verify_scenario_corpus(scenario_id)  # refuse drifted worlds up front
+    if not store.verify_scenario_corpus(scenario_id):
+        print(f"refusing drifted scenario corpus: {scenario_id}", file=sys.stderr)
+        return 1
     if store.get_scenario_rubric(scenario_id) is None:
         print(f"warning: {scenario_id} has no sealed rubric - runs will not be "
               "coverage-scorable until one is sealed", file=sys.stderr)

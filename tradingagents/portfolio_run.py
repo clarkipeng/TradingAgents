@@ -27,8 +27,9 @@ DEFAULT_CONSTRAINTS = {
 }
 
 # A portfolio day is deliberately bounded before any provider work starts.
-# Research is one logical call per ticker and CIO sizing is one additional call.
-MAX_LLM_CALLS_PER_PORTFOLIO_DAY = 25
+# One unit is one research invocation (a full per-ticker graph run) or the
+# CIO sizing call; the 30-ticker universe plus CIO plus headroom fits under it.
+MAX_RESEARCH_CALLS_PER_PORTFOLIO_DAY = 40
 
 logger = logging.getLogger(__name__)
 
@@ -176,18 +177,18 @@ def run_portfolio_day(
         # never a second spend.
         return {"skipped": "day already sealed", "scenario_id": scenario_id, "day": day}
 
-    planned_llm_calls = len(tickers) + 1
-    if planned_llm_calls > MAX_LLM_CALLS_PER_PORTFOLIO_DAY:
+    planned_research_calls = len(tickers) + 1
+    if planned_research_calls > MAX_RESEARCH_CALLS_PER_PORTFOLIO_DAY:
         logger.warning(
-            "LLM call budget exceeded for portfolio day %s: planned=%d cap=%d; skipping",
-            day, planned_llm_calls, MAX_LLM_CALLS_PER_PORTFOLIO_DAY,
+            "research call budget exceeded for portfolio day %s: planned=%d cap=%d; skipping",
+            day, planned_research_calls, MAX_RESEARCH_CALLS_PER_PORTFOLIO_DAY,
         )
         return {
-            "skipped": "LLM call budget exceeded",
+            "skipped": "research call budget exceeded",
             "scenario_id": scenario_id,
             "day": day,
-            "llm_call_budget": MAX_LLM_CALLS_PER_PORTFOLIO_DAY,
-            "planned_llm_calls": planned_llm_calls,
+            "research_call_budget": MAX_RESEARCH_CALLS_PER_PORTFOLIO_DAY,
+            "planned_research_calls": planned_research_calls,
         }
 
     as_of = parse_timestamp(f"{day}T21:30:00Z")
@@ -196,17 +197,17 @@ def run_portfolio_day(
         run_id=run_id or str(uuid.uuid4()),
     )
     with temporal_context(context):
-        llm_calls = 0
+        research_calls = 0
 
-        def call_llm(callable_, *args):
-            nonlocal llm_calls
-            if llm_calls >= MAX_LLM_CALLS_PER_PORTFOLIO_DAY:
+        def budgeted_call(callable_, *args):
+            nonlocal research_calls
+            if research_calls >= MAX_RESEARCH_CALLS_PER_PORTFOLIO_DAY:
                 logger.warning(
-                    "LLM call budget exceeded for portfolio day %s: calls=%d cap=%d; skipping",
-                    day, llm_calls, MAX_LLM_CALLS_PER_PORTFOLIO_DAY,
+                    "research call budget exceeded for portfolio day %s: calls=%d cap=%d; skipping",
+                    day, research_calls, MAX_RESEARCH_CALLS_PER_PORTFOLIO_DAY,
                 )
                 return None
-            llm_calls += 1
+            research_calls += 1
             return callable_(*args)
 
         ratings: dict[str, str] = {}
@@ -214,13 +215,13 @@ def run_portfolio_day(
         failures: list[str] = []
         for ticker in tickers:
             try:
-                research = call_llm(research_fn, ticker, context)
+                research = budgeted_call(research_fn, ticker, context)
                 if research is None:
                     return {
-                        "skipped": "LLM call budget exceeded",
+                        "skipped": "research call budget exceeded",
                         "scenario_id": scenario_id,
                         "day": day,
-                        "llm_call_budget": MAX_LLM_CALLS_PER_PORTFOLIO_DAY,
+                        "research_call_budget": MAX_RESEARCH_CALLS_PER_PORTFOLIO_DAY,
                     }
                 ratings[ticker] = research["rating"]
                 briefs[ticker] = research.get("brief", "")
@@ -254,7 +255,7 @@ def run_portfolio_day(
         plan = cio_allocate(
             {t: r for t, r in ratings.items() if t in quotes},
             briefs=briefs, constraints=constraints,
-            complete_llm=lambda prompt: call_llm(complete_llm, prompt),
+            complete_llm=lambda prompt: budgeted_call(complete_llm, prompt),
         )
         orders = rebalance_orders(prior, plan["weights"], quotes, submitted_at=as_of)
 

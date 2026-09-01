@@ -1563,7 +1563,7 @@ def temporal_portfolio_run(
     )
     summary = run_portfolio_day(temporal_store, symbols, day=date, **inputs)
     typer.echo(json.dumps(summary, indent=2, sort_keys=True))
-    if summary["failures"]:
+    if summary.get("failures"):
         typer.echo(f"failures: {', '.join(summary['failures'])}", err=True)
 
 
