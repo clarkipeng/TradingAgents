@@ -560,7 +560,7 @@ class TemporalStore:
                 token_index.setdefault(token, []).append(row["doc_key"])
         ubiquitous_cutoff = max(8, len(rows) // 20)
 
-        for url, keys in by_url.items():
+        for keys in by_url.values():
             for key in keys[1:]:
                 union(keys[0], key)
 
@@ -1421,6 +1421,52 @@ class TemporalStore:
                 "available_at": row["available_at"],
             })
         return posts
+
+    def portfolio_state_asof(
+        self,
+        as_of: datetime,
+        *,
+        initial_cash: str = "100000",
+    ) -> dict:
+        """Return the latest captured portfolio state visible at ``as_of``."""
+        cutoff = format_timestamp(parse_timestamp(as_of))
+        with self._connect() as connection:
+            row = connection.execute(
+                """SELECT request_json, response_json FROM evidence
+                   WHERE tool = 'portfolio.state' AND is_error = 0
+                     AND available_at <= ?
+                   ORDER BY available_at DESC, evidence_id LIMIT 1""",
+                (cutoff,),
+            ).fetchone()
+        if row is None:
+            return {
+                "portfolio_day": None,
+                "cash": initial_cash,
+                "positions": {},
+                "equity": None,
+            }
+        return self._portfolio_state_from_row(row)
+
+    def portfolio_states(self) -> list[dict]:
+        """Return all captured portfolio states in deterministic evidence order."""
+        with self._connect() as connection:
+            rows = connection.execute(
+                """SELECT request_json, response_json FROM evidence
+                   WHERE tool = 'portfolio.state' AND is_error = 0
+                   ORDER BY available_at, evidence_id"""
+            ).fetchall()
+        return [self._portfolio_state_from_row(row) for row in rows]
+
+    @staticmethod
+    def _portfolio_state_from_row(row: sqlite3.Row) -> dict:
+        request = json.loads(row["request_json"])
+        response = json.loads(row["response_json"])
+        return {
+            "portfolio_day": request["portfolio_day"],
+            "cash": response["cash"],
+            "positions": dict(response["positions"]),
+            "equity": response.get("equity"),
+        }
 
     def list_search_traces(self, run_id: str) -> list[SearchTraceRecord]:
         with self._connect() as connection:
