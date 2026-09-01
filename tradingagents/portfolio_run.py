@@ -11,6 +11,9 @@ from __future__ import annotations
 import json
 import logging
 import math
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 from decimal import Decimal
 
@@ -30,6 +33,9 @@ DEFAULT_CONSTRAINTS = {
 # One unit is one research invocation (a full per-ticker graph run) or the
 # CIO sizing call; the 30-ticker universe plus CIO plus headroom fits under it.
 MAX_RESEARCH_CALLS_PER_PORTFOLIO_DAY = 40
+MAX_RESEARCH_WORKERS = 4
+MIN_TICKER_COVERAGE = 0.8
+PORTFOLIO_DAY_DEADLINE_SECONDS = 900
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +61,15 @@ def record_portfolio_state(
         available_at=available_at,
         source="portfolio-simulator",
     )
+    claim_id = f"legacy:{day}"
+    store.claim_portfolio_day(day, claim_id, claimed_at=available_at)
+    if store.portfolio_day(day)["status"] == "claimed":
+        store.complete_portfolio_day(
+            day, claim_id, state=state, available_at=available_at,
+            scenario_id=f"portfolio-{day}", scenario_as_of=available_at,
+            scenario_basis="legacy", scenario_metadata={"kind": "portfolio-day"},
+            capture_run_id=claim_id, decision="", report="",
+        )
     return record.evidence_id
 
 
@@ -165,13 +180,13 @@ def run_portfolio_day(
     and the post-fill state becomes evidence the next day reads. One ticker's
     research failure costs that ticker, never the day.
     """
-    import uuid
-
     from tradingagents.temporal import TemporalContext, TemporalMode, temporal_context
     from tradingagents.temporal.simulation import MarketQuote, PortfolioSimulator
 
     scenario_id = f"portfolio-{day}"
-    if store.get_scenario(scenario_id) is not None:
+    import uuid
+    claim_id = run_id or str(uuid.uuid4())
+    if not store.claim_portfolio_day(day, claim_id):
         # Sealed days are immutable; a retry (manual overlap, a scheduler
         # re-fire after machine sleep) is a quiet no-op, never a crash and
         # never a second spend.
@@ -183,6 +198,7 @@ def run_portfolio_day(
             "research call budget exceeded for portfolio day %s: planned=%d cap=%d; skipping",
             day, planned_research_calls, MAX_RESEARCH_CALLS_PER_PORTFOLIO_DAY,
         )
+        store.fail_portfolio_day(day, claim_id, "POLICY_BREACH")
         return {
             "skipped": "research call budget exceeded",
             "scenario_id": scenario_id,
@@ -198,35 +214,47 @@ def run_portfolio_day(
     )
     with temporal_context(context):
         research_calls = 0
+        call_lock = threading.Lock()
+        started = time.monotonic()
+        deadline_breached = False
 
         def budgeted_call(callable_, *args):
-            nonlocal research_calls
-            if research_calls >= MAX_RESEARCH_CALLS_PER_PORTFOLIO_DAY:
-                logger.warning(
-                    "research call budget exceeded for portfolio day %s: calls=%d cap=%d; skipping",
-                    day, research_calls, MAX_RESEARCH_CALLS_PER_PORTFOLIO_DAY,
-                )
-                return None
-            research_calls += 1
+            nonlocal research_calls, deadline_breached
+            with call_lock:
+                if time.monotonic() - started >= PORTFOLIO_DAY_DEADLINE_SECONDS:
+                    deadline_breached = True
+                    return None
+                if research_calls >= MAX_RESEARCH_CALLS_PER_PORTFOLIO_DAY:
+                    deadline_breached = True
+                    logger.warning(
+                        "research call budget exceeded for portfolio day %s: calls=%d cap=%d; skipping",
+                        day, research_calls, MAX_RESEARCH_CALLS_PER_PORTFOLIO_DAY,
+                    )
+                    return None
+                research_calls += 1
             return callable_(*args)
 
         ratings: dict[str, str] = {}
         briefs: dict[str, str] = {}
         failures: list[str] = []
-        for ticker in tickers:
-            try:
-                research = budgeted_call(research_fn, ticker, context)
-                if research is None:
-                    return {
-                        "skipped": "research call budget exceeded",
-                        "scenario_id": scenario_id,
-                        "day": day,
-                        "research_call_budget": MAX_RESEARCH_CALLS_PER_PORTFOLIO_DAY,
-                    }
-                ratings[ticker] = research["rating"]
-                briefs[ticker] = research.get("brief", "")
-            except Exception as error:  # noqa: BLE001 - one ticker never kills the day
-                failures.append(f"{ticker}: {type(error).__name__}")
+        with ThreadPoolExecutor(max_workers=MAX_RESEARCH_WORKERS) as pool:
+            futures = {pool.submit(budgeted_call, research_fn, ticker, context): ticker for ticker in tickers}
+            for future in as_completed(futures):
+                ticker = futures[future]
+                try:
+                    research = future.result()
+                    if research is not None:
+                        ratings[ticker] = research["rating"]
+                        briefs[ticker] = research.get("brief", "")[:400]
+                except Exception as error:  # noqa: BLE001 - one ticker never kills the day
+                    failures.append(f"{ticker}: {type(error).__name__}")
+        coverage = len(ratings) / len(tickers) if tickers else 0.0
+        if deadline_breached:
+            store.fail_portfolio_day(day, claim_id, "POLICY_BREACH")
+            return {"outcome": "POLICY_BREACH", "policy_breach": "DEADLINE_OR_CALL_CEILING", "coverage": coverage, "failures": failures, "day": day, "scenario_id": scenario_id}
+        if len(tickers) >= 3 and coverage < MIN_TICKER_COVERAGE:
+            store.fail_portfolio_day(day, claim_id, "POLICY_BREACH")
+            return {"outcome": "POLICY_BREACH", "policy_breach": "MIN_TICKER_COVERAGE", "coverage": coverage, "failures": failures, "day": day, "scenario_id": scenario_id}
 
         prior = portfolio_state_asof(
             store, as_of, initial_cash=constraints["initial_cash"]
@@ -234,19 +262,28 @@ def run_portfolio_day(
         symbols = sorted(set(ratings) | set(prior["positions"]))
         quotes: dict[str, Decimal] = {}
         for symbol in symbols:
-            price = quote_fn(symbol, day)
+            try:
+                price = quote_fn(symbol, day)
+            except Exception as error:  # noqa: BLE001 - quote gaps are policy data
+                failures.append(f"{symbol}: {type(error).__name__}")
+                price = None
             if price is None:
                 failures.append(f"{symbol}: no quote")
             else:
                 quotes[symbol] = Decimal(str(price))
 
+        if set(prior["positions"]) - set(quotes):
+            store.fail_portfolio_day(day, claim_id, "QUOTE_COVERAGE_FAILED")
+            return {"outcome": "QUOTE_COVERAGE_FAILED", "policy_breach": "HELD_QUOTE_COVERAGE", "day": day, "scenario_id": scenario_id}
         if not quotes:
             logger.warning(
                 "all quotes missing for portfolio day %s; skipping without sealing",
                 day,
             )
+            store.fail_portfolio_day(day, claim_id, "QUOTE_COVERAGE_FAILED")
             return {
                 "skipped": "all quotes missing",
+                "outcome": "QUOTE_COVERAGE_FAILED",
                 "scenario_id": scenario_id,
                 "day": day,
                 "failures": failures,
@@ -282,9 +319,7 @@ def run_portfolio_day(
 
         marked = {s: q for s, q in quotes.items() if s in simulator.state.positions}
         equity = simulator.marked_value(marked)
-        state_evidence_id = record_portfolio_state(
-            store,
-            {
+        final_state = {
                 "cash": simulator.state.cash,
                 "positions": {
                     symbol: qty
@@ -292,18 +327,7 @@ def run_portfolio_day(
                     if qty
                 },
                 "equity": equity,
-            },
-            day=day,
-            available_at=as_of,
-        )
-
-    store.seal_scenario(
-        scenario_id,
-        as_of=as_of,
-        basis="forward-captured",
-        metadata={"kind": "portfolio-day", "trade_date": day, "tickers": tickers},
-        capture_run_id=context.run_id,
-    )
+            }
     summary = {
         "day": day,
         "scenario_id": scenario_id,
@@ -313,14 +337,20 @@ def run_portfolio_day(
         "fills": fills,
         "equity": str(equity),
         "cash": str(simulator.state.cash),
-        "state_evidence_id": state_evidence_id,
+        "state_evidence_id": None,
         "failures": failures,
+        "coverage": coverage,
+        "research_call_count": research_calls,
+        "elapsed_seconds": round(time.monotonic() - started, 3),
     }
-    store.record_research_run(
-        context.run_id or "", scenario_id,
-        decision=json.dumps(plan, sort_keys=True),
-        report=json.dumps(summary, sort_keys=True),
+    state_evidence_id = store.complete_portfolio_day(
+        day, claim_id, state=final_state, available_at=as_of,
+        scenario_id=scenario_id, scenario_as_of=as_of, scenario_basis="forward-captured",
+        scenario_metadata={"kind": "portfolio-day", "trade_date": day, "tickers": tickers},
+        capture_run_id=context.run_id or claim_id,
+        decision=json.dumps(plan, sort_keys=True), report=json.dumps(summary, sort_keys=True),
     )
+    summary["state_evidence_id"] = state_evidence_id
     return summary
 
 
@@ -409,8 +439,8 @@ def production_day_inputs(store: TemporalStore, *, deep_model: str = "gpt-5.4",
         "llm_provider": "openai",
         "deep_think_llm": sweep_model,
         "quick_think_llm": sweep_model,
-        "max_debate_rounds": 1,
-        "max_risk_discuss_rounds": 1,
+        "max_debate_rounds": 0,
+        "max_risk_discuss_rounds": 0,
         "checkpoint_enabled": False,
     })
     config["temporal"] = {
@@ -419,13 +449,16 @@ def production_day_inputs(store: TemporalStore, *, deep_model: str = "gpt-5.4",
         "store": str(store.root),
         "search_enabled": True,
     }
-    recorder = LangChainTapeRecorder(store)
-    graph = TradingAgentsGraph(config=config, callbacks=[recorder])
+    # A graph and recorder are owned by one ticker worker.  They are never
+    # shared across the bounded sweep executor.
+    cio_recorder = LangChainTapeRecorder(store)
     cio_model = create_llm_client(
-        "openai", deep_model, callbacks=[recorder]
+        "openai", deep_model, callbacks=[cio_recorder]
     ).get_llm()
 
     def research(ticker: str, context) -> dict:
+        recorder = LangChainTapeRecorder(store)
+        graph = TradingAgentsGraph(config=copy.deepcopy(config), callbacks=[recorder])
         final_state, _signal = graph.propagate(
             ticker, context.clock.as_of.date().isoformat(), temporal=context
         )
