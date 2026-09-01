@@ -54,7 +54,7 @@ The final combined integration verification passed with 48 tests.
 
 ## Exact verification commands
 
-`uv run python -m pytest -q tests/test_temporal_documents.py tests/test_temporal_search.py tests/test_temporal_core.py tests/test_temporal_langchain_adapter.py tests/test_temporal_gdelt.py tests/test_temporal_gdelt_wayback.py tests/test_portfolio_run.py`
+`uv run python -m pytest -q tests/test_portfolio_lifecycle.py tests/test_portfolio_run.py tests/test_temporal_langchain_adapter.py tests/test_temporal_documents.py tests/test_temporal_gdelt.py tests/test_temporal_gdelt_wayback.py`
 
 `uv run python -m pytest -q`
 
