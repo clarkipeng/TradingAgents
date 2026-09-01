@@ -25,6 +25,11 @@ DEFAULT_CONSTRAINTS = {
     "initial_cash": "100000",
 }
 
+# Hard upper bound for one portfolio day's research and CIO model calls.
+# Keep this finite so a vendor or graph regression cannot turn one scheduled
+# run into an unbounded provider spend.
+PORTFOLIO_DAY_LLM_CALL_BUDGET = 100
+
 _STATE_TOOL = "portfolio.state"
 
 
@@ -200,13 +205,44 @@ def run_portfolio_day(
         ratings: dict[str, str] = {}
         briefs: dict[str, str] = {}
         failures: list[str] = []
+
+        # ``research_fn`` may wrap a graph with several model calls, while
+        # tests and alternative adapters may expose only one opaque call.
+        # Count both the invocation floor and the exact calls taped by the
+        # temporal store, taking the larger value without double-counting.
+        llm_calls_used = 0
+
+        def current_llm_calls() -> int:
+            return max(
+                llm_calls_used,
+                len(store.list_llm_calls(temporal_run_id=context.run_id)),
+            )
+
+        def budget_skip() -> dict:
+            used = current_llm_calls()
+            return {
+                "day": day,
+                "scenario_id": scenario_id,
+                "run_id": context.run_id,
+                "skipped": "LLM call budget exceeded",
+                "failures": [
+                    f"LLM call budget exceeded: {used}/{PORTFOLIO_DAY_LLM_CALL_BUDGET} calls used"
+                ],
+            }
+
         for ticker in tickers:
+            if current_llm_calls() >= PORTFOLIO_DAY_LLM_CALL_BUDGET:
+                return budget_skip()
             try:
                 research = research_fn(ticker, context)
+                llm_calls_used += 1
                 ratings[ticker] = research["rating"]
                 briefs[ticker] = research.get("brief", "")
             except Exception as error:  # noqa: BLE001 - one ticker never kills the day
+                llm_calls_used += 1
                 failures.append(f"{ticker}: {type(error).__name__}")
+            if current_llm_calls() > PORTFOLIO_DAY_LLM_CALL_BUDGET:
+                return budget_skip()
 
         prior = portfolio_state_asof(
             store, as_of, initial_cash=constraints["initial_cash"]
@@ -220,9 +256,30 @@ def run_portfolio_day(
             else:
                 quotes[symbol] = Decimal(str(price))
 
+        if not quotes:
+            return {
+                "day": day,
+                "scenario_id": scenario_id,
+                "run_id": context.run_id,
+                "skipped": "all quotes missing",
+                "failures": failures,
+            }
+
+        if current_llm_calls() >= PORTFOLIO_DAY_LLM_CALL_BUDGET:
+            return budget_skip()
+
+        def budgeted_complete(prompt: str) -> str:
+            nonlocal llm_calls_used
+            if current_llm_calls() >= PORTFOLIO_DAY_LLM_CALL_BUDGET:
+                raise RuntimeError("LLM call budget exceeded")
+            try:
+                return complete_llm(prompt)
+            finally:
+                llm_calls_used += 1
+
         plan = cio_allocate(
             {t: r for t, r in ratings.items() if t in quotes},
-            briefs=briefs, constraints=constraints, complete_llm=complete_llm,
+            briefs=briefs, constraints=constraints, complete_llm=budgeted_complete,
         )
         orders = rebalance_orders(prior, plan["weights"], quotes, submitted_at=as_of)
 

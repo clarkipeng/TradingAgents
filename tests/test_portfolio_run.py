@@ -142,6 +142,49 @@ def test_run_portfolio_day_skips_an_already_sealed_day_without_spending(tmp_path
 
 
 @pytest.mark.unit
+def test_run_portfolio_day_skips_loudly_when_llm_budget_is_exceeded(tmp_path, monkeypatch):
+    store = TemporalStore(tmp_path)
+    monkeypatch.setattr(portfolio_run, "PORTFOLIO_DAY_LLM_CALL_BUDGET", 1)
+    researched = []
+
+    def research(ticker, context):
+        researched.append(ticker)
+        return {"rating": "Overweight", "brief": "strong"}
+
+    result = portfolio_run.run_portfolio_day(
+        store,
+        ["NVDA", "MSFT"],
+        day="2026-08-28",
+        research_fn=research,
+        complete_llm=lambda prompt: pytest.fail("budget exhaustion must skip CIO"),
+        quote_fn=lambda symbol, day: Decimal("500"),
+    )
+
+    assert result["skipped"] == "LLM call budget exceeded"
+    assert result["failures"] == ["LLM call budget exceeded: 1/1 calls used"]
+    assert researched == ["NVDA"]
+    assert store.get_scenario("portfolio-2026-08-28") is None
+
+
+@pytest.mark.unit
+def test_run_portfolio_day_skips_without_sealing_when_all_quotes_are_missing(tmp_path):
+    store = TemporalStore(tmp_path)
+
+    result = portfolio_run.run_portfolio_day(
+        store,
+        ["NVDA", "MSFT"],
+        day="2026-08-28",
+        research_fn=lambda ticker, context: {"rating": "Overweight"},
+        complete_llm=lambda prompt: pytest.fail("missing quotes must skip CIO"),
+        quote_fn=lambda symbol, day: None,
+    )
+
+    assert result["skipped"] == "all quotes missing"
+    assert result["failures"] == ["MSFT: no quote", "NVDA: no quote"]
+    assert store.get_scenario("portfolio-2026-08-28") is None
+
+
+@pytest.mark.unit
 def test_portfolio_report_tracks_equity_by_day_and_benchmark(tmp_path):
     store = TemporalStore(tmp_path)
     for day, equity, cash in [
