@@ -4,6 +4,8 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from decimal import Decimal
 
+import pytest
+
 from tradingagents import portfolio_run
 from tradingagents.temporal import TemporalStore
 
@@ -106,6 +108,56 @@ def test_deadline_interrupts_a_hung_research_call(tmp_path, monkeypatch):
     assert result["status"] == "failed_unsealed"
     assert result["reason"] == "deadline_exceeded"
     assert elapsed < 10  # the hung call could not hold the day open
+
+
+def test_deadline_interrupts_a_hung_quote_call(tmp_path, monkeypatch):
+    import threading
+    import time as time_module
+
+    store = TemporalStore(tmp_path)
+    monkeypatch.setattr(portfolio_run, "PORTFOLIO_DAY_DEADLINE_SECONDS", 1)
+    release = threading.Event()
+
+    def hung_quote(symbol, day):
+        release.wait(30)
+        return Decimal("1")
+
+    started = time_module.monotonic()
+    result = portfolio_run.run_portfolio_day(
+        store, ["A"], day="2026-09-01",
+        research_fn=lambda *_: {"rating": "Buy"},
+        complete_llm=lambda *_: "{}",
+        quote_fn=hung_quote,
+    )
+    elapsed = time_module.monotonic() - started
+    release.set()
+    assert result["reason"] == "deadline_exceeded"
+    assert elapsed < 10
+
+
+def test_deadline_interrupts_a_hung_cio_call(tmp_path, monkeypatch):
+    import threading
+    import time as time_module
+
+    store = TemporalStore(tmp_path)
+    monkeypatch.setattr(portfolio_run, "PORTFOLIO_DAY_DEADLINE_SECONDS", 1)
+    release = threading.Event()
+
+    def hung_cio(prompt):
+        release.wait(30)
+        return "{}"
+
+    started = time_module.monotonic()
+    result = portfolio_run.run_portfolio_day(
+        store, ["A"], day="2026-09-01",
+        research_fn=lambda *_: {"rating": "Buy"},
+        complete_llm=hung_cio,
+        quote_fn=lambda *_: Decimal("1"),
+    )
+    elapsed = time_module.monotonic() - started
+    release.set()
+    assert result["reason"] == "deadline_exceeded"
+    assert elapsed < 10
 
 
 def test_abandoned_claim_recovers_after_staleness(tmp_path):
