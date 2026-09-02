@@ -34,7 +34,7 @@ DEFAULT_CONSTRAINTS = {
 # CIO sizing call; the 30-ticker universe plus CIO plus headroom fits under it.
 MAX_RESEARCH_CALLS_PER_PORTFOLIO_DAY = 40
 PORTFOLIO_DAY_POLICY = {
-    "wall_clock_seconds": 900,
+    "wall_clock_seconds": 2700,
     "minimum_ticker_coverage": 0.8,
     "max_workers": 4,
     "complete_held_quote_coverage": True,

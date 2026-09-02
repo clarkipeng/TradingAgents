@@ -26,5 +26,5 @@ tickers=$(awk '
 cd "$project_dir"
 exec "$command_name" temporal-portfolio-run \
     --tickers "$tickers" \
-    --date "$(date -u +%Y-%m-%d)" \
+    --date "$(date +%Y-%m-%d)" \
     --store "$temporal_store"
