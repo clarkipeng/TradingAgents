@@ -109,9 +109,10 @@ kill_timeout = "300s"
   processes = ["app"]
 
 # The trader runs the 30-ticker research day (4 parallel workers) against a
-# multi-GB SQLite store; memory headroom is what keeps the OS killer away.
+# multi-GB SQLite store; the day process alone peaks past 3.6GB anon RSS
+# (kernel OOM-killed it on a 4GB machine, 2026-09-02), so 8GB is the floor.
 [[vm]]
-  memory = "4gb"
+  memory = "8gb"
   cpu_kind = "shared"
-  cpus = 2
+  cpus = 4
   processes = ["trader"]
