@@ -12,15 +12,15 @@ import json
 import logging
 import math
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError, as_completed
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 from tradingagents.portfolio_backtest import rating_score, target_weights
 from tradingagents.temporal import TemporalRunInvalidError, TemporalStore
 from tradingagents.temporal.clock import format_timestamp, parse_timestamp
-from tradingagents.temporal.store import PORTFOLIO_CLAIM_STALE_SECONDS
 from tradingagents.temporal.simulation import Order, OrderSide
+from tradingagents.temporal.store import PORTFOLIO_CLAIM_STALE_SECONDS  # noqa: F401
 
 DEFAULT_CONSTRAINTS = {
     "mode": "long-only",
@@ -257,6 +257,23 @@ def _run_portfolio_day(
                 research_calls += 1
             return callable_(*args)
 
+        def deadline_bounded_call(callable_, *args):
+            """Run provider work without allowing it to hold the day open."""
+            nonlocal deadline_breached
+            remaining = PORTFOLIO_DAY_DEADLINE_SECONDS - (time.monotonic() - started)
+            if remaining <= 0:
+                deadline_breached = True
+                return None
+            pool = ThreadPoolExecutor(max_workers=1)
+            future = pool.submit(callable_, *args)
+            try:
+                return future.result(timeout=remaining)
+            except FuturesTimeoutError:
+                deadline_breached = True
+                return None
+            finally:
+                pool.shutdown(wait=False, cancel_futures=True)
+
         ratings: dict[str, str] = {}
         briefs: dict[str, str] = {}
         failures: list[str] = []
@@ -305,11 +322,15 @@ def _run_portfolio_day(
         symbols = sorted(set(ratings) | set(prior["positions"]))
         quotes: dict[str, Decimal] = {}
         for symbol in symbols:
-            price = quote_fn(symbol, day)
+            with temporal_context(context):
+                price = deadline_bounded_call(quote_fn, symbol, day)
             if price is None:
                 failures.append(f"{symbol}: no quote")
             else:
                 quotes[symbol] = Decimal(str(price))
+
+        if deadline_breached:
+            return {"status": "failed_unsealed", "reason": "deadline_exceeded", "skipped": "policy breach", "scenario_id": scenario_id, "day": day, "coverage": coverage, "research_call_count": research_calls, "elapsed_seconds": round(time.monotonic() - started, 3), "failures": failures}
 
         if not quotes:
             logger.warning(
@@ -340,7 +361,9 @@ def _run_portfolio_day(
         plan = cio_allocate(
             {t: r for t, r in ratings.items() if t in quotes},
             briefs=briefs, constraints=constraints,
-            complete_llm=lambda prompt: budgeted_call(complete_llm, prompt),
+            complete_llm=lambda prompt: deadline_bounded_call(
+                budgeted_call, complete_llm, prompt
+            ),
         )
         if deadline_breached:
             return {"status": "failed_unsealed", "reason": "deadline_exceeded", "skipped": "policy breach", "scenario_id": scenario_id, "day": day, "coverage": coverage, "research_call_count": research_calls, "elapsed_seconds": round(time.monotonic() - started, 3), "failures": failures}
