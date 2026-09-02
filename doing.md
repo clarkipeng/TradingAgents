@@ -1,6 +1,14 @@
 # What's happening right now
 
-Updated: 2026-09-02 midday. I keep this file current - check it anytime.
+Updated: 2026-09-02 afternoon. I keep this file current - check it anytime.
+
+## Cloud migration: happening now (you said go)
+The whole system is moving to Fly today. Progress:
+- DONE: new `trader` machine built and deployed (supervisor owns the store and all schedules: polling, capture, 5:45pm trading day, discovery, import, nightly backup).
+- DONE: all laptop jobs stopped and parked reboot-proof; laptop is now read-only.
+- IN PROGRESS: uploading the 2.1GB evidence database + artifacts to the cloud volume.
+- NEXT: supervisor auto-starts once seeded, then the full 10-day backfill runs in the cloud.
+The local day-18 attempt this morning had invalidated itself (recording failures from the lock-wedge fallout), so nothing was lost by cutting over.
 
 ## The goal
 Build a paper-trading system whose results can actually be trusted.
