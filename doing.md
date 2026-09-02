@@ -2,13 +2,14 @@
 
 Updated: 2026-09-02 afternoon. I keep this file current - check it anytime.
 
-## Cloud migration: happening now (you said go)
-The whole system is moving to Fly today. Progress:
-- DONE: new `trader` machine built and deployed (supervisor owns the store and all schedules: polling, capture, 5:45pm trading day, discovery, import, nightly backup).
-- DONE: all laptop jobs stopped and parked reboot-proof; laptop is now read-only.
-- IN PROGRESS: uploading the 2.1GB evidence database + artifacts to the cloud volume.
-- NEXT: supervisor auto-starts once seeded, then the full 10-day backfill runs in the cloud.
-The local day-18 attempt this morning had invalidated itself (recording failures from the lock-wedge fallout), so nothing was lost by cutting over.
+## Cloud migration: DONE (2026-09-02 afternoon)
+The whole system now runs on Fly. What changed today:
+- New `trader` machine owns the evidence database (2.2GB, verified after upload) on its own disk and runs everything: market-hours polling (already capturing), 5:45pm trading day, nightly discovery, cloud-media import, rotating backups.
+- The laptop is read-only now. All its jobs are parked reboot-proof; `scripts/sync_store_down.sh` pulls the nightly cloud backup down as your local mirror and off-site backup.
+- The 10-day backfill is running on the cloud machine (day Aug 18 in progress, ~5-7 hours total). Results: `tradingagents temporal-portfolio-report` against the mirror once synced.
+Watch the cloud: `flyctl logs -a tradagent` or `flyctl ssh console -a tradagent --machine e82e501b3d66d8 -C "tail -20 /data/backfill.log"`
+
+Small hardening still to do (cloud follow-ups): include artifacts in the backup rotation, a stall alarm (a wedged writer should page within minutes), failure notifications to your phone.
 
 ## The goal
 Build a paper-trading system whose results can actually be trusted.
