@@ -1,5 +1,7 @@
 from datetime import datetime, timezone
 
+import pytest
+
 from tradingagents.temporal import TemporalStore, import_archive_jsonl
 
 UTC = timezone.utc
@@ -23,6 +25,19 @@ def test_temporal_search_excludes_future_evidence(tmp_path):
     assert early.manifest.ranker_version == "temporal-hybrid-v3"
     assert early.manifest.index_state_hash
     assert early.manifest.corpus_hash != later.manifest.corpus_hash
+
+
+def test_search_does_not_return_after_repeated_generation_swaps(tmp_path, monkeypatch):
+    store = TemporalStore(tmp_path / "store")
+    store.record("corpus.document", {"url": "one"}, {"text": "NVDA supply"}, available_at=at(9))
+
+    # Each attempt observes a swap after its read. Returning the final response
+    # here would allow an unverified index/hydration pair to escape.
+    generations = iter((0, 0, 1, 1, 1, 2))
+    monkeypatch.setattr(store, "active_generation_id", lambda: next(generations))
+
+    with pytest.raises(RuntimeError, match="document generation changed during search"):
+        store.search("NVDA", as_of=at(10))
 
 
 def test_long_natural_queries_still_match_partially_relevant_documents(tmp_path):
