@@ -14,9 +14,12 @@ Trust comes from the sealing: a day either completes fully and honestly or fails
   Watch it: `tail -f .tradingagents/portfolio-backfill.log`
   See results after: `tradingagents temporal-portfolio-report`
 
-## Open question from you: run it all on Fly?
-Capture already lives on Fly (X + global news, 24/7). The daily trading run still lives on the laptop, and the laptop is the proven weak point (sleep, this lock wedge, an OS kill).
-My take: yes, move the trading day to the cloud too. It needs the evidence store reachable from the cloud machine plus the LLM keys there - roughly a day of work. Say go and I'll plan it.
+## Planned: move everything to the cloud
+You asked why not run it all on Fly. Agreed - the laptop is the proven weak point.
+Full plan: `docs/cloud-migration-plan.md`.
+Short version: one bigger Fly machine owns the evidence database and runs capture, discovery, and the daily trading run; the laptop just downloads copies for you to look at.
+About one day of work plus an evening cutover, ~$25-35/month extra, starts after tonight's backfill report.
+Waiting on your go.
 
 ## Just finished (the audit arc)
 Three audit rounds found and fixed 10+ real problems; 1,762 tests green.
