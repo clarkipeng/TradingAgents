@@ -50,6 +50,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
+# The trader supervisor schedules in America/Los_Angeles; slim images ship no
+# zoneinfo database.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends tzdata \
+ && rm -rf /var/lib/apt/lists/*
+
 RUN printf '%s' "$GIT_REVISION" | grep -Eq '^[0-9a-f]{40}$' \
  && printf '%s' "$COLLECTOR_DEPLOYMENT_NONCE" | grep -Eq '^[0-9a-f]{32}$' \
  && install -d -m 0755 /opt/tradingagents \
@@ -59,7 +65,10 @@ RUN printf '%s' "$GIT_REVISION" | grep -Eq '^[0-9a-f]{40}$' \
  && install -d -m 0755 -o appuser -g appuser /home/appuser/.tradingagents
 USER appuser
 WORKDIR /home/appuser/app
+COPY --chown=appuser:appuser config/temporal-universe.txt config/temporal-universe.txt
+COPY --chown=appuser:appuser --chmod=0555 scripts/docker-entrypoint.sh /opt/tradingagents/entrypoint.sh
 
-ENTRYPOINT ["tradingagents-poller"]
+ENTRYPOINT ["/opt/tradingagents/entrypoint.sh"]
+# Default CMD keeps collector behavior; the trader process passes `supervisor`.
 # Optional ticker sources use MEDIA_POLLER_TICKERS; global-only mode needs none.
 CMD []

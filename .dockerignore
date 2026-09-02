@@ -15,3 +15,8 @@
 !tradingagents/**/*.py
 !cli/**/*.py
 !cli/static/welcome.txt
+
+# The trader machine needs the frozen ticker universe and the entrypoint
+# dispatch; both are code-reviewed text with no credential surface.
+!config/temporal-universe.txt
+!scripts/docker-entrypoint.sh

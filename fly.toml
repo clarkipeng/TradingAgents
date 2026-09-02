@@ -29,6 +29,10 @@ kill_timeout = "300s"
 
 [processes]
   app = "--global-only"
+  # The trading machine: owns the volume-mounted canonical temporal store and
+  # every writer that touches it (ticker poller, capture, portfolio day,
+  # discovery, cloud-media import, backups). See tradingagents/cloud_supervisor.py.
+  trader = "supervisor"
 
 # Non-secret config. Credentials are set with Fly secrets, never committed.
 [env]
@@ -53,13 +57,34 @@ kill_timeout = "300s"
   # Private Fly health listener. There is deliberately no services/http_service
   # section, so this port is not published on the app's public hostname.
   MEDIA_HEALTH_PORT = "5500"
+  # Fly env is app-wide; the trader supervisor reads this, and its poller child
+  # gets a pinned environment (never the collector's X identity above).
+  TRADINGAGENTS_TEMPORAL_STORE = "/data/temporal"
+  TRADINGAGENTS_TEMPORAL_UNIVERSE_FILE = "/home/appuser/app/config/temporal-universe.txt"
+  # Non-secret model config for the trader's research day, matching the
+  # laptop's .env so cloud days are comparable with the local track record.
+  TRADINGAGENTS_LLM_PROVIDER = "openai"
+  TRADINGAGENTS_DEEP_THINK_LLM = "gpt-5.4"
+  TRADINGAGENTS_QUICK_THINK_LLM = "gpt-5.4-mini"
+  TRADINGAGENTS_OUTPUT_LANGUAGE = "English"
+  TRADINGAGENTS_MAX_DEBATE_ROUNDS = "1"
+  TRADINGAGENTS_MAX_RISK_ROUNDS = "1"
+  TRADINGAGENTS_CHECKPOINT_ENABLED = "false"
+  TRADINGAGENTS_TEMPERATURE = "0.0"
 
 # The sole persistent collector must come back after any unexpected process exit.
 # Fly still owns intentional deployment replacement and scale-to-zero operations;
 # durable receipts and request budgets make a restarted collection idempotent.
 [[restart]]
   policy = "always"
-  processes = ["app"]
+  processes = ["app", "trader"]
+
+# The canonical temporal store. Exactly one trader machine may exist: the
+# store's single-mutator flock only binds writers on one host.
+[mounts]
+  source = "temporal_store"
+  destination = "/data"
+  processes = ["trader"]
 
 # A top-level check works without defining a public Fly service. Keep the
 # existing check name for rollout and rollback compatibility. /readyz proves
@@ -81,3 +106,12 @@ kill_timeout = "300s"
   memory = "256mb"
   cpu_kind = "shared"
   cpus = 1
+  processes = ["app"]
+
+# The trader runs the 30-ticker research day (4 parallel workers) against a
+# multi-GB SQLite store; memory headroom is what keeps the OS killer away.
+[[vm]]
+  memory = "4gb"
+  cpu_kind = "shared"
+  cpus = 2
+  processes = ["trader"]
