@@ -46,7 +46,7 @@ class TemporalRetriever:
             )
             if self.store.active_generation_id() == generation_before:
                 return response
-        return response
+        raise RuntimeError("document generation changed during search")
 
     def _search_once(
         self, query: str, *, as_of: datetime, limit: int = 10, page: int = 1,
