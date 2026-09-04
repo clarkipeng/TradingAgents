@@ -191,3 +191,26 @@ def test_every_job_has_a_positive_timeout(env: dict[str, str]) -> None:
     for job in build_jobs(env):
         assert isinstance(job, ScheduledJob)
         assert job.timeout_seconds > 0
+
+
+def test_store_construction_heals_rollback_journal_mode(tmp_path: Path) -> None:
+    """A VACUUM INTO copy arrives in rollback-journal mode; opening it as a
+    TemporalStore must restore WAL, or readers block writers store-wide."""
+    from tradingagents.temporal.store import TemporalStore
+
+    first = TemporalStore(tmp_path / "store")
+    conn = sqlite3.connect(first.database_path)
+    assert conn.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
+    copy_dir = tmp_path / "copy"
+    copy_dir.mkdir()
+    conn.execute("VACUUM INTO ?", (str(copy_dir / "temporal.sqlite3"),))
+    conn.close()
+
+    degraded = sqlite3.connect(copy_dir / "temporal.sqlite3")
+    assert degraded.execute("PRAGMA journal_mode").fetchone()[0] == "delete"
+    degraded.close()
+
+    TemporalStore(copy_dir)
+    healed = sqlite3.connect(copy_dir / "temporal.sqlite3")
+    assert healed.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
+    healed.close()

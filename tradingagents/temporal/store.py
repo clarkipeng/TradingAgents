@@ -84,6 +84,11 @@ class TemporalStore:
     def _connect(self) -> Iterator[sqlite3.Connection]:
         connection = sqlite3.connect(self.database_path, timeout=_SQLITE_BUSY_TIMEOUT_SECONDS)
         connection.row_factory = sqlite3.Row
+        # WAL pairs with NORMAL: commits stop fsyncing individually (a real
+        # cost on network-backed volumes) while the database stays consistent
+        # across crashes; at worst the tail of un-checkpointed transactions is
+        # lost, and every writer here is re-runnable or re-importable.
+        connection.execute("PRAGMA synchronous=NORMAL")
         try:
             yield connection
             connection.commit()
@@ -120,6 +125,12 @@ class TemporalStore:
 
     def _initialize(self) -> None:
         with self._connect() as connection:
+            # WAL is an invariant, not inherited file state: a copy made with
+            # VACUUM INTO or a fresh database starts in rollback-journal mode,
+            # where every reader blocks every writer - on the trader machine
+            # that starved a research day to 9 calls in 45 minutes. The pragma
+            # is persistent and a no-op when already set.
+            connection.execute("PRAGMA journal_mode=WAL")
             connection.executescript(
                 """
                 CREATE TABLE IF NOT EXISTS artifacts (
