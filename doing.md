@@ -1,15 +1,22 @@
 # What's happening right now
 
-Updated: 2026-09-02 afternoon. I keep this file current - check it anytime.
+Updated: 2026-09-04 early morning. I keep this file current - check it anytime.
 
-## Cloud migration: DONE (2026-09-02 afternoon)
-The whole system now runs on Fly. What changed today:
-- New `trader` machine owns the evidence database (2.2GB, verified after upload) on its own disk and runs everything: market-hours polling (already capturing), 5:45pm trading day, nightly discovery, cloud-media import, rotating backups.
-- The laptop is read-only now. All its jobs are parked reboot-proof; `scripts/sync_store_down.sh` pulls the nightly cloud backup down as your local mirror and off-site backup.
-- The 10-day backfill is running on the cloud machine (day Aug 18 in progress, ~5-7 hours total). Results: `tradingagents temporal-portfolio-report` against the mirror once synced.
-Watch the cloud: `flyctl logs -a tradagent` or `flyctl ssh console -a tradagent --machine e82e501b3d66d8 -C "tail -20 /data/backfill.log"`
+## The memory bug that killed every trading day: found and fixed (Sep 3-4)
+No 30-stock trading day had ever completed - not on the laptop, not on the cloud. The killer: the search index loaded the entire 190,000-document archive into memory as Python objects, once per parallel worker, growing past 8GB until the OS shot the process.
+Rewritten as a compact statistics index: 0.34GB instead of 7.8GB, searches in 22ms instead of a full archive scan, provably identical rankings and seals (the old implementation is embedded in a test as the oracle). 1,779 tests green, deployed.
 
-Small hardening still to do (cloud follow-ups): include artifacts in the backup rotation, a stall alarm (a wedged writer should page within minutes), failure notifications to your phone.
+## Running right now
+- **The backfill, on the cloud, on the fixed build**: twelve days, Aug 18 through Sep 3, in order. Started ~1:40am Sep 4. With fast search, expect it done by morning.
+  Results after: `tradingagents temporal-portfolio-report`
+- Today's scheduled 5:45pm trading day (Sep 4) runs automatically after it - first fully hands-off cloud day.
+
+## Cloud migration: DONE (Sep 2)
+Everything runs on Fly now - two machines: the X/news collector, and the trader (owns the evidence database on its own disk; polling, 5:45pm trading day, discovery, import, rotating backups; a pause switch for the trading day when I need to run manual chains).
+The laptop is read-only; all its jobs parked reboot-proof. `scripts/sync_store_down.sh` pulls the nightly cloud backup as your local mirror.
+The overnight schedule has already proven itself twice unattended (capture, import, backup all ran while sessions were down).
+
+Small hardening still to do: artifacts in the backup rotation, a writer-stall alarm, failure notifications to your phone.
 
 ## The goal
 Build a paper-trading system whose results can actually be trusted.
