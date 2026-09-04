@@ -111,8 +111,11 @@ kill_timeout = "300s"
 # The trader runs the 30-ticker research day (4 parallel workers) against a
 # multi-GB SQLite store; the day process alone peaks past 3.6GB anon RSS
 # (kernel OOM-killed it on a 4GB machine, 2026-09-02), so 8GB is the floor.
+# Performance cores because the GIL serializes the workers' tool-side Python:
+# day throughput tracks single-core speed, and shared vCPUs ran it ~10x
+# slower than a laptop core (measured 255s vs 27s on the same index build).
 [[vm]]
   memory = "8gb"
-  cpu_kind = "shared"
-  cpus = 4
+  cpu_kind = "performance"
+  cpus = 2
   processes = ["trader"]

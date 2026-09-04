@@ -34,7 +34,9 @@ DEFAULT_CONSTRAINTS = {
 # CIO sizing call; the 30-ticker universe plus CIO plus headroom fits under it.
 MAX_RESEARCH_CALLS_PER_PORTFOLIO_DAY = 40
 PORTFOLIO_DAY_POLICY = {
-    "wall_clock_seconds": 2700,
+    # Calibrated on the cloud trader machine: the GIL serializes the workers'
+    # tool-side Python, so wall clock tracks single-core speed, not vCPUs.
+    "wall_clock_seconds": 3600,
     "minimum_ticker_coverage": 0.8,
     "max_workers": 4,
     "complete_held_quote_coverage": True,

@@ -191,7 +191,7 @@ def build_jobs(env: Mapping[str, str]) -> list[ScheduledJob]:
 
     jobs = [
         ScheduledJob("temporal-capture", 17, 15, True, 3000.0, capture),
-        ScheduledJob("portfolio-day", 17, 45, True, 3600.0, portfolio_day),
+        ScheduledJob("portfolio-day", 17, 45, True, 5400.0, portfolio_day),
         ScheduledJob("daily-discovery", 18, 30, False, 3600.0, discovery),
         ScheduledJob("cloud-media-import", 19, 15, False, 3600.0, media_import),
         ScheduledJob("store-backup", 20, 30, False, 3600.0, backup),
