@@ -24,7 +24,12 @@ from datetime import datetime
 from .models import canonical_json
 
 RANKER_VERSION = "temporal-hybrid-v3"
-INDEX_VERSION = "eligible-chunk-index-v3"
+# v4: the digest covers exactly what determines ranking - the eligible
+# document chunks at the cutoff. v3 embedded the whole-evidence corpus_hash,
+# which a live run's own tool tapes advance on every call, so one day run
+# produced dozens of "distinct" indexes of identical documents (a 255s
+# rebuild each on the trader machine).
+INDEX_VERSION = "eligible-chunk-index-v4"
 TITLE_WEIGHT = 2.0
 BODY_WEIGHT = 1.0
 RECENCY_HALF_LIFE_DAYS = 30.0
@@ -49,7 +54,6 @@ def _terms(value: str) -> list[str]:
 
 @dataclass(frozen=True)
 class EligibleChunkIndex:
-    corpus_hash: str
     as_of: str
     index_state_hash: str
     n_chunks: int
@@ -67,7 +71,7 @@ class EligibleChunkIndex:
     sum_body_lens: int
 
 
-def build_eligible_index(connection: sqlite3.Connection, *, corpus_hash: str, as_of: str) -> EligibleChunkIndex:
+def build_eligible_index(connection: sqlite3.Connection, *, as_of: str) -> EligibleChunkIndex:
     document_columns = {row[1] for row in connection.execute("PRAGMA table_info(documents)")}
     chunk_columns = {row[1] for row in connection.execute("PRAGMA table_info(document_chunks)")}
     cluster = "d.cluster_key" if "cluster_key" in document_columns else "d.doc_key"
@@ -131,11 +135,10 @@ def build_eligible_index(connection: sqlite3.Connection, *, corpus_hash: str, as
         recency_weights.append(math.exp(-math.log(2) * age_days / RECENCY_HALF_LIFE_DAYS))
 
     digest.update((
-        '],"corpus_hash":' + json.dumps(corpus_hash, ensure_ascii=False)
-        + ',"version":' + json.dumps(INDEX_VERSION, ensure_ascii=False) + "}"
+        '],"version":' + json.dumps(INDEX_VERSION, ensure_ascii=False) + "}"
     ).encode("utf-8"))
     return EligibleChunkIndex(
-        corpus_hash=corpus_hash, as_of=as_of, index_state_hash=digest.hexdigest(),
+        as_of=as_of, index_state_hash=digest.hexdigest(),
         n_chunks=len(doc_keys), doc_keys=tuple(doc_keys), cluster_by_doc_key=cluster_by_doc_key,
         postings=postings, title_lens=title_lens, body_lens=body_lens,
         recency_weights=recency_weights, has_alias=bytes(has_alias),

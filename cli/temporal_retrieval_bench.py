@@ -13,7 +13,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from tradingagents.temporal.models import canonical_json
 from tradingagents.temporal.ranking import build_eligible_index, rank
 
 
@@ -118,17 +117,11 @@ def _search(connection: sqlite3.Connection, case: Case, limit: int, index_cache:
     ).fetchone()
     if has_documents:
         cutoff = case.as_of
-        eligible = connection.execute(
-            "SELECT evidence_id FROM evidence WHERE available_at <= ? ORDER BY evidence_id", (cutoff,)
-        ).fetchall()
-        corpus_hash = __import__("hashlib").sha256(
-            canonical_json({"as_of": cutoff, "evidence_ids": [row[0] for row in eligible]}).encode()
-        ).hexdigest()
         cache = index_cache if index_cache is not None else {}
-        index = cache.get((corpus_hash, cutoff))
+        index = cache.get(cutoff)
         if index is None:
-            index = build_eligible_index(connection, corpus_hash=corpus_hash, as_of=cutoff)
-            cache[(corpus_hash, cutoff)] = index
+            index = build_eligible_index(connection, as_of=cutoff)
+            cache[cutoff] = index
         return [key for key, _score in rank(index, case.query, limit)]
     return [row[0] for row in connection.execute(
         """SELECT f.evidence_id FROM evidence_fts AS f

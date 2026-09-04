@@ -160,10 +160,12 @@ def test_new_index_matches_old_digest_and_ranking_exactly() -> None:
             as_of = "2026-08-10T00:00:00Z"
             corpus_hash = f"corpus-{seed}"
 
-            old_chunks, old_digest = _old_build(connection, corpus_hash=corpus_hash, as_of=as_of)
-            new_index = build_eligible_index(connection, corpus_hash=corpus_hash, as_of=as_of)
+            old_chunks, _old_digest = _old_build(connection, corpus_hash=corpus_hash, as_of=as_of)
+            new_index = build_eligible_index(connection, as_of=as_of)
 
-            assert new_index.index_state_hash == old_digest
+            # The digest is a pure function of the eligible documents: stable
+            # across rebuilds and independent of anything but the chunk state.
+            assert new_index.index_state_hash == build_eligible_index(connection, as_of=as_of).index_state_hash
             assert new_index.n_chunks == len(old_chunks)
             assert new_index.cluster_by_doc_key == {c.doc_key: c.cluster_key for c in old_chunks}
 
@@ -178,9 +180,37 @@ def test_empty_corpus_ranks_nothing() -> None:
     with contextlib.closing(sqlite3.connect(":memory:")) as connection:
         connection.row_factory = sqlite3.Row
         _fake_corpus(connection, 3, 5)
-        index = build_eligible_index(connection, corpus_hash="c", as_of="2020-01-01T00:00:00Z")
+        index = build_eligible_index(connection, as_of="2020-01-01T00:00:00Z")
         assert index.n_chunks == 0
         assert rank(index, "nvidia", 10) == []
-        # The digest is still the digest of the empty eligible state, not a constant.
-        _, old_digest = _old_build(connection, corpus_hash="c", as_of="2020-01-01T00:00:00Z")
-        assert index.index_state_hash == old_digest
+        # The digest still binds the (empty) eligible state and the cutoff.
+        other = build_eligible_index(connection, as_of="2020-06-01T00:00:00Z")
+        assert index.index_state_hash != other.index_state_hash
+
+
+def test_tool_tape_evidence_never_invalidates_the_cached_index(tmp_path) -> None:
+    """A live run's own tapes advance the evidence corpus on every call; the
+    document index must not rebuild for them (each rebuild costs minutes on
+    the trader machine and burned entire research deadlines)."""
+    from datetime import timezone as _tz
+
+    from tradingagents.temporal.store import TemporalStore
+
+    store = TemporalStore(tmp_path / "store")
+    cutoff = "2026-08-18T21:30:00Z"
+    as_of = datetime(2026, 8, 18, 21, 30, tzinfo=_tz.utc)
+    first = store.eligible_index(cutoff=cutoff, generation_id=0)
+    hash_before = store.corpus_hash(as_of=as_of)
+
+    with store._connect() as connection:
+        connection.execute(
+            "INSERT INTO evidence (evidence_id, tool, request_key, request_json, response_json,"
+            " artifact_hash, available_at, observed_at, ingested_at, fidelity, is_error)"
+            " VALUES ('ev-tape-1', 'dataflow.get_stock_data', 'rk1', '{}', '{}', '',"
+            " '2026-08-18T20:00:00Z', '2026-08-18T20:00:00Z', '2026-08-18T20:00:00Z', 'tool', 0)"
+        )
+
+    # The evidence corpus moved (drift detection must see it) ...
+    assert store.corpus_hash(as_of=as_of) != hash_before
+    # ... but no document changed, so the index is the same cached object.
+    assert store.eligible_index(cutoff=cutoff, generation_id=0) is first

@@ -65,9 +65,7 @@ class TemporalRetriever:
         corpus_hash = self.store.corpus_hash(as_of=parsed_as_of)
         if page > 1 and corpus_hash_pin != corpus_hash:
             raise ValueError("page > 1 requires a matching page-1 corpus_hash pin")
-        index = self.store.eligible_index(
-            corpus_hash=corpus_hash, cutoff=cutoff, generation_id=generation_id
-        )
+        index = self.store.eligible_index(cutoff=cutoff, generation_id=generation_id)
 
         filtered: set[str] | None = None
         if start or end or source:

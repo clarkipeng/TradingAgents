@@ -45,11 +45,7 @@ _SQLITE_BUSY_TIMEOUT_SECONDS = 180.0
 
 _TITLE_TOKEN_MIN_LENGTH = 4
 _STOPWORDS = frozenset(
-    "the this that with from what when where will would could should have been were their "
-    "about after before over under into out for and are was were has had its his her our "
-    "your they them then than thus here there these those says said say new now how why "
-    "not but all can may more most other some such only also just like near amid upon per"
-    .split()
+    ["the", "this", "that", "with", "from", "what", "when", "where", "will", "would", "could", "should", "have", "been", "were", "their", "about", "after", "before", "over", "under", "into", "out", "for", "and", "are", "was", "were", "has", "had", "its", "his", "her", "our", "your", "they", "them", "then", "than", "thus", "here", "there", "these", "those", "says", "said", "say", "new", "now", "how", "why", "not", "but", "all", "can", "may", "more", "most", "other", "some", "such", "only", "also", "just", "like", "near", "amid", "upon", "per"]
 )
 
 
@@ -846,20 +842,30 @@ class TemporalStore:
             raise KeyError(f"unknown evidence: {evidence_id}")
         return self._record_from_row(row)
 
-    def eligible_index(self, *, corpus_hash: str, cutoff: str, generation_id: object = None) -> EligibleChunkIndex:
-        """The eligible index for one (generation, corpus, cutoff), built at most once.
+    def eligible_index(self, *, cutoff: str, generation_id: object = None) -> EligibleChunkIndex:
+        """The eligible document index at one cutoff, built at most once.
 
-        The lock is held across the build so racing research workers share a
-        single build instead of each materializing the corpus, and the cache
-        keeps only the newest key so a long process never accumulates indexes
-        across cutoffs. Both were live OOM paths on a 190k-document corpus.
+        The cache key is the eligible DOCUMENT set's freshness, not the
+        whole-evidence corpus hash: a live run's own tool tapes advance the
+        evidence hash on every call without touching any document, and keying
+        on it rebuilt an identical index dozens of times per day. Documents
+        are append-only within a generation, so (count, max rowid) at the
+        cutoff changes exactly when the eligible set does. The lock is held
+        across the build so racing research workers share a single build, and
+        the cache keeps only the newest key so a long process never
+        accumulates indexes across cutoffs (a live OOM path at 190k docs).
         """
-        key = (generation_id, corpus_hash, cutoff)
+        with self._connect() as connection:
+            freshness = connection.execute(
+                "SELECT COUNT(*), COALESCE(MAX(rowid), 0) FROM documents WHERE available_at <= ?",
+                (cutoff,),
+            ).fetchone()
+        key = (generation_id, cutoff, freshness[0], freshness[1])
         with self._eligible_index_lock:
             index = self._eligible_index_cache.get(key)
             if index is None:
                 with self._connect() as connection:
-                    index = build_eligible_index(connection, corpus_hash=corpus_hash, as_of=cutoff)
+                    index = build_eligible_index(connection, as_of=cutoff)
                 self._eligible_index_cache.clear()
                 self._eligible_index_cache[key] = index
             return index
@@ -1289,7 +1295,7 @@ class TemporalStore:
         if page > 1 and corpus_hash_pin != corpus_hash:
             raise ValueError("page > 1 requires a matching page-1 corpus_hash pin")
         index = self.eligible_index(
-            corpus_hash=corpus_hash, cutoff=cutoff, generation_id=self.active_generation_id()
+            cutoff=cutoff, generation_id=self.active_generation_id()
         )
         # Date/source filters restrict results, never ranking statistics:
         # scores stay a pure function of (eligible corpus, query, ranker),
