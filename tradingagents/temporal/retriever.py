@@ -15,7 +15,7 @@ from .models import (
     TemporalSearchResult,
     canonical_json,
 )
-from .ranking import RANKER_VERSION, build_eligible_index, rank
+from .ranking import RANKER_VERSION, rank
 
 _SNIPPET_CHARS = 1_500
 
@@ -65,12 +65,9 @@ class TemporalRetriever:
         corpus_hash = self.store.corpus_hash(as_of=parsed_as_of)
         if page > 1 and corpus_hash_pin != corpus_hash:
             raise ValueError("page > 1 requires a matching page-1 corpus_hash pin")
-        cache_key = (generation_id, corpus_hash, cutoff)
-        index = self.store._eligible_index_cache.get(cache_key)
-        if index is None:
-            with self.store._connect() as connection:
-                index = build_eligible_index(connection, corpus_hash=corpus_hash, as_of=cutoff)
-            self.store._eligible_index_cache[cache_key] = index
+        index = self.store.eligible_index(
+            corpus_hash=corpus_hash, cutoff=cutoff, generation_id=generation_id
+        )
 
         filtered: set[str] | None = None
         if start or end or source:
@@ -91,7 +88,7 @@ class TemporalRetriever:
                     f"WHERE {' AND '.join(predicates)}", parameters,
                 ).fetchall()}
 
-        cluster_by_key = {chunk.doc_key: chunk.cluster_key for chunk in index.chunks}
+        cluster_by_key = index.cluster_by_doc_key
         if not query.strip():
             with self.store._connect() as connection:
                 rows = connection.execute(

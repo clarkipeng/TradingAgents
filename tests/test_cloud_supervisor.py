@@ -168,6 +168,15 @@ def test_poller_backoff_doubles_to_cap_and_resets_when_healthy(
     assert child.next_backoff(healthy_seconds=3600.0) == 30.0
 
 
+def test_portfolio_day_pause_switch_only_pauses_the_trading_day(
+    env: dict[str, str],
+) -> None:
+    names = {job.name for job in build_jobs({**env, "TRADER_PORTFOLIO_DAY_ENABLED": "false"})}
+    assert "portfolio-day" not in names
+    assert {"temporal-capture", "daily-discovery", "cloud-media-import", "store-backup"} <= names
+    assert "portfolio-day" in {job.name for job in build_jobs(env)}
+
+
 def test_unseeded_volume_is_not_a_store(env: dict[str, str]) -> None:
     from tradingagents.cloud_supervisor import store_is_seeded
 

@@ -7,6 +7,7 @@ import hashlib
 import json
 import re
 import sqlite3
+import threading
 from collections.abc import Iterable, Iterator, Mapping
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
@@ -68,6 +69,10 @@ class TemporalStore:
         self.artifacts_dir = self.root / "artifacts"
         self.database_path = self.root / "temporal.sqlite3"
         self._eligible_index_cache: dict[tuple[object, ...], EligibleChunkIndex] = {}
+        # Single-flight and bounded: concurrent research workers must not each
+        # build (or accumulate) whole-corpus indexes - that is an OOM, not a
+        # cache. One build at a time; only the freshest index is retained.
+        self._eligible_index_lock = threading.Lock()
         self._pending_cluster_keys: set[str] | None = None
         self.artifacts_dir.mkdir(parents=True, exist_ok=True)
         self._initialize()
@@ -830,6 +835,24 @@ class TemporalStore:
             raise KeyError(f"unknown evidence: {evidence_id}")
         return self._record_from_row(row)
 
+    def eligible_index(self, *, corpus_hash: str, cutoff: str, generation_id: object = None) -> EligibleChunkIndex:
+        """The eligible index for one (generation, corpus, cutoff), built at most once.
+
+        The lock is held across the build so racing research workers share a
+        single build instead of each materializing the corpus, and the cache
+        keeps only the newest key so a long process never accumulates indexes
+        across cutoffs. Both were live OOM paths on a 190k-document corpus.
+        """
+        key = (generation_id, corpus_hash, cutoff)
+        with self._eligible_index_lock:
+            index = self._eligible_index_cache.get(key)
+            if index is None:
+                with self._connect() as connection:
+                    index = build_eligible_index(connection, corpus_hash=corpus_hash, as_of=cutoff)
+                self._eligible_index_cache.clear()
+                self._eligible_index_cache[key] = index
+            return index
+
     def corpus_hash(self, *, as_of: datetime) -> str:
         """Digest the exact evidence corpus eligible at one virtual time."""
         cutoff = format_timestamp(parse_timestamp(as_of))
@@ -1254,12 +1277,9 @@ class TemporalStore:
         corpus_hash = self.corpus_hash(as_of=parsed_as_of)
         if page > 1 and corpus_hash_pin != corpus_hash:
             raise ValueError("page > 1 requires a matching page-1 corpus_hash pin")
-        cache_key = (corpus_hash, cutoff)
-        index = self._eligible_index_cache.get(cache_key)
-        if index is None:
-            with self._connect() as connection:
-                index = build_eligible_index(connection, corpus_hash=corpus_hash, as_of=cutoff)
-            self._eligible_index_cache[cache_key] = index
+        index = self.eligible_index(
+            corpus_hash=corpus_hash, cutoff=cutoff, generation_id=self.active_generation_id()
+        )
         # Date/source filters restrict results, never ranking statistics:
         # scores stay a pure function of (eligible corpus, query, ranker),
         # so the cached eligible index is reused across filtered views.
@@ -1286,7 +1306,7 @@ class TemporalStore:
                         parameters,
                     ).fetchall()
                 }
-        cluster_by_key = {chunk.doc_key: chunk.cluster_key for chunk in index.chunks}
+        cluster_by_key = index.cluster_by_doc_key
         if not query.strip():
             # Empty query is calendar browsing: eligible documents by recency
             # within the filters, cluster-collapsed, deterministically ordered.

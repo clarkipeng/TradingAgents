@@ -189,13 +189,20 @@ def build_jobs(env: Mapping[str, str]) -> list[ScheduledJob]:
 
         return run
 
-    return [
+    jobs = [
         ScheduledJob("temporal-capture", 17, 15, True, 3000.0, capture),
         ScheduledJob("portfolio-day", 17, 45, True, 3600.0, portfolio_day),
         ScheduledJob("daily-discovery", 18, 30, False, 3600.0, discovery),
         ScheduledJob("cloud-media-import", 19, 15, False, 3600.0, media_import),
         ScheduledJob("store-backup", 20, 30, False, 3600.0, backup),
     ]
+    # Operator pause switch for the trading day only - capture never pauses.
+    # Used while a manual chain (e.g. a backfill) owns portfolio state, so a
+    # scheduled day can never trade from a mid-chain position.
+    if env.get("TRADER_PORTFOLIO_DAY_ENABLED", "true").lower() == "false":
+        print("[supervisor] portfolio-day is paused via TRADER_PORTFOLIO_DAY_ENABLED", flush=True)
+        jobs = [job for job in jobs if job.name != "portfolio-day"]
+    return jobs
 
 
 class PollerChild:

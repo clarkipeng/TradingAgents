@@ -74,12 +74,27 @@ def test_fly_worker_restart_and_image_entrypoint_contract():
     assert config["kill_signal"] == "SIGTERM"
     assert config["kill_timeout"] == "300s"
     assert config["build"]["dockerfile"] == "Dockerfile.poller"
-    assert config["restart"] == [{"policy": "always", "processes": ["app"]}]
+    assert config["restart"] == [{"policy": "always", "processes": ["app", "trader"]}]
     # Fly's retry count applies to on-failure, not the always-on worker policy.
     assert "retries" not in config["restart"][0]
 
     dockerfile = DOCKERFILE.read_text(encoding="utf-8")
-    assert 'ENTRYPOINT ["tradingagents-poller"]' in dockerfile
+    # The entrypoint shim preserves the collector contract: with no dispatch
+    # word it execs the poller CLI exactly as the bare entrypoint did, and the
+    # only other word is the trader supervisor.
+    assert 'ENTRYPOINT ["/opt/tradingagents/entrypoint.sh"]' in dockerfile
+    entrypoint = (DOCKERFILE.parent / "scripts" / "docker-entrypoint.sh").read_text(encoding="utf-8")
+    assert 'exec tradingagents-poller "$@"' in entrypoint
+    assert "exec python -m tradingagents.cloud_supervisor" in entrypoint
+    dispatch_lines = [
+        line.strip()
+        for line in entrypoint.splitlines()
+        if line.strip().startswith("exec ")
+    ]
+    assert dispatch_lines == [
+        "exec python -m tradingagents.cloud_supervisor",
+        'exec tradingagents-poller "$@"',
+    ]
     with PYPROJECT.open("rb") as handle:
         project = tomllib.load(handle)
     assert project["project"]["scripts"]["tradingagents-poller"] == (
@@ -123,6 +138,10 @@ def test_poller_image_context_is_deny_by_default_and_copy_is_allowlisted():
             "!tradingagents/**/*.py",
             "!cli/**/*.py",
             "!cli/static/welcome.txt",
+            # Trader machine additions: the frozen universe and the entrypoint
+            # dispatch. Reviewed text files with no credential surface.
+            "!config/temporal-universe.txt",
+            "!scripts/docker-entrypoint.sh",
         }
         for pattern in meaningful_patterns
     )
