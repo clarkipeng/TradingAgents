@@ -93,16 +93,18 @@ def due_jobs(
     return due
 
 
-def backup_store(store_dir: Path, backup_dir: Path, weekday: int) -> Path:
-    """Vacuum the store database into a 7-slot weekday rotation.
+def backup_store(store_dir: Path, backup_dir: Path) -> Path:
+    """Vacuum the store database into a single overwritten backup slot.
 
-    Constant space by construction: the slot for a weekday is overwritten the
-    next time that weekday comes around.
+    One slot, not a rotation: full copies of a multi-GB store filled the
+    volume in three days. History comes from Fly's scheduled volume
+    snapshots (5-day retention); the laptop's nightly pull is the offsite
+    copy. This file exists so both have one consistent artifact to take.
     """
     source = store_dir / "temporal.sqlite3"
     backup_dir.mkdir(parents=True, exist_ok=True)
-    target = backup_dir / f"temporal-{weekday}.sqlite3"
-    partial = backup_dir / f"temporal-{weekday}.sqlite3.partial"
+    target = backup_dir / "temporal-latest.sqlite3"
+    partial = backup_dir / "temporal-latest.sqlite3.partial"
     partial.unlink(missing_ok=True)
     conn = sqlite3.connect(f"file:{source}?mode=ro", uri=True, timeout=300)
     try:
@@ -182,16 +184,14 @@ def build_jobs(env: Mapping[str, str]) -> list[ScheduledJob]:
 
     def backup(slot: datetime) -> Callable[[], None]:
         def run() -> None:
-            target = backup_store(
-                Path(store), Path(store).parent / "backups", slot.weekday()
-            )
+            target = backup_store(Path(store), Path(store).parent / "backups")
             print(f"[supervisor] backup wrote {target}", flush=True)
 
         return run
 
     jobs = [
         ScheduledJob("temporal-capture", 17, 15, True, 3000.0, capture),
-        ScheduledJob("portfolio-day", 17, 45, True, 5400.0, portfolio_day),
+        ScheduledJob("portfolio-day", 17, 45, True, 7200.0, portfolio_day),
         ScheduledJob("daily-discovery", 18, 30, False, 3600.0, discovery),
         ScheduledJob("cloud-media-import", 19, 15, False, 3600.0, media_import),
         ScheduledJob("store-backup", 20, 30, False, 3600.0, backup),

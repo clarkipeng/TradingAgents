@@ -105,7 +105,8 @@ def test_media_import_spans_slot_yesterday_to_slot_day(env: dict[str, str]) -> N
     assert argv[argv.index("--media-db-url") + 1] == env["MEDIA_DB_URL"]
 
 
-def test_backup_rotates_by_weekday_and_overwrites(tmp_path: Path) -> None:
+def test_backup_is_a_single_overwritten_slot(tmp_path: Path) -> None:
+    """One slot only: rotating full multi-GB copies filled the volume."""
     store_dir = tmp_path / "temporal"
     store_dir.mkdir()
     db = store_dir / "temporal.sqlite3"
@@ -116,8 +117,8 @@ def test_backup_rotates_by_weekday_and_overwrites(tmp_path: Path) -> None:
     conn.close()
 
     backups = tmp_path / "backups"
-    target = backup_store(store_dir, backups, weekday=2)
-    assert target == backups / "temporal-2.sqlite3"
+    target = backup_store(store_dir, backups)
+    assert target == backups / "temporal-latest.sqlite3"
     copy = sqlite3.connect(target)
     assert copy.execute("SELECT v FROM t").fetchall() == [("first",)]
     copy.close()
@@ -126,11 +127,11 @@ def test_backup_rotates_by_weekday_and_overwrites(tmp_path: Path) -> None:
     conn.execute("UPDATE t SET v = 'second'")
     conn.commit()
     conn.close()
-    backup_store(store_dir, backups, weekday=2)
-    copy = sqlite3.connect(backups / "temporal-2.sqlite3")
+    backup_store(store_dir, backups)
+    copy = sqlite3.connect(backups / "temporal-latest.sqlite3")
     assert copy.execute("SELECT v FROM t").fetchall() == [("second",)]
     copy.close()
-    assert sorted(p.name for p in backups.iterdir()) == ["temporal-2.sqlite3"]
+    assert sorted(p.name for p in backups.iterdir()) == ["temporal-latest.sqlite3"]
 
 
 def test_poller_child_pins_stores_to_the_local_volume(env: dict[str, str]) -> None:

@@ -214,3 +214,54 @@ def test_tool_tape_evidence_never_invalidates_the_cached_index(tmp_path) -> None
     assert store.corpus_hash(as_of=as_of) != hash_before
     # ... but no document changed, so the index is the same cached object.
     assert store.eligible_index(cutoff=cutoff, generation_id=0) is first
+
+
+def test_incremental_corpus_hash_matches_scratch_recomputation(tmp_path) -> None:
+    """The cached corpus hash must equal a from-scratch digest through
+    arbitrary interleavings of tape inserts and reads - it is the drift
+    detector; a stale or wrong value would blind or false-alarm it."""
+    import hashlib as _hashlib
+    from datetime import timezone as _tz
+
+    from tradingagents.temporal.models import canonical_json
+    from tradingagents.temporal.store import TemporalStore
+
+    store = TemporalStore(tmp_path / "store")
+    as_of = datetime(2026, 8, 18, 21, 30, tzinfo=_tz.utc)
+    cutoff = "2026-08-18T21:30:00.000000Z"
+
+    def scratch() -> str:
+        with store._connect() as connection:
+            ids = [
+                row["evidence_id"]
+                for row in connection.execute(
+                    "SELECT evidence_id FROM evidence WHERE available_at <= ? ORDER BY evidence_id",
+                    (cutoff,),
+                )
+            ]
+        payload = {"as_of": cutoff, "evidence_ids": ids}
+        return _hashlib.sha256(canonical_json(payload).encode("utf-8")).hexdigest()
+
+    def insert(evidence_id: str, available_at: str) -> None:
+        with store._connect() as connection:
+            connection.execute(
+                "INSERT INTO evidence (evidence_id, tool, request_key, request_json, response_json,"
+                " artifact_hash, available_at, observed_at, ingested_at, fidelity, is_error)"
+                " VALUES (?, 'dataflow.tape', ?, '{}', '{}', '', ?, ?, ?, 'tool', 0)",
+                (evidence_id, evidence_id, available_at, available_at, available_at),
+            )
+
+    assert store.corpus_hash(as_of=as_of) == scratch()
+    # Eligible insert that sorts BEFORE existing ids exercises the merge.
+    insert("aaa-early", "2026-08-18T10:00:00Z")
+    assert store.corpus_hash(as_of=as_of) == scratch()
+    # Repeated call with no writes hits the cache; still exact.
+    assert store.corpus_hash(as_of=as_of) == scratch()
+    # Ineligible insert (after cutoff) must not change the digest.
+    before = store.corpus_hash(as_of=as_of)
+    insert("zzz-late", "2026-08-19T10:00:00Z")
+    assert store.corpus_hash(as_of=as_of) == before == scratch()
+    # A burst of eligible inserts, then verify once more.
+    for n in range(5):
+        insert(f"mid-{n}", "2026-08-18T12:00:00Z")
+    assert store.corpus_hash(as_of=as_of) == scratch()

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import bisect
 import fcntl
 import hashlib
 import json
@@ -69,6 +70,8 @@ class TemporalStore:
         # build (or accumulate) whole-corpus indexes - that is an OOM, not a
         # cache. One build at a time; only the freshest index is retained.
         self._eligible_index_lock = threading.Lock()
+        self._corpus_hash_lock = threading.Lock()
+        self._corpus_hash_cache: dict[str, tuple[int, int, str, tuple[str, ...]]] = {}
         self._pending_cluster_keys: set[str] | None = None
         self.artifacts_dir.mkdir(parents=True, exist_ok=True)
         self._initialize()
@@ -871,15 +874,56 @@ class TemporalStore:
             return index
 
     def corpus_hash(self, *, as_of: datetime) -> str:
-        """Digest the exact evidence corpus eligible at one virtual time."""
+        """Digest the exact evidence corpus eligible at one virtual time.
+
+        Same digest as always, maintained incrementally: evidence is
+        append-only, so (count, max rowid) at the cutoff identifies the
+        eligible set exactly, and on growth only the delta rows are fetched
+        and merged into the cached sorted id list. The full refetch was
+        O(corpus) per search and dominated research days as the corpus grew.
+        """
         cutoff = format_timestamp(parse_timestamp(as_of))
         with self._connect() as connection:
-            rows = connection.execute(
-                "SELECT evidence_id FROM evidence WHERE available_at <= ? ORDER BY evidence_id",
+            count, max_rowid = connection.execute(
+                "SELECT COUNT(*), COALESCE(MAX(rowid), 0) FROM evidence WHERE available_at <= ?",
                 (cutoff,),
-            ).fetchall()
-        payload = {"as_of": cutoff, "evidence_ids": [row["evidence_id"] for row in rows]}
-        return hashlib.sha256(canonical_json(payload).encode("utf-8")).hexdigest()
+            ).fetchone()
+            with self._corpus_hash_lock:
+                cached = self._corpus_hash_cache.get(cutoff)
+                if cached is not None and (cached[0], cached[1]) == (count, max_rowid):
+                    return cached[2]
+                if (
+                    cached is not None
+                    and count > cached[0]
+                    and max_rowid > cached[1]
+                    and count - cached[0] <= max_rowid - cached[1]
+                ):
+                    delta = connection.execute(
+                        "SELECT evidence_id FROM evidence WHERE rowid > ? AND available_at <= ?",
+                        (cached[1], cutoff),
+                    ).fetchall()
+                    ids = cached[3]
+                    if len(delta) == count - cached[0]:
+                        ids = list(ids)
+                        for row in delta:
+                            bisect.insort(ids, row["evidence_id"])
+                    else:
+                        ids = None
+                else:
+                    ids = None
+                if ids is None:
+                    ids = [
+                        row["evidence_id"]
+                        for row in connection.execute(
+                            "SELECT evidence_id FROM evidence WHERE available_at <= ? ORDER BY evidence_id",
+                            (cutoff,),
+                        )
+                    ]
+                payload = {"as_of": cutoff, "evidence_ids": ids}
+                digest = hashlib.sha256(canonical_json(payload).encode("utf-8")).hexdigest()
+                self._corpus_hash_cache.clear()
+                self._corpus_hash_cache[cutoff] = (count, max_rowid, digest, tuple(ids))
+                return digest
 
     def seal_scenario_snapshot(
         self,
