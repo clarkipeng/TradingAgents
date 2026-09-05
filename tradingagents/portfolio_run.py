@@ -36,8 +36,9 @@ MAX_RESEARCH_CALLS_PER_PORTFOLIO_DAY = 40
 PORTFOLIO_DAY_POLICY = {
     # Calibrated on the cloud trader machine: the GIL serializes the workers'
     # tool-side Python, so wall clock tracks single-core speed, not vCPUs,
-    # and search cost scales with the corpus (240k docs at Sep 2026).
-    "wall_clock_seconds": 5400,
+    # and search cost scales with the corpus (240k docs at Sep 2026: a day
+    # reached 28/30 tickers at 5400s - the honest budget is two hours).
+    "wall_clock_seconds": 7200,
     "minimum_ticker_coverage": 0.8,
     "max_workers": 4,
     "complete_held_quote_coverage": True,
