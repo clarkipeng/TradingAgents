@@ -1,15 +1,19 @@
 # What's happening right now
 
-Updated: 2026-09-04 early morning. I keep this file current - check it anytime.
+Updated: 2026-09-05 early morning. I keep this file current - check it anytime.
 
-## The memory bug that killed every trading day: found and fixed (Sep 3-4)
-No 30-stock trading day had ever completed - not on the laptop, not on the cloud. The killer: the search index loaded the entire 190,000-document archive into memory as Python objects, once per parallel worker, growing past 8GB until the OS shot the process.
-Rewritten as a compact statistics index: 0.34GB instead of 7.8GB, searches in 22ms instead of a full archive scan, provably identical rankings and seals (the old implementation is embedded in a test as the oracle). 1,779 tests green, deployed.
+## Milestone: the first sealed 30-stock trading days exist
+Aug 18, 19, and 20 completed and sealed on the cloud - the first ever. Before this, no 30-stock day had survived anywhere.
+Getting here took a chain of five real fixes, each found by measurement: a memory balloon in the search index (8GB, OS kill), a database journal downgrade from my own store copy (readers strangled writers), the day's own recordings invalidating the search cache (minutes-long rebuilds, dozens per day), slow shared CPUs (the Python side runs single-core because of the GIL - now dedicated fast cores), and the growing archive (72k -> 242k documents across the window) making the per-search drift check ever more expensive - now maintained incrementally.
+
+## The honest current picture
+- Sealed: Aug 18, 19, 20.
+- Failed on the old limits and being re-run now: Aug 21 through Sep 4 (ten days).
+- Friday evening the disk filled (my backup rotation kept 7 full copies of a 2.7GB database on a 10GB disk - bad call, now one slot + Fly's own snapshots) and every evening job crashed once. Disk extended to 25GB; nothing corrupted - the safety rules held everywhere, all failures were visible and clean.
 
 ## Running right now
-- **The backfill, on the cloud, on the fixed build**: twelve days, Aug 18 through Sep 3, in order. Started ~1:40am Sep 4. With fast search, expect it done by morning.
+- Re-run of the ten unsealed days on the newest build (90-minute budget each, cheap drift checks). Expect the full track record later today.
   Results after: `tradingagents temporal-portfolio-report`
-- Today's scheduled 5:45pm trading day (Sep 4) runs automatically after it - first fully hands-off cloud day.
 
 ## Cloud migration: DONE (Sep 2)
 Everything runs on Fly now - two machines: the X/news collector, and the trader (owns the evidence database on its own disk; polling, 5:45pm trading day, discovery, import, rotating backups; a pause switch for the trading day when I need to run manual chains).
