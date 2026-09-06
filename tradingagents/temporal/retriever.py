@@ -43,6 +43,7 @@ class TemporalRetriever:
             response = self._search_once(
                 query, as_of=as_of, limit=limit, page=page, date_from=date_from,
                 date_to=date_to, source=source, corpus_hash_pin=corpus_hash_pin,
+                generation_id=generation_before,
             )
             if self.store.active_generation_id() == generation_before:
                 return response
@@ -52,6 +53,7 @@ class TemporalRetriever:
         self, query: str, *, as_of: datetime, limit: int = 10, page: int = 1,
         date_from: str | None = None, date_to: str | None = None,
         source: str | None = None, corpus_hash_pin: str | None = None,
+        generation_id: int | None = None,
     ) -> TemporalSearchResponse:
         if limit < 1 or page < 1:
             raise ValueError("limit and page must be positive")
@@ -61,7 +63,8 @@ class TemporalRetriever:
         if start and end and start > end:
             raise ValueError("date_from must be on or before date_to")
         cutoff = format_timestamp(parsed_as_of)
-        generation_id = self.store.active_generation_id()
+        if generation_id is None:
+            generation_id = self.store.active_generation_id()
         corpus_hash = self.store.corpus_hash(as_of=parsed_as_of)
         if page > 1 and corpus_hash_pin != corpus_hash:
             raise ValueError("page > 1 requires a matching page-1 corpus_hash pin")

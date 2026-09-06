@@ -73,6 +73,7 @@ class TemporalStore:
         self._corpus_hash_lock = threading.Lock()
         self._corpus_hash_cache: dict[str, tuple[int, int, str, tuple[str, ...]]] = {}
         self._pending_cluster_keys: set[str] | None = None
+        self._thread_connections = threading.local()
         self.artifacts_dir.mkdir(parents=True, exist_ok=True)
         self._initialize()
         from .retriever import TemporalRetriever
@@ -81,21 +82,37 @@ class TemporalStore:
 
     @contextmanager
     def _connect(self) -> Iterator[sqlite3.Connection]:
-        connection = sqlite3.connect(self.database_path, timeout=_SQLITE_BUSY_TIMEOUT_SECONDS)
-        connection.row_factory = sqlite3.Row
-        # WAL pairs with NORMAL: commits stop fsyncing individually (a real
-        # cost on network-backed volumes) while the database stays consistent
-        # across crashes; at worst the tail of un-checkpointed transactions is
-        # lost, and every writer here is re-runnable or re-importable.
-        connection.execute("PRAGMA synchronous=NORMAL")
+        connection = getattr(self._thread_connections, "connection", None)
+        if connection is None:
+            connection = sqlite3.connect(self.database_path, timeout=_SQLITE_BUSY_TIMEOUT_SECONDS)
+            connection.row_factory = sqlite3.Row
+            # WAL pairs with NORMAL: commits stop fsyncing individually (a real
+            # cost on network-backed volumes) while the database stays consistent
+            # across crashes; at worst the tail of un-checkpointed transactions is
+            # lost, and every writer here is re-runnable or re-importable.
+            connection.execute("PRAGMA synchronous=NORMAL")
+            self._thread_connections.connection = connection
         try:
             yield connection
             connection.commit()
         except BaseException:
             connection.rollback()
             raise
-        finally:
+
+    def close(self) -> None:
+        """Close this thread's owned connection at the store lifecycle boundary."""
+        connection = getattr(self._thread_connections, "connection", None)
+        if connection is not None:
             connection.close()
+            del self._thread_connections.connection
+
+    def __del__(self) -> None:
+        # Tests and short-lived CLI commands often rely on object lifetime;
+        # explicit close() remains the production lifecycle boundary.
+        try:
+            self.close()
+        except (AttributeError, sqlite3.Error):
+            pass
 
     @contextmanager
     def write_lock(self) -> Iterator[None]:
@@ -279,6 +296,12 @@ class TemporalStore:
                     generation_id INTEGER NOT NULL DEFAULT 0,
                     UNIQUE(run_id, sequence)
                 );
+                CREATE TABLE IF NOT EXISTS trace_sequences (
+                    run_id TEXT NOT NULL,
+                    trace_kind TEXT NOT NULL,
+                    next_sequence INTEGER NOT NULL,
+                    PRIMARY KEY(run_id, trace_kind)
+                );
                 """
             )
 
@@ -291,6 +314,13 @@ class TemporalStore:
                 connection.execute("ALTER TABLE evidence ADD COLUMN event_at TEXT")
             if "source_published_at" not in columns:
                 connection.execute("ALTER TABLE evidence ADD COLUMN source_published_at TEXT")
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS evidence_media_post_lookup ON evidence("
+                "json_extract(response_json, '$.metadata.media_post.source'), "
+                "json_extract(response_json, '$.metadata.media_post.ticker'), "
+                "available_at DESC, evidence_id) "
+                "WHERE tool = 'corpus.document' AND is_error = 0"
+            )
             portfolio_columns = {row[1] for row in connection.execute("PRAGMA table_info(portfolio_days)")}
             if portfolio_columns and "state_evidence_id" not in portfolio_columns:
                 connection.execute("ALTER TABLE portfolio_days ADD COLUMN state_evidence_id TEXT")
@@ -605,6 +635,7 @@ class TemporalStore:
                     extractor_version TEXT NOT NULL, cluster_key TEXT NOT NULL, UNIQUE(parent_evidence_id, logical_position)
                 );
                 CREATE INDEX {documents_table}_available ON {documents_table}(available_at, doc_key);
+                CREATE INDEX {documents_table}_cluster ON {documents_table}(cluster_key, doc_key);
                 CREATE TABLE {chunks_table} (
                     chunk_id TEXT PRIMARY KEY, doc_key TEXT NOT NULL, chunk_index INTEGER NOT NULL,
                     token_start INTEGER NOT NULL, token_end INTEGER NOT NULL, body TEXT NOT NULL,
@@ -675,6 +706,10 @@ class TemporalStore:
             """)
             count = connection.execute("SELECT COUNT(*) FROM documents").fetchone()[0]
         self._eligible_index_cache.clear()
+        # Reindex is an explicit maintenance boundary; publish its durable
+        # generation to the main database before returning to callers.
+        with self._connect() as connection:
+            connection.execute("PRAGMA wal_checkpoint(TRUNCATE)")
         return count
 
     @staticmethod
@@ -1247,7 +1282,8 @@ class TemporalStore:
                     temporal_sequence,
                 ),
             )
-        return self.get_llm_call(run_id)
+            row = connection.execute("SELECT * FROM llm_calls WHERE run_id = ?", (run_id,)).fetchone()
+        return self._llm_call_from_row(row)
 
     def finish_llm_call(
         self,
@@ -1273,9 +1309,10 @@ class TemporalStore:
                 """,
                 (response_json, response_hash, error_json, format_timestamp(completed), run_id),
             ).rowcount
+            row = connection.execute("SELECT * FROM llm_calls WHERE run_id = ?", (run_id,)).fetchone()
         if not updated:
             raise KeyError(f"unknown LLM run: {run_id}")
-        return self.get_llm_call(run_id)
+        return self._llm_call_from_row(row)
 
     def get_llm_call(self, run_id: str) -> LLMCallRecord:
         with self._connect() as connection:
@@ -1359,11 +1396,18 @@ class TemporalStore:
             predicates.append("(d.source_domain = ? OR e.source = ? OR d.source_domain LIKE ?)")
             params.extend((source, source, f"%{source}%"))
         with self._connect() as connection:
-            rows = connection.execute(f"SELECT d.source_domain, d.available_at FROM documents d JOIN evidence e ON e.evidence_id=d.parent_evidence_id WHERE {' AND '.join(predicates)} ORDER BY d.available_at", params).fetchall()
-        domains = sorted({row["source_domain"] for row in rows})
-        return {"as_of": cutoff, "source": source, "document_count": len(rows),
-                "source_counts": {domain: sum(row["source_domain"] == domain for row in rows) for domain in domains},
-                "date_span": {"from": rows[0]["available_at"][:10] if rows else None, "to": rows[-1]["available_at"][:10] if rows else None},
+            rows = connection.execute(
+                f"SELECT d.source_domain, COUNT(*) AS document_count, "
+                f"MIN(d.available_at) AS first_available, MAX(d.available_at) AS last_available "
+                f"FROM documents d JOIN evidence e ON e.evidence_id=d.parent_evidence_id "
+                f"WHERE {' AND '.join(predicates)} GROUP BY d.source_domain ORDER BY d.source_domain",
+                params,
+            ).fetchall()
+        return {"as_of": cutoff, "source": source,
+                "document_count": sum(row["document_count"] for row in rows),
+                "source_counts": {row["source_domain"]: row["document_count"] for row in rows},
+                "date_span": {"from": min((row["first_available"][:10] for row in rows), default=None),
+                              "to": max((row["last_available"][:10] for row in rows), default=None)},
                 "corpus_hash": self.corpus_hash(as_of=as_of)}
 
     @staticmethod
@@ -1400,10 +1444,7 @@ class TemporalStore:
             # Tool nodes may also run concurrently; sequence allocation is an
             # ordered tape operation rather than a best-effort counter.
             connection.execute("BEGIN IMMEDIATE")
-            sequence = connection.execute(
-                "SELECT COALESCE(MAX(sequence), 0) + 1 FROM tool_traces WHERE run_id = ?",
-                (run_id,),
-            ).fetchone()[0]
+            sequence = self._next_trace_sequence(connection, run_id, "tool")
             identity = {
                 "run_id": run_id,
                 "sequence": sequence,
@@ -1455,10 +1496,7 @@ class TemporalStore:
         invoked = parse_timestamp(invoked_at or datetime.now(timezone.utc))
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            sequence = connection.execute(
-                "SELECT COALESCE(MAX(sequence), 0) + 1 FROM search_traces WHERE run_id = ?",
-                (run_id,),
-            ).fetchone()[0]
+            sequence = self._next_trace_sequence(connection, run_id, "search")
             identity = {
                 "run_id": run_id,
                 "sequence": sequence,
@@ -1504,6 +1542,27 @@ class TemporalStore:
             manifest,
             invoked,
         )
+
+    @staticmethod
+    def _next_trace_sequence(
+        connection: sqlite3.Connection, run_id: str, trace_kind: str
+    ) -> int:
+        """Allocate a per-run trace sequence without rescanning trace history."""
+        table = "tool_traces" if trace_kind == "tool" else "search_traces"
+        connection.execute(
+            "INSERT OR IGNORE INTO trace_sequences(run_id, trace_kind, next_sequence) "
+            f"SELECT ?, ?, COALESCE(MAX(sequence), 0) + 1 FROM {table} WHERE run_id = ?",
+            (run_id, trace_kind, run_id),
+        )
+        sequence = connection.execute(
+            "SELECT next_sequence FROM trace_sequences WHERE run_id = ? AND trace_kind = ?",
+            (run_id, trace_kind),
+        ).fetchone()[0]
+        connection.execute(
+            "UPDATE trace_sequences SET next_sequence = ? WHERE run_id = ? AND trace_kind = ?",
+            (sequence + 1, run_id, trace_kind),
+        )
+        return sequence
 
     def list_tool_traces(self, run_id: str) -> list[ToolTraceRecord]:
         with self._connect() as connection:
