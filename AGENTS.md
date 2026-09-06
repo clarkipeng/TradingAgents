@@ -14,3 +14,8 @@
   a clean committed tree. Never bypass the release preflight or health gate.
 - Never run a provider-fetching command for diagnosis when a read-only audit,
   stats command, or isolated database/network probe can answer the question.
+
+# Engineering review
+
+Read [taste.md](taste.md) before substantive implementation or review.
+Keep [doing.md](doing.md) as one current status, distinguishing planned work from verified outcomes.
