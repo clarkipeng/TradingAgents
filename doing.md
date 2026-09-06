@@ -6,14 +6,21 @@ Updated: 2026-09-05 early morning. I keep this file current - check it anytime.
 Aug 18, 19, and 20 completed and sealed on the cloud - the first ever. Before this, no 30-stock day had survived anywhere.
 Getting here took a chain of five real fixes, each found by measurement: a memory balloon in the search index (8GB, OS kill), a database journal downgrade from my own store copy (readers strangled writers), the day's own recordings invalidating the search cache (minutes-long rebuilds, dozens per day), slow shared CPUs (the Python side runs single-core because of the GIL - now dedicated fast cores), and the growing archive (72k -> 242k documents across the window) making the per-search drift check ever more expensive - now maintained incrementally.
 
-## The honest current picture
-- Sealed: Aug 18, 19, 20.
-- Failed on the old limits and being re-run now: Aug 21 through Sep 4 (ten days).
-- Friday evening the disk filled (my backup rotation kept 7 full copies of a 2.7GB database on a 10GB disk - bad call, now one slot + Fly's own snapshots) and every evening job crashed once. Disk extended to 25GB; nothing corrupted - the safety rules held everywhere, all failures were visible and clean.
+## The track record exists: 13 sealed days, Aug 18 - Sep 4
+Total +0.26% vs SPY +0.36%. Too short to mean anything about returns; it proves the machinery.
+One real strategy bug found in it and fixed: 8 of 13 days went to 100% cash because the CIO's proposed weights summed a hair over the limit and the whole plan was rejected into a fallback that liquidated everything.
+Now: small overages scale down proportionally (exposure can only shrink), and a genuinely rejected plan holds the book instead of selling it - the honest null action, and the cheap one (no fee churn).
+See it: `tradingagents temporal-portfolio-report` (on the cloud store).
+
+## Costs per month, roughly
+- X data (your "big" tier choice): ~$450 - dominates everything.
+- AI research: ~$2-3 per trading day (~$60).
+- Cloud machines + disk: ~$70-95.
+- Cloud Postgres (the news middle layer): ~$30-70 - planned to be removed after a clean week, the biggest safe cut.
+Everything else this week made days cheaper by not wasting them: no more OOM re-runs, no more liquidate-and-rebuy fee churn.
 
 ## Running right now
-- Re-run of the ten unsealed days on the newest build (90-minute budget each, cheap drift checks). Expect the full track record later today.
-  Results after: `tradingagents temporal-portfolio-report`
+Nothing. Monday 5:45pm the scheduled day runs hands-off on the fixed build - the first true end-to-end unattended day.
 
 ## Cloud migration: DONE (Sep 2)
 Everything runs on Fly now - two machines: the X/news collector, and the trader (owns the evidence database on its own disk; polling, 5:45pm trading day, discovery, import, rotating backups; a pause switch for the trading day when I need to run manual chains).
