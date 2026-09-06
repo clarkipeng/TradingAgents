@@ -22,7 +22,7 @@ Awaiting owner implementation: 2, 6, 9–16, 19–26, 28–33, C4, full P4/P5/P6
 
 ## Worker and coordination record
 
-Required worker launch prompts are retained as `luna-ops-prompt.md` and `luna-store-prompt.md`. Two launches were attempted with canonical root, `--base agent-trading-simulation-backtest --local-base`, isolated worktrees, and `codex-luna`; control plane returned HTTP 500 for store and no active child record was returned. No worker IDs, branches, wake IDs, or external-run subscriptions were created; no reconciliation/archival action is applicable. Signal policy set for lead: `terminal`. Repowire London was offline and delivery unavailable; no wake handshake is claimed verified. Usage/coordination statistics: unknown.
+Required worker launch prompts are retained as `luna-ops-prompt.md` and `luna-store-prompt.md`. Both Luna workers are active with terminal signaling: ops workspace `1ad9882e-57b3-42ba-a696-89312c054456`, store workspace `5f3e9cc0-43b9-47c1-beed-f7034fd445c5`; their branches/usage statistics remain unknown until their durable handoffs arrive. External-run wake subscription `7b17d96c-6b31-4c23-8374-6778c6cfad4e` delivered `notified`; receipt path is London's `.context/audit-fleet/env-check`. Native parent probe ack: `befa60b3-b6c5-4bae-ba17-417b460287f3`. The 15-minute fallback is `io.tradingagents.audit-fleet-wake-20260906` and must be booted out with its exact plist removed only at complete/real external block. Repowire is not a wake dependency.
 
 ## Rollout constraints and next owner
 
