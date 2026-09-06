@@ -43,6 +43,7 @@ reconciled and archived after its corrective slice landed.
 | `7806f1c` | Read-only Sol review record. | Four findings recorded in `sol-review.md`; 28 focused review tests passed. |
 | `d203e1d` | Claim containment exceeds the two-hour day deadline; child research shares the day budget; model reservations use explicit nonzero Decimal estimates; replay verifies stream digests and failed ticker membership. | Focused portfolio/budget/replay/lifecycle/LangChain suite: 41 passed. |
 | `c85bd19` | The legacy test fixture explicitly removes P4 pin rows, proving old seals still reject corpus drift. | Revised combined suite: 211 passed. |
+| `69042fb` | Captured instrument context is recorded for portfolio workers and reused verbatim by graph replay, preventing mutable identity lookup from changing strict prompts. | `test_temporal_full_trace_replay.py test_portfolio_run.py test_portfolio_lifecycle.py test_portfolio_replay.py` — 28 passed. |
 
 The Sol reviewer was `c9836aea-6030-4b3b-86e1-75c8af909039`, session
 `28867288-0080-4d9d-903a-9cd04a2742a3`, branch `cdt/c983-ta-sol-review`.
@@ -58,8 +59,9 @@ by `sightmesh workspace archive --confirm-reconciled`; closeout receipt
 `aa0f67dc-312d-4cad-a27d-1bcf887ea297` was queued before archival.
 
 Coverage remains deliberately honest: IDs 1--33 and C1--C4 are all retained
-in the two coverage paragraphs above, with P4 membership/legacy-reader and
-C3 reservation invariants now strengthened. Remaining P1 production replay,
+in the two coverage paragraphs above. Finding 2 now has captured-context
+prompt parity; P4 membership/legacy-reader and C3 reservation invariants are
+also strengthened. Remaining P1 production replay,
 P4 generation/retention, P5 cache/brief work, and P6 cutover/preflight tooling
 are not complete and require a local-fixture-only successor. No promotion is
 authorized. The launchd fallback remains London's responsibility and may only
