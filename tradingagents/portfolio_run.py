@@ -422,11 +422,16 @@ def _run_portfolio_day(
         "research_call_count": research_calls,
         "elapsed_seconds": round(time.monotonic() - started, 3),
     }
+    from tradingagents.portfolio_replay import build_portfolio_replay_manifest
+    replay_manifest = build_portfolio_replay_manifest(
+        store, parent_run_id=context.run_id or "", tickers=ratings,
+    )
     summary["state_evidence_id"] = store.complete_portfolio_day(
         day, _claim_id, as_of=as_of, state=final_state,
         scenario_metadata={"kind": "portfolio-day", "trade_date": day, "tickers": tickers,
                            "summary": {"coverage": summary["coverage"], "research_call_count": research_calls,
-                                       "elapsed_seconds": summary["elapsed_seconds"]}},
+                                       "elapsed_seconds": summary["elapsed_seconds"]},
+                           "replay_manifest": replay_manifest},
         capture_run_id=context.run_id or "", decision=json.dumps(plan, sort_keys=True),
         report=json.dumps(summary, sort_keys=True),
     )
