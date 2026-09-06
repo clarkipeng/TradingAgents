@@ -19,6 +19,7 @@ from pydantic import BaseModel, ConfigDict, PrivateAttr
 
 from tradingagents.temporal import LLMCallRecord, TemporalStore, canonical_json, current_context
 from tradingagents.temporal.retriever import search_payload
+from tradingagents.model_budget import ModelBudgetExceeded
 
 logger = logging.getLogger(__name__)
 
@@ -298,6 +299,17 @@ class LangChainTapeRecorder(BaseCallbackHandler):
 
     def _begin(self, run_id: UUID, request: dict[str, Any]) -> None:
         context = current_context()
+        if context is not None and context.model_budget is not None:
+            # Conservative, deterministic preflight.  The reservation itself
+            # is durable and shared by all worker threads for this day.
+            try:
+                context.model_budget.reserve(
+                    str(run_id), estimated_tokens=max(1, len(canonical_json(request)) // 4),
+                    estimated_cost="0",
+                )
+            except ModelBudgetExceeded:
+                context.invalidate()
+                raise
         try:
             self.store.begin_llm_call(
                 str(run_id),

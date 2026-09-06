@@ -15,6 +15,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, ROUND_DOWN, localcontext
+from tradingagents.model_budget import DailyModelBudget
 
 from tradingagents.temporal import TemporalRunInvalidError, TemporalStore
 from tradingagents.temporal.clock import format_timestamp, parse_timestamp
@@ -45,6 +46,8 @@ PORTFOLIO_DAY_POLICY = {
     "minimum_ticker_coverage": 0.8,
     "max_workers": 4,
     "complete_held_quote_coverage": True,
+    "model_token_budget": 1_000_000,
+    "model_cost_budget": "100",
 }
 MAX_RESEARCH_WORKERS = PORTFOLIO_DAY_POLICY["max_workers"]
 MIN_TICKER_COVERAGE = PORTFOLIO_DAY_POLICY["minimum_ticker_coverage"]
@@ -253,6 +256,10 @@ def _run_portfolio_day(
     context = TemporalContext.at(
         TemporalMode.LIVE_CAPTURE, as_of, store=store,
         run_id=run_id or str(uuid.uuid4()),
+    )
+    context.model_budget = DailyModelBudget(
+        store.root, day, max_tokens=PORTFOLIO_DAY_POLICY["model_token_budget"],
+        max_cost=PORTFOLIO_DAY_POLICY["model_cost_budget"],
     )
     with temporal_context(context):
         research_calls = 0

@@ -27,6 +27,7 @@ class TemporalContext:
     store: TemporalStore | None = None
     run_id: str | None = None
     source_run_id: str | None = None
+    model_budget: object | None = None
     _invalid: bool = False
 
     def invalidate(self) -> None:
