@@ -156,6 +156,8 @@ class TemporalStore:
                 );
                 CREATE INDEX IF NOT EXISTS evidence_lookup
                 ON evidence(tool, request_key, available_at, observed_at, evidence_id);
+                CREATE INDEX IF NOT EXISTS evidence_available
+                ON evidence(available_at, evidence_id);
                 CREATE TABLE IF NOT EXISTS llm_calls (
                     call_id TEXT PRIMARY KEY,
                     run_id TEXT NOT NULL UNIQUE,
@@ -237,6 +239,7 @@ class TemporalStore:
                     UNIQUE(parent_evidence_id, logical_position)
                 );
                 CREATE INDEX IF NOT EXISTS documents_available ON documents(available_at, doc_key);
+                CREATE INDEX IF NOT EXISTS documents_cluster ON documents(cluster_key, doc_key);
                 CREATE TABLE IF NOT EXISTS document_chunks (
                     chunk_id TEXT PRIMARY KEY,
                     doc_key TEXT NOT NULL REFERENCES documents(doc_key),
@@ -261,8 +264,6 @@ class TemporalStore:
                     invoked_at TEXT NOT NULL,
                     UNIQUE(run_id, sequence)
                 );
-                CREATE INDEX IF NOT EXISTS tool_traces_run
-                ON tool_traces(run_id, sequence);
                 CREATE TABLE IF NOT EXISTS search_traces (
                     trace_id TEXT PRIMARY KEY,
                     run_id TEXT NOT NULL,
@@ -278,8 +279,6 @@ class TemporalStore:
                     generation_id INTEGER NOT NULL DEFAULT 0,
                     UNIQUE(run_id, sequence)
                 );
-                CREATE INDEX IF NOT EXISTS search_traces_run
-                ON search_traces(run_id, sequence);
                 """
             )
 
@@ -334,6 +333,11 @@ class TemporalStore:
                 "ON llm_calls(temporal_run_id, temporal_sequence) "
                 "WHERE temporal_run_id IS NOT NULL"
             )
+            # These indexes duplicate the automatically maintained B-trees
+            # backing UNIQUE(run_id, sequence). Remove them for existing
+            # stores; the constraints remain the sole trace lookup indexes.
+            connection.execute("DROP INDEX IF EXISTS tool_traces_run")
+            connection.execute("DROP INDEX IF EXISTS search_traces_run")
 
     def claim_portfolio_day(self, day: str, claim_id: str, *, claimed_at: datetime) -> dict:
         stamp = format_timestamp(parse_timestamp(claimed_at))
@@ -1322,128 +1326,6 @@ class TemporalStore:
         return self.retriever.search(
             query, as_of=as_of, limit=limit, page=page, date_from=date_from,
             date_to=date_to, source=source, corpus_hash_pin=corpus_hash_pin,
-        )
-        # Kept below only as a source-compatible migration marker; retrieval is
-        # owned by TemporalRetriever and this branch is unreachable.
-        if limit < 1:
-            raise ValueError("limit must be positive")
-        if page < 1:
-            raise ValueError("page must be positive")
-        parsed_as_of = parse_timestamp(as_of)
-        start = (date_from[:10] if isinstance(date_from, str) and len(date_from) == 10 else parse_timestamp(date_from).date().isoformat()) if date_from else None
-        end = (date_to[:10] if isinstance(date_to, str) and len(date_to) == 10 else parse_timestamp(date_to).date().isoformat()) if date_to else None
-        if start and end and start > end:
-            raise ValueError("date_from must be on or before date_to")
-        cutoff = format_timestamp(parsed_as_of)
-        corpus_hash = self.corpus_hash(as_of=parsed_as_of)
-        if page > 1 and corpus_hash_pin != corpus_hash:
-            raise ValueError("page > 1 requires a matching page-1 corpus_hash pin")
-        index = self.eligible_index(
-            cutoff=cutoff, generation_id=self.active_generation_id()
-        )
-        # Date/source filters restrict results, never ranking statistics:
-        # scores stay a pure function of (eligible corpus, query, ranker),
-        # so the cached eligible index is reused across filtered views.
-        filtered: set[str] | None = None
-        if start or end or source:
-            predicates = ["d.available_at <= ?"]
-            parameters: list[Any] = [cutoff]
-            if start:
-                predicates.append("substr(d.available_at, 1, 10) >= ?")
-                parameters.append(start)
-            if end:
-                predicates.append("substr(d.available_at, 1, 10) <= ?")
-                parameters.append(end)
-            if source:
-                predicates.append("(d.source_domain = ? OR e.source = ? OR d.source_domain LIKE ?)")
-                parameters.extend((source, source, f"%{source}%"))
-            with self._connect() as connection:
-                filtered = {
-                    row["doc_key"]
-                    for row in connection.execute(
-                        "SELECT d.doc_key FROM documents d"
-                        " JOIN evidence e ON e.evidence_id = d.parent_evidence_id"
-                        f" WHERE {' AND '.join(predicates)}",
-                        parameters,
-                    ).fetchall()
-                }
-        cluster_by_key = index.cluster_by_doc_key
-        if not query.strip():
-            # Empty query is calendar browsing: eligible documents by recency
-            # within the filters, cluster-collapsed, deterministically ordered.
-            with self._connect() as connection:
-                rows = connection.execute(
-                    "SELECT doc_key, cluster_key FROM documents WHERE available_at <= ?"
-                    " ORDER BY available_at DESC, doc_key ASC",
-                    (cutoff,),
-                ).fetchall()
-            best: dict[str, dict[str, Any]] = {}
-            for row in rows:
-                if filtered is not None and row["doc_key"] not in filtered:
-                    continue
-                best.setdefault(row["cluster_key"], {"doc_key": row["doc_key"], "cluster_key": row["cluster_key"], "rank": 0.0})
-            ordered = list(best.values())
-        else:
-            candidate_limit = max(limit * 8 * page, 32)
-            candidates = rank(index, query, candidate_limit)
-            best = {}
-            for doc_key, score in candidates:
-                if filtered is not None and doc_key not in filtered:
-                    continue
-                cluster = cluster_by_key[doc_key]
-                if cluster not in best or (-score, doc_key) < (-float(best[cluster]["rank"]), best[cluster]["doc_key"]):
-                    best[cluster] = {"doc_key": doc_key, "cluster_key": cluster, "rank": score}
-            ordered = sorted(best.values(), key=lambda row: (-float(row["rank"]), row["doc_key"]))
-        selected_candidates = ordered[(page - 1) * limit : page * limit]
-        selected_keys = [row["doc_key"] for row in selected_candidates]
-        placeholders = ",".join("?" for _ in selected_keys)
-        with self._connect() as connection:
-            hydrated_rows = connection.execute(
-                f"""
-                SELECT d.*, e.*, json_extract(e.response_json, '$.metadata') AS metadata_json
-                FROM documents d
-                JOIN evidence e ON e.evidence_id = d.parent_evidence_id
-                WHERE d.doc_key IN ({placeholders})
-                """,
-                selected_keys,
-            ).fetchall()
-            hydrated = {row["doc_key"]: row for row in hydrated_rows}
-            siblings = {
-                row["cluster_key"]: tuple(r["doc_key"] for r in connection.execute(
-                    "SELECT doc_key FROM documents WHERE cluster_key=? AND doc_key<>? ORDER BY doc_key",
-                    (row["cluster_key"], row["doc_key"])).fetchall())
-                for row in selected_candidates
-            }
-        results = tuple(TemporalSearchResult(
-            evidence=self._search_evidence_from_row(hydrated[row["doc_key"]]),
-            rank=float(row["rank"]),
-            document=TemporalDocument(
-                doc_key=row["doc_key"], parent_evidence_id=hydrated[row["doc_key"]]["parent_evidence_id"],
-                title=hydrated[row["doc_key"]]["title"], body=hydrated[row["doc_key"]]["body"],
-                source_domain=hydrated[row["doc_key"]]["source_domain"],
-                canonical_url=hydrated[row["doc_key"]]["canonical_url"],
-                published_at=parse_timestamp(hydrated[row["doc_key"]]["published_at"])
-                if hydrated[row["doc_key"]]["published_at"] else None,
-                available_at=parse_timestamp(hydrated[row["doc_key"]]["available_at"]),
-                doc_kind=hydrated[row["doc_key"]]["doc_kind"],
-                siblings=siblings[row["cluster_key"]],
-            ),
-        ) for row in selected_candidates)
-        return TemporalSearchResponse(
-            results=results,
-            manifest=SearchManifest(
-                query=query,
-                as_of=parsed_as_of,
-                ranker_version=RANKER_VERSION,
-                corpus_hash=corpus_hash,
-                evidence_ids=tuple(result.evidence.evidence_id for result in results),
-                index_state_hash=index.index_state_hash,
-                page=page,
-                limit=limit,
-                date_from=start,
-                date_to=end,
-                source=source,
-            ),
         )
 
     def fetch_document(self, doc_key: str, *, as_of: datetime, page: int = 1, page_chars: int = 4000) -> dict[str, Any]:
