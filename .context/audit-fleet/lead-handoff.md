@@ -31,6 +31,34 @@ Required worker launch prompts are retained as `luna-ops-prompt.md` and `luna-st
 
 Both workers completed clean and their handoffs were cherry-picked. `sightmesh close` / `workspace archive` were attempted after reconciliation but rejected because its endpoint requires a workspace UUID while `peek` exposes only the session ID and name; no archive occurred. A permitted Sol replacement launch was attempted and failed with the same Sightmesh HTTP 500; no Sol review exists.
 
+## Final review correction and reconciliation status
+
+| Commit | Contract | Proof |
+| --- | --- | --- |
+| `c5234f9` | Temporal-store connections have an explicit all-thread lifecycle. | Luna store focused suite: 46 passed, ResourceWarning-clean. |
+| `78308b7` | New scenario seals pin exact evidence membership; legacy seals retain their canonical corpus-hash reader. | Included in integration suite below. |
+| `7806f1c` | Read-only Sol review record. | Four findings recorded in `sol-review.md`; 28 focused review tests passed. |
+| `d203e1d` | Claim containment exceeds the two-hour day deadline; child research shares the day budget; model reservations use explicit nonzero Decimal estimates; replay verifies stream digests and failed ticker membership. | Focused portfolio/budget/replay/lifecycle/LangChain suite: 41 passed. |
+| pending working-tree commit | The legacy test fixture explicitly removes P4 pin rows, proving old seals still reject corpus drift. | Revised combined suite: 211 passed. |
+
+The Sol reviewer was `c9836aea-6030-4b3b-86e1-75c8af909039`, session
+`28867288-0080-4d9d-903a-9cd04a2742a3`, branch `cdt/c983-ta-sol-review`.
+Its source review commit was integrated as `7806f1c`. Usage counters are not
+authoritative (cached/cumulative status unknown); do not derive spend from
+them. The two Luna workspace UUIDs supplied by London are
+`67b7d7e7-6cc7-4280-8c0b-ea3da8b3d2d4` (store) and
+`a87f14d2-fc09-4d46-a62c-c82b5afaf885` (ops); their worker branches and
+session IDs remain recorded above. Native wake receipt was observed for
+external run `7b17d96c-6b31-4c23-8374-6778c6cfad4e`; delivery is `notified`.
+
+Coverage remains deliberately honest: IDs 1--33 and C1--C4 are all retained
+in the two coverage paragraphs above, with P4 membership/legacy-reader and
+C3 reservation invariants now strengthened. Remaining P1 production replay,
+P4 generation/retention, P5 cache/brief work, and P6 cutover/preflight tooling
+are not complete and require a local-fixture-only successor. No promotion is
+authorized. The launchd fallback remains London's responsibility and may only
+be removed at program completion or a real external gate.
+
 ## Rollout constraints and next owner
 
 Do not promote, deploy, fetch providers, alter stores/seals, push, or open a PR. Use local fixtures. Before any production cutover, fold the budget sidecar into the backup/restore manifest and prove restore. The next integration owner should first obtain the two mandated workers or explicitly transfer their file ownership, integrate their committed P0/P3 changes, then run the full required suite once. London owns production promotion and `doing.md`.
