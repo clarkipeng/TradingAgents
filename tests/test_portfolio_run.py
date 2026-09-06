@@ -69,7 +69,13 @@ def test_temporal_store_owns_portfolio_state_projections(tmp_path):
 
 
 @pytest.mark.unit
-def test_cio_falls_back_to_deterministic_weights_on_invalid_output():
+def test_cio_falls_back_to_holding_the_book_on_invalid_output():
+    """A rejected proposal is a null signal: the honest action is no trades.
+
+    The old fallback re-derived weights from ratings, which in production are
+    a constant - so every CIO hiccup liquidated the entire book (8 of the
+    first 13 live days went to 100% cash this way).
+    """
     ratings = {"NVDA": "Overweight", "TSLA": "Sell", "MSFT": "Hold"}
 
     def bad_llm(prompt: str) -> str:
@@ -80,10 +86,47 @@ def test_cio_falls_back_to_deterministic_weights_on_invalid_output():
         complete_llm=bad_llm,
     )
     assert plan["source"] == "deterministic-fallback"
-    assert "unknown" in plan["fallback_reason"] or "weight" in plan["fallback_reason"]
-    assert plan["weights"]["NVDA"] > 0
-    assert plan["weights"].get("TSLA", 0.0) == 0.0  # Sell scores negative, long-only
-    assert sum(plan["weights"].values()) <= 1.0 + 1e-9
+    assert "unknown" in plan["fallback_reason"]
+    assert plan["hold_book"] is True
+    assert plan["weights"] == {}
+
+
+@pytest.mark.unit
+def test_cio_gross_overage_is_normalized_not_rejected():
+    """Full-book proposals routinely sum a hair over the limit (30 float
+    weights); scaling down is deterministic and can only reduce exposure.
+    Rejecting them liquidated the book over rounding epsilon."""
+    ratings = {t: "Hold" for t in ("NVDA", "MSFT", "AAPL", "AMZN")}
+
+    def eager_llm(prompt: str) -> str:
+        return '{"weights": {"NVDA": 0.10, "MSFT": 0.10, "AAPL": 0.10, "AMZN": 0.10}}'
+
+    constraints = {**portfolio_run.DEFAULT_CONSTRAINTS, "gross_limit": 0.3}
+    plan = portfolio_run.cio_allocate(
+        ratings, briefs={}, constraints=constraints, complete_llm=eager_llm,
+    )
+    assert plan["source"] == "cio-llm"
+    assert plan["gross_normalized_from"] == pytest.approx(0.4)
+    assert sum(plan["weights"].values()) == pytest.approx(0.3)
+    for weight in plan["weights"].values():
+        assert weight == pytest.approx(0.075)
+
+
+@pytest.mark.unit
+def test_cio_per_ticker_cap_breach_still_falls_back():
+    """Gross drift is benign; a single weight over the cap means the model
+    ignored the constraint sheet - that proposal stays rejected."""
+    ratings = {"NVDA": "Hold", "MSFT": "Hold"}
+
+    def greedy_llm(prompt: str) -> str:
+        return '{"weights": {"NVDA": 0.50, "MSFT": 0.05}}'
+
+    plan = portfolio_run.cio_allocate(
+        ratings, briefs={}, constraints=portfolio_run.DEFAULT_CONSTRAINTS,
+        complete_llm=greedy_llm,
+    )
+    assert plan["source"] == "deterministic-fallback"
+    assert plan["hold_book"] is True
 
 
 @pytest.mark.unit

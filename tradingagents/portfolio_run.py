@@ -16,7 +16,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
-from tradingagents.portfolio_backtest import rating_score, target_weights
 from tradingagents.temporal import TemporalRunInvalidError, TemporalStore
 from tradingagents.temporal.clock import format_timestamp, parse_timestamp
 from tradingagents.temporal.store import PORTFOLIO_CLAIM_STALE_SECONDS
@@ -120,16 +119,14 @@ def cio_allocate(
     }, ensure_ascii=False, sort_keys=True)
 
     def fallback(reason: str) -> dict:
-        weights = target_weights(
-            {ticker: rating_score(rating) for ticker, rating in ratings.items()},
-            mode=constraints["mode"],
-            gross_limit=constraints["gross_limit"],
-            max_weight=constraints["max_weight"],
-        )
+        # A rejected proposal is a null signal. The only honest null action
+        # for a portfolio is to hold the current book: re-deriving weights
+        # from ratings liquidated everything whenever the ratings were flat.
         return {
             "source": "deterministic-fallback",
             "fallback_reason": reason,
-            "weights": {t: w for t, w in weights.items() if w > 0},
+            "hold_book": True,
+            "weights": {},
             "rationale": {},
         }
 
@@ -153,14 +150,21 @@ def cio_allocate(
                 return fallback(f"weight for {ticker} exceeds max_weight")
             if value > 0:
                 validated[ticker] = value
-        if sum(validated.values()) > constraints["gross_limit"] + 1e-9:
-            return fallback("gross exposure exceeds gross_limit")
         rationale = proposal.get("rationale")
-        return {
+        plan = {
             "source": "cio-llm",
             "weights": validated,
             "rationale": rationale if isinstance(rationale, dict) else {},
         }
+        gross = sum(validated.values())
+        if gross > constraints["gross_limit"]:
+            # Full-book proposals routinely sum a hair over the limit; the
+            # constraint is enforced by construction (proportional downscale
+            # can only reduce exposure), never by liquidating the book.
+            scale = constraints["gross_limit"] / gross
+            plan["weights"] = {t: w * scale for t, w in validated.items()}
+            plan["gross_normalized_from"] = gross
+        return plan
     except Exception as error:  # noqa: BLE001 - any malformed output falls back
         return fallback(f"proposal rejected ({type(error).__name__})")
 
@@ -348,7 +352,10 @@ def _run_portfolio_day(
         )
         if deadline_breached:
             return {"status": "failed_unsealed", "reason": "deadline_exceeded", "skipped": "policy breach", "scenario_id": scenario_id, "day": day, "coverage": coverage, "research_call_count": research_calls, "elapsed_seconds": round(time.monotonic() - started, 3), "failures": failures}
-        orders = rebalance_orders(prior, plan["weights"], quotes, submitted_at=as_of)
+        if plan.get("hold_book"):
+            orders = []
+        else:
+            orders = rebalance_orders(prior, plan["weights"], quotes, submitted_at=as_of)
 
         simulator = PortfolioSimulator(
             prior["cash"], fee_bps=fee_bps, slippage_bps=slippage_bps
