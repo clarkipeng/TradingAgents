@@ -50,6 +50,9 @@ them. The two Luna workspace UUIDs supplied by London are
 `a87f14d2-fc09-4d46-a62c-c82b5afaf885` (ops); their worker branches and
 session IDs remain recorded above. Native wake receipt was observed for
 external run `7b17d96c-6b31-4c23-8374-6778c6cfad4e`; delivery is `notified`.
+The Sol workspace was reconciled and archived with `sightmesh close` followed
+by `sightmesh workspace archive --confirm-reconciled`; closeout receipt
+`aa0f67dc-312d-4cad-a27d-1bcf887ea297` was queued before archival.
 
 Coverage remains deliberately honest: IDs 1--33 and C1--C4 are all retained
 in the two coverage paragraphs above, with P4 membership/legacy-reader and
