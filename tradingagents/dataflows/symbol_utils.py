@@ -130,6 +130,11 @@ def normalize_symbol(raw: str) -> str:
         canonical = crypto
     elif len(s) == 6 and s[:3] in _FOREX_CURRENCIES and s[3:] in _FOREX_CURRENCIES:
         canonical = f"{s}=X"
+    elif re.fullmatch(r"[A-Z]{1,4}\.[A-Z]", s):
+        # US share classes are dotted at brokers (BRK.B, BF.B) but dashed on
+        # Yahoo (BRK-B). Only a single letter after the dot: multi-letter dot
+        # suffixes are Yahoo-native exchange codes (BMW.DE) and must pass.
+        canonical = s.replace(".", "-")
     else:
         canonical = s
 

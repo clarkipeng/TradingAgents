@@ -28,6 +28,10 @@ DEFAULT_CONSTRAINTS = {
     "initial_cash": "100000",
 }
 
+# Ignore weight drift smaller than this fraction of equity: rebalancing to
+# chase day-to-day jitter pays fees for nothing. Full exits always trade.
+REBALANCE_BAND = Decimal("0.002")
+
 # A portfolio day is deliberately bounded before any provider work starts.
 # One unit is one research invocation (a full per-ticker graph run) or the
 # CIO sizing call; the 30-ticker universe plus CIO plus headroom fits under it.
@@ -114,7 +118,9 @@ def cio_allocate(
             "gross_limit": constraints["gross_limit"],
             "long_only": True,
         },
-        "ratings": ratings,
+        # Ratings are a production constant ("Hold" for every ticker) - noise
+        # that anchors the model; the universe is what matters.
+        "universe": sorted(ratings),
         "briefs": briefs,
     }, ensure_ascii=False, sort_keys=True)
 
@@ -548,7 +554,10 @@ def production_day_inputs(store: TemporalStore, *, deep_model: str = "gpt-5.4",
             for key in ("market_report", "sentiment_report", "news_report", "fundamentals_report")
             if final_state.get(key)
         }
-        brief = json.dumps(reports, ensure_ascii=False, sort_keys=True)[:400]
+        # The CIO decides on these briefs alone; 400 chars threw away nearly
+        # all of the research it just paid for. 2000 chars per ticker costs
+        # about two cents a day at the deep model's input price.
+        brief = json.dumps(reports, ensure_ascii=False, sort_keys=True)[:2000]
         if not brief:
             raise ValueError("empty analyst brief")
         return {"rating": "Hold", "brief": brief}
@@ -598,12 +607,16 @@ def rebalance_orders(
 
     Sells are emitted before buys so freed cash funds the purchases; buy
     quantities floor to whole shares so the plan can never overdraw.
+    Day-to-day weight jitter below the trade band is not acted on - paying
+    fees to chase noise is pure waste - but a full exit (target weight zero
+    on a held position) is a deliberate signal and always executes.
     """
     cash = Decimal(str(state["cash"]))
     positions = {symbol: Decimal(str(qty)) for symbol, qty in state["positions"].items()}
     equity = cash + sum(
         qty * quotes[symbol] for symbol, qty in positions.items() if symbol in quotes
     )
+    band = equity * REBALANCE_BAND
 
     deltas: list[tuple[str, Decimal]] = []
     for symbol in sorted(set(positions) | set(weights)):
@@ -612,8 +625,12 @@ def rebalance_orders(
         target_value = equity * Decimal(str(weights.get(symbol, 0.0)))
         target_shares = Decimal(int(target_value / quotes[symbol]))
         change = target_shares - positions.get(symbol, Decimal("0"))
-        if change:
-            deltas.append((symbol, change))
+        if not change:
+            continue
+        full_exit = weights.get(symbol, 0.0) == 0.0 and positions.get(symbol)
+        if not full_exit and abs(change) * quotes[symbol] < band:
+            continue
+        deltas.append((symbol, change))
 
     orders = []
     for sequence, (symbol, change) in enumerate(

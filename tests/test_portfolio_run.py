@@ -113,6 +113,31 @@ def test_cio_gross_overage_is_normalized_not_rejected():
 
 
 @pytest.mark.unit
+def test_rebalance_ignores_jitter_but_always_executes_full_exits():
+    state = {"cash": "1000", "positions": {"NVDA": "100", "MSFT": "2"}}
+    quotes = {"NVDA": Decimal("500"), "MSFT": Decimal("100")}
+    # equity = 1000 + 50000 + 200 = 51200; band = 0.2% = 102.40
+    weights = {
+        "NVDA": 0.9766,  # target ~50003 -> 100 shares, delta 0 after flooring
+        # MSFT target weight 0 on a held position: full exit, below-band value
+    }
+    orders = portfolio_run.rebalance_orders(
+        state, weights, quotes, submitted_at=datetime(2026, 9, 5, tzinfo=timezone.utc)
+    )
+    assert [(o.symbol, o.side.value, int(o.quantity)) for o in orders] == [
+        ("MSFT", "SELL", 2)
+    ]
+
+    # One-share jitter on NVDA ($500 > band) still trades; a $100 drift on a
+    # cheap name inside the band does not.
+    weights = {"NVDA": 0.9873, "MSFT": 0.0059}  # NVDA -> 101 shares, MSFT -> 3
+    orders = portfolio_run.rebalance_orders(
+        state, weights, quotes, submitted_at=datetime(2026, 9, 5, tzinfo=timezone.utc)
+    )
+    assert [(o.symbol, int(o.quantity)) for o in orders] == [("NVDA", 1)]
+
+
+@pytest.mark.unit
 def test_cio_per_ticker_cap_breach_still_falls_back():
     """Gross drift is benign; a single weight over the cap means the model
     ignored the constraint sheet - that proposal stays rejected."""

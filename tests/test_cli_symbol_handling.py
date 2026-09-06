@@ -22,6 +22,11 @@ from tradingagents.dataflows.symbol_utils import normalize_symbol
     ("GC=F", "GC=F"),
     ("600519.SS", "600519.SS"),
     ("EURUSD", "EURUSD=X"),
+    # US share classes: broker dots become Yahoo dashes; exchange-suffix
+    # dots (two+ letters) are Yahoo-native and stay (#BRK.B failed every day)
+    ("BRK.B", "BRK-B"),
+    ("bf.b", "BF-B"),
+    ("BMW.DE", "BMW.DE"),
 ])
 def test_normalize_symbol_crypto_and_passthrough(raw, expected):
     assert normalize_symbol(raw) == expected

@@ -15,8 +15,16 @@ from tradingagents.dataflows.symbol_utils import (
 @pytest.mark.unit
 class TestNormalizeSymbol(unittest.TestCase):
     def test_plain_equities_unchanged(self):
-        for sym in ("AAPL", "MSFT", "TSM", "BRK.B", "0700.HK", "^GSPC", "GC=F"):
+        for sym in ("AAPL", "MSFT", "TSM", "0700.HK", "^GSPC", "GC=F"):
             self.assertEqual(normalize_symbol(sym), sym)
+
+    def test_us_share_classes_use_yahoo_dashes(self):
+        # Brokers write BRK.B; Yahoo only knows BRK-B - the dotted form
+        # returned "possibly delisted" on every single portfolio day.
+        self.assertEqual(normalize_symbol("BRK.B"), "BRK-B")
+        self.assertEqual(normalize_symbol("BF.B"), "BF-B")
+        # Multi-letter dot suffixes are Yahoo-native exchange codes.
+        self.assertEqual(normalize_symbol("BMW.DE"), "BMW.DE")
 
     def test_lowercases_are_upper(self):
         self.assertEqual(normalize_symbol("aapl"), "AAPL")

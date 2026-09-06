@@ -15,6 +15,7 @@ second claim, imports and discovery re-run for free, and backups overwrite.
 from __future__ import annotations
 
 import os
+import resource
 import signal
 import sqlite3
 import subprocess
@@ -295,7 +296,13 @@ def run_job(job: ScheduledJob, slot: datetime) -> None:
         return
     try:
         result = subprocess.run(built, timeout=job.timeout_seconds)
-        print(f"[supervisor] {job.name} exit={result.returncode}", flush=True)
+        # Max RSS across reaped children, for right-sizing machine memory
+        # from observed peaks instead of guesses (Linux reports KiB).
+        peak_mb = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss // 1024
+        print(
+            f"[supervisor] {job.name} exit={result.returncode} child_peak_rss={peak_mb}MB",
+            flush=True,
+        )
     except subprocess.TimeoutExpired:
         print(f"[supervisor] {job.name} timed out after {job.timeout_seconds}s", flush=True)
     except Exception as exc:  # noqa: BLE001 - the schedule must survive any job
