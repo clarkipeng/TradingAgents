@@ -26,11 +26,20 @@ class BudgetReservation:
 
 
 class DailyModelBudget:
-    def __init__(self, root: str | Path, day: str, *, max_tokens: int, max_cost: Decimal | str):
+    def __init__(
+        self,
+        root: str | Path,
+        day: str,
+        *,
+        max_tokens: int,
+        max_cost: Decimal | str,
+        cost_per_token: Decimal | str = "0.0001",
+    ):
         self.path = Path(root) / "model-budget.sqlite"
         self.day = day
         self.max_tokens = max_tokens
         self.max_cost = Decimal(str(max_cost))
+        self.cost_per_token = Decimal(str(cost_per_token))
         with self._connect() as db:
             db.execute("CREATE TABLE IF NOT EXISTS model_reservations (day TEXT NOT NULL, call_id TEXT NOT NULL, tokens INTEGER NOT NULL, cost TEXT NOT NULL, PRIMARY KEY(day, call_id))")
 
@@ -54,8 +63,12 @@ class DailyModelBudget:
             if prior:
                 db.execute("COMMIT")
                 return BudgetReservation(call_id, prior[0], Decimal(prior[1]))
-            tokens, spent = db.execute("SELECT COALESCE(SUM(tokens), 0), COALESCE(SUM(CAST(cost AS REAL)), 0) FROM model_reservations WHERE day = ?", (self.day,)).fetchone()
-            if tokens + estimated_tokens > self.max_tokens or Decimal(str(spent)) + cost > self.max_cost:
+            rows = db.execute(
+                "SELECT tokens, cost FROM model_reservations WHERE day = ?", (self.day,)
+            ).fetchall()
+            tokens = sum(row[0] for row in rows)
+            spent = sum((Decimal(row[1]) for row in rows), Decimal("0"))
+            if tokens + estimated_tokens > self.max_tokens or spent + cost > self.max_cost:
                 db.execute("ROLLBACK")
                 raise ModelBudgetExceeded("portfolio model budget exhausted")
             db.execute("INSERT INTO model_reservations(day, call_id, tokens, cost) VALUES (?, ?, ?, ?)", (self.day, call_id, estimated_tokens, str(cost)))

@@ -40,7 +40,7 @@ from .ranking import RANKER_VERSION, EligibleChunkIndex, build_eligible_index, r
 # runs their writes). Writers wait; they must never lose work to a peer.
 # A portfolio-day claim older than this is abandoned: the deadline policy
 # bounds a healthy run to a fraction of it, so only a dead owner exceeds it.
-PORTFOLIO_CLAIM_STALE_SECONDS = 3600.0
+PORTFOLIO_CLAIM_STALE_SECONDS = 10800.0
 
 _SQLITE_BUSY_TIMEOUT_SECONDS = 180.0
 

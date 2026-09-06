@@ -119,3 +119,7 @@ def _assert_consumed(stream: Mapping[str, Any], result: Mapping[str, Any]) -> No
         raise ValueError("portfolio replay did not consume its complete LLM stream")
     if result.get("tool_call_count") != stream["tool_call_count"]:
         raise ValueError("portfolio replay did not consume its complete tool stream")
+    if result.get("llm_digest") != stream["llm_digest"]:
+        raise ValueError("portfolio replay consumed a different LLM stream")
+    if result.get("tool_digest") != stream["tool_digest"]:
+        raise ValueError("portfolio replay consumed a different tool stream")

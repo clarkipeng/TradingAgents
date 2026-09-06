@@ -48,6 +48,10 @@ PORTFOLIO_DAY_POLICY = {
     "complete_held_quote_coverage": True,
     "model_token_budget": 1_000_000,
     "model_cost_budget": "100",
+    # Conservative, explicit pre-call estimate for the configured model tier.
+    # Returned usage reconciliation can only refine this reservation; it must
+    # never turn a request into an uncharged one.
+    "model_cost_per_token": "0.0001",
 }
 MAX_RESEARCH_WORKERS = PORTFOLIO_DAY_POLICY["max_workers"]
 MIN_TICKER_COVERAGE = PORTFOLIO_DAY_POLICY["minimum_ticker_coverage"]
@@ -260,6 +264,7 @@ def _run_portfolio_day(
     context.model_budget = DailyModelBudget(
         store.root, day, max_tokens=PORTFOLIO_DAY_POLICY["model_token_budget"],
         max_cost=PORTFOLIO_DAY_POLICY["model_cost_budget"],
+        cost_per_token=PORTFOLIO_DAY_POLICY["model_cost_per_token"],
     )
     with temporal_context(context):
         research_calls = 0
@@ -431,7 +436,7 @@ def _run_portfolio_day(
     }
     from tradingagents.portfolio_replay import build_portfolio_replay_manifest
     replay_manifest = build_portfolio_replay_manifest(
-        store, parent_run_id=context.run_id or "", tickers=ratings,
+        store, parent_run_id=context.run_id or "", tickers=tickers,
     )
     summary["state_evidence_id"] = store.complete_portfolio_day(
         day, _claim_id, as_of=as_of, state=final_state,
@@ -562,6 +567,7 @@ def production_day_inputs(store: TemporalStore, *, deep_model: str = "gpt-5.4",
             store=context.store,
             run_id=f"{context.run_id}:research:{ticker}",
         )
+        worker_context.model_budget = context.model_budget
         final_state, _signal = worker_graph().propagate(
             ticker, context.clock.as_of.date().isoformat(), temporal=worker_context
         )

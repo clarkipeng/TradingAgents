@@ -305,7 +305,8 @@ class LangChainTapeRecorder(BaseCallbackHandler):
             try:
                 context.model_budget.reserve(
                     str(run_id), estimated_tokens=max(1, len(canonical_json(request)) // 4),
-                    estimated_cost="0",
+                    estimated_cost=(max(1, len(canonical_json(request)) // 4)
+                                    * context.model_budget.cost_per_token),
                 )
             except ModelBudgetExceeded:
                 context.invalidate()
