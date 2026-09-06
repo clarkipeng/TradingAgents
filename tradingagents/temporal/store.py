@@ -74,6 +74,8 @@ class TemporalStore:
         self._corpus_hash_cache: dict[str, tuple[int, int, str, tuple[str, ...]]] = {}
         self._pending_cluster_keys: set[str] | None = None
         self._thread_connections = threading.local()
+        self._connection_lock = threading.Lock()
+        self._owned_connections: set[sqlite3.Connection] = set()
         self.artifacts_dir.mkdir(parents=True, exist_ok=True)
         self._initialize()
         from .retriever import TemporalRetriever
@@ -84,7 +86,14 @@ class TemporalStore:
     def _connect(self) -> Iterator[sqlite3.Connection]:
         connection = getattr(self._thread_connections, "connection", None)
         if connection is None:
-            connection = sqlite3.connect(self.database_path, timeout=_SQLITE_BUSY_TIMEOUT_SECONDS)
+            # Connections are still used by one owning thread at a time, but
+            # the registry lets the explicit store lifecycle close every
+            # thread-owned connection at shutdown.
+            connection = sqlite3.connect(
+                self.database_path,
+                timeout=_SQLITE_BUSY_TIMEOUT_SECONDS,
+                check_same_thread=False,
+            )
             connection.row_factory = sqlite3.Row
             # WAL pairs with NORMAL: commits stop fsyncing individually (a real
             # cost on network-backed volumes) while the database stays consistent
@@ -92,6 +101,8 @@ class TemporalStore:
             # lost, and every writer here is re-runnable or re-importable.
             connection.execute("PRAGMA synchronous=NORMAL")
             self._thread_connections.connection = connection
+            with self._connection_lock:
+                self._owned_connections.add(connection)
         try:
             yield connection
             connection.commit()
@@ -100,11 +111,20 @@ class TemporalStore:
             raise
 
     def close(self) -> None:
-        """Close this thread's owned connection at the store lifecycle boundary."""
-        connection = getattr(self._thread_connections, "connection", None)
-        if connection is not None:
+        """Close every thread-owned connection at the store lifecycle boundary."""
+        with self._connection_lock:
+            connections = tuple(self._owned_connections)
+            self._owned_connections.clear()
+        for connection in connections:
             connection.close()
+        if hasattr(self._thread_connections, "connection"):
             del self._thread_connections.connection
+
+    def __enter__(self) -> "TemporalStore":
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        self.close()
 
     def __del__(self) -> None:
         # Tests and short-lived CLI commands often rely on object lifetime;
