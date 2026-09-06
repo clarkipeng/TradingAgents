@@ -14,7 +14,7 @@ import math
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal
+from decimal import Decimal, ROUND_DOWN, localcontext
 
 from tradingagents.temporal import TemporalRunInvalidError, TemporalStore
 from tradingagents.temporal.clock import format_timestamp, parse_timestamp
@@ -320,10 +320,14 @@ def _run_portfolio_day(
         quotes: dict[str, Decimal] = {}
         for symbol in symbols:
             price = quote_fn(symbol, day)
-            if price is None:
+            try:
+                quote = Decimal(str(price)) if price is not None else None
+                if quote is None or not quote.is_finite() or quote <= 0:
+                    raise ValueError("unusable quote")
+            except (ValueError, ArithmeticError):
                 failures.append(f"{symbol}: no quote")
             else:
-                quotes[symbol] = Decimal(str(price))
+                quotes[symbol] = quote
 
         if not quotes:
             logger.warning(
@@ -361,7 +365,10 @@ def _run_portfolio_day(
         if plan.get("hold_book"):
             orders = []
         else:
-            orders = rebalance_orders(prior, plan["weights"], quotes, submitted_at=as_of)
+            orders = rebalance_orders(
+                prior, plan["weights"], quotes, submitted_at=as_of,
+                fee_bps=fee_bps, slippage_bps=slippage_bps,
+            )
 
         simulator = PortfolioSimulator(
             prior["cash"], fee_bps=fee_bps, slippage_bps=slippage_bps
@@ -374,9 +381,14 @@ def _run_portfolio_day(
             quote = MarketQuote(order.symbol, quotes[order.symbol], as_of)
             try:
                 fill = simulator.fill_from_quote(order, quote, filled_at=as_of)
-            except Exception as error:  # noqa: BLE001 - skip infeasible, keep the day
-                failures.append(f"{order.symbol}: {type(error).__name__}")
-                continue
+            except Exception as error:  # noqa: BLE001 - a planner/simulator disagreement is not a successful day
+                return {
+                    "status": "failed_unsealed", "reason": "execution_policy_error",
+                    "scenario_id": scenario_id, "day": day, "coverage": coverage,
+                    "research_call_count": research_calls,
+                    "elapsed_seconds": round(time.monotonic() - started, 3),
+                    "failures": failures + [f"{order.symbol}: {type(error).__name__}"],
+                }
             fills.append({
                 "symbol": fill.symbol,
                 "side": fill.side.value,
@@ -602,6 +614,8 @@ def rebalance_orders(
     quotes: dict[str, Decimal],
     *,
     submitted_at: datetime,
+    fee_bps: Decimal | str | float = 0,
+    slippage_bps: Decimal | str | float = 0,
 ) -> list[Order]:
     """Whole-share orders moving the portfolio to its target weights.
 
@@ -611,37 +625,46 @@ def rebalance_orders(
     fees to chase noise is pure waste - but a full exit (target weight zero
     on a held position) is a deliberate signal and always executes.
     """
-    cash = Decimal(str(state["cash"]))
-    positions = {symbol: Decimal(str(qty)) for symbol, qty in state["positions"].items()}
-    equity = cash + sum(
-        qty * quotes[symbol] for symbol, qty in positions.items() if symbol in quotes
-    )
-    band = equity * REBALANCE_BAND
+    with localcontext() as decimal_context:
+        # Local policy prevents callers' global Decimal context from changing
+        # executable quantities or cash conservation.
+        decimal_context.prec = 28
+        decimal_context.rounding = ROUND_DOWN
+        cash = Decimal(str(state["cash"]))
+        positions = {symbol: Decimal(str(qty)) for symbol, qty in state["positions"].items()}
+        equity = cash + sum(qty * quotes[symbol] for symbol, qty in positions.items())
+        band = equity * REBALANCE_BAND
+        fee_rate = Decimal(str(fee_bps)) / Decimal("10000")
+        slip_rate = Decimal(str(slippage_bps)) / Decimal("10000")
 
-    deltas: list[tuple[str, Decimal]] = []
-    for symbol in sorted(set(positions) | set(weights)):
-        if symbol not in quotes:
-            continue
-        target_value = equity * Decimal(str(weights.get(symbol, 0.0)))
-        target_shares = Decimal(int(target_value / quotes[symbol]))
-        change = target_shares - positions.get(symbol, Decimal("0"))
-        if not change:
-            continue
-        full_exit = weights.get(symbol, 0.0) == 0.0 and positions.get(symbol)
-        if not full_exit and abs(change) * quotes[symbol] < band:
-            continue
-        deltas.append((symbol, change))
+        sells: list[tuple[str, Decimal]] = []
+        buys: list[tuple[str, Decimal]] = []
+        for symbol in sorted(set(positions) | set(weights)):
+            target_value = equity * Decimal(str(weights.get(symbol, 0.0)))
+            target_shares = (target_value / quotes[symbol]).to_integral_value(rounding=ROUND_DOWN)
+            change = target_shares - positions.get(symbol, Decimal("0"))
+            if not change:
+                continue
+            full_exit = weights.get(symbol, 0.0) == 0.0 and positions.get(symbol)
+            if not full_exit and abs(change) * quotes[symbol] < band:
+                continue
+            (buys if change > 0 else sells).append((symbol, abs(change)))
 
-    orders = []
-    for sequence, (symbol, change) in enumerate(
-        sorted(deltas, key=lambda item: item[1] > 0), start=1
-    ):
-        side = OrderSide.BUY if change > 0 else OrderSide.SELL
-        orders.append(Order(
-            f"rebalance-{submitted_at:%Y%m%d}-{sequence}",
-            symbol,
-            side,
-            abs(change),
-            submitted_at,
-        ))
-    return orders
+        # The exact sell proceeds and buy costs use the simulator's policy.
+        # Plan sells first, then allocate remaining cash in ticker order. This
+        # gives deterministic residual cash rather than infeasible orders.
+        for symbol, quantity in sells:
+            gross = quotes[symbol] / (Decimal("1") + slip_rate) * quantity
+            cash += gross * (Decimal("1") - fee_rate)
+        affordable: list[tuple[str, Decimal]] = []
+        for symbol, desired in buys:
+            unit_cost = quotes[symbol] * (Decimal("1") + slip_rate) * (Decimal("1") + fee_rate)
+            quantity = min(desired, (cash / unit_cost).to_integral_value(rounding=ROUND_DOWN))
+            if quantity:
+                affordable.append((symbol, quantity))
+                cash -= unit_cost * quantity
+
+        ordered = [(symbol, OrderSide.SELL, quantity) for symbol, quantity in sells]
+        ordered += [(symbol, OrderSide.BUY, quantity) for symbol, quantity in affordable]
+        return [Order(f"rebalance-{submitted_at:%Y%m%d}-{sequence}", symbol, side, quantity, submitted_at)
+                for sequence, (symbol, side, quantity) in enumerate(ordered, start=1)]
