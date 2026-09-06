@@ -566,7 +566,12 @@ class TradingAgentsGraph:
         )
         historical = is_replay or is_scenario_capture or self.config.get("backtest_mode")
         snapshot_name = "tradingagents.memory_context"
-        if is_replay:
+        if self.config.get("analysts_only"):
+            # A portfolio sweep terminates at analyst reports.  No active
+            # node consumes decision memory, so touching it would create an
+            # unrecorded dependency and needless I/O/model-visible context.
+            past_context = ""
+        elif is_replay:
             snapshot = (
                 temporal.store.get_scenario_snapshot(temporal.scenario_id, snapshot_name)
                 if temporal.store is not None and temporal.scenario_id is not None
