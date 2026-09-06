@@ -39,7 +39,7 @@ Both workers completed clean and their handoffs were cherry-picked. `sightmesh c
 | `78308b7` | New scenario seals pin exact evidence membership; legacy seals retain their canonical corpus-hash reader. | Included in integration suite below. |
 | `7806f1c` | Read-only Sol review record. | Four findings recorded in `sol-review.md`; 28 focused review tests passed. |
 | `d203e1d` | Claim containment exceeds the two-hour day deadline; child research shares the day budget; model reservations use explicit nonzero Decimal estimates; replay verifies stream digests and failed ticker membership. | Focused portfolio/budget/replay/lifecycle/LangChain suite: 41 passed. |
-| pending working-tree commit | The legacy test fixture explicitly removes P4 pin rows, proving old seals still reject corpus drift. | Revised combined suite: 211 passed. |
+| `c85bd19` | The legacy test fixture explicitly removes P4 pin rows, proving old seals still reject corpus drift. | Revised combined suite: 211 passed. |
 
 The Sol reviewer was `c9836aea-6030-4b3b-86e1-75c8af909039`, session
 `28867288-0080-4d9d-903a-9cd04a2742a3`, branch `cdt/c983-ta-sol-review`.
