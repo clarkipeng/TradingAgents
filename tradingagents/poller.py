@@ -45,6 +45,7 @@ import signal
 import time
 from collections.abc import Mapping
 from copy import deepcopy
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 from tradingagents import global_research
@@ -184,6 +185,32 @@ _RUNTIME_FAILURE_STAGES = frozenset(
         "lease_lost",
     }
 )
+
+
+@dataclass(frozen=True)
+class PollerCapabilities:
+    """Explicit authority granted to one poller process."""
+
+    sources: tuple[str, ...]
+    allow_macro: bool
+    pause_policy: str
+    health_endpoint: str
+    alert_identity: str
+
+
+def poller_capabilities(env: Mapping[str, str] | None = None) -> PollerCapabilities:
+    values = os.environ if env is None else env
+    return PollerCapabilities(
+        sources=tuple(_comma_separated(values.get("MEDIA_POLLER_SOURCES"), lowercase=True)),
+        allow_macro=(
+            _env_bool("MEDIA_POLLER_ALLOW_MACRO", values)
+            if "MEDIA_POLLER_ALLOW_MACRO" in values
+            else True
+        ),
+        pause_policy=(values.get("MEDIA_POLLER_PAUSE_POLICY") or "process").strip(),
+        health_endpoint=(values.get("MEDIA_POLLER_HEALTH_ENDPOINT") or "disabled").strip(),
+        alert_identity=(values.get("MEDIA_POLLER_ALERT_IDENTITY") or "collector").strip(),
+    )
 
 
 _DISCOVERY_INPUTS = _DISCOVERY_POLICY["inputs"]
@@ -3571,6 +3598,28 @@ def _install_collector_signal_handlers(stop: dict) -> None:
     signal.signal(signal.SIGTERM, _handle)
 
 
+def _run_post_cycle_hook(hook, stop: dict, *, lease_guard=None) -> bool:
+    """Retry only a completed cycle's hook; never refetch the provider sweep."""
+    for attempt, delay in enumerate((0.0, 5.0, 30.0), start=1):
+        if delay:
+            _sleep(delay, stop, lease_guard=lease_guard)
+        if stop["flag"]:
+            return False
+        try:
+            if lease_guard is not None:
+                lease_guard.assert_held()
+            hook()
+            return True
+        except Exception as exc:  # noqa: BLE001 - fixed-vocabulary operational outcome
+            logger.info(
+                "post-cycle hook failed stage=post_cycle_hook attempt=%d/%d type=%s",
+                attempt,
+                3,
+                _exception_kind(exc),
+            )
+    return False
+
+
 def poll_forever(
     store,
     tickers: list[str],
@@ -3652,24 +3701,32 @@ def poll_forever(
                     lease_guard.assert_held()
                 # Shadow telemetry runs only after formal coverage and health
                 # are terminal. It cannot change either result.
-                poll_x_shadow_once(
-                    store,
-                    shadow_period_utc,
-                    max_topics=x_topic_limit,
+                _run_post_cycle_hook(
+                    lambda: poll_x_shadow_once(store, shadow_period_utc, max_topics=x_topic_limit),
+                    stop,
+                    lease_guard=lease_guard,
                 )
                 if lease_guard is not None:
                     lease_guard.assert_held()
             if source_shadow_enabled:
                 if lease_guard is not None:
                     lease_guard.assert_held()
-                poll_source_shadow_once(store, shadow_period_utc)
+                _run_post_cycle_hook(
+                    lambda: poll_source_shadow_once(store, shadow_period_utc),
+                    stop,
+                    lease_guard=lease_guard,
+                )
                 if lease_guard is not None:
                     lease_guard.assert_held()
             roster_enabled = (os.environ.get("MEDIA_POLLER_X_ROSTER") or "true").strip().lower() not in ("0", "false", "no", "off")
             if x_enabled and roster_enabled:
                 if lease_guard is not None:
                     lease_guard.assert_held()
-                poll_x_roster_once(store, shadow_period_utc)
+                _run_post_cycle_hook(
+                    lambda: poll_x_roster_once(store, shadow_period_utc),
+                    stop,
+                    lease_guard=lease_guard,
+                )
                 if lease_guard is not None:
                     lease_guard.assert_held()
             _sleep(interval, stop, lease_guard=lease_guard)
@@ -4040,7 +4097,9 @@ def _build_parser(env: Mapping[str, str] | None = None) -> argparse.ArgumentPars
         "--no-macro",
         dest="macro",
         action="store_false",
-        default=True,
+        default=_env_bool("MEDIA_POLLER_ALLOW_MACRO", values)
+        if "MEDIA_POLLER_ALLOW_MACRO" in values
+        else True,
         help="Skip the macro snapshot (Polymarket odds + theme news). "
         "Macro is on by default; it captures unrecoverable data.",
     )
@@ -4506,6 +4565,16 @@ def main(argv: list[str] | None = None) -> None:
     env = os.environ
     p = _build_parser(env)
     args = p.parse_args(argv)
+
+    capabilities = poller_capabilities(env)
+    if args.macro and not capabilities.allow_macro:
+        p.error("macro polling is outside this poller's explicit capabilities")
+    if (
+        args.health_port is not None
+        and "MEDIA_POLLER_HEALTH_ENDPOINT" in env
+        and capabilities.health_endpoint == "disabled"
+    ):
+        p.error("health endpoint is outside this poller's explicit capabilities")
 
     if args.preflight and not args.global_only:
         p.error("--preflight requires --global-only")
