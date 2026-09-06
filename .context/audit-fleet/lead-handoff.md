@@ -29,7 +29,10 @@ Awaiting owner implementation: 2, 6, 17–18, 20, 23–24, 26–27, 31, full P4/
 
 Required worker launch prompts are retained as `luna-ops-prompt.md` and `luna-store-prompt.md`. Both Luna workers completed with terminal signaling: ops session `5f3e9cc0-43b9-47c1-beed-f7034fd445c5` on `cdt/a87f-ta-luna-ops` (102886 tokens used); store session `1ad9882e-57b3-42ba-a696-89312c054456` on `cdt/67b7-ta-luna-store` (81053 tokens used). External-run wake subscription `7b17d96c-6b31-4c23-8374-6778c6cfad4e` delivered `notified`; receipt path is London's `.context/audit-fleet/env-check`. Native parent probe ack: `befa60b3-b6c5-4bae-ba17-417b460287f3`. The 15-minute fallback is `io.tradingagents.audit-fleet-wake-20260906` and must be booted out with its exact plist removed only at complete/real external block. Repowire is not a wake dependency.
 
-Both workers completed clean and their handoffs were cherry-picked. `sightmesh close` / `workspace archive` were attempted after reconciliation but rejected because its endpoint requires a workspace UUID while `peek` exposes only the session ID and name; no archive occurred. A permitted Sol replacement launch was attempted and failed with the same Sightmesh HTTP 500; no Sol review exists.
+Both Luna workers completed clean and their handoffs were cherry-picked. They
+were reconciled and archived using the exact workspace UUIDs supplied by
+London; no active Luna owner remains. The focused Sol review was likewise
+reconciled and archived after its corrective slice landed.
 
 ## Final review correction and reconciliation status
 
