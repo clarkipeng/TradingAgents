@@ -129,6 +129,36 @@ def _stop_process_group(process: subprocess.Popen, *, grace: float = CHILD_STOP_
         process.wait()
 
 
+def _process_tree_rss_mb(root_pid: int) -> int | None:
+    """Best-effort instantaneous RSS for a process tree on Linux."""
+    proc_root = Path("/proc")
+    if not proc_root.exists():
+        return None
+    parents: dict[int, int] = {}
+    rss: dict[int, int] = {}
+    for entry in proc_root.iterdir():
+        if not entry.name.isdigit():
+            continue
+        try:
+            status = (entry / "status").read_text()
+            parent = next(line for line in status.splitlines() if line.startswith("PPid:"))
+            resident = next(line for line in status.splitlines() if line.startswith("VmRSS:"))
+            pid = int(entry.name)
+            parents[pid] = int(parent.split()[1])
+            rss[pid] = int(resident.split()[1])
+        except (OSError, StopIteration, ValueError):
+            continue
+    members = {root_pid}
+    changed = True
+    while changed:
+        changed = False
+        for pid, parent in parents.items():
+            if parent in members and pid not in members:
+                members.add(pid)
+                changed = True
+    return max(0, sum(rss.get(pid, 0) for pid in members) // 1024)
+
+
 def universe_tickers(universe_file: Path) -> str:
     """The frozen ticker universe as a comma-joined string."""
     tickers: list[str] = []
@@ -446,9 +476,23 @@ def run_job(job: ScheduledJob, slot: datetime) -> JobResult:
     process: subprocess.Popen | None = None
     try:
         process = subprocess.Popen(built, start_new_session=True)
-        result = process.wait(timeout=job.timeout_seconds)
+        deadline = time.monotonic() + job.timeout_seconds
+        peak_mb: int | None = None
+        while True:
+            sample = _process_tree_rss_mb(process.pid)
+            if sample is not None:
+                peak_mb = max(peak_mb or 0, sample)
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise subprocess.TimeoutExpired(built, job.timeout_seconds)
+            try:
+                result = process.wait(timeout=min(1.0, remaining))
+                break
+            except subprocess.TimeoutExpired:
+                continue
         print(
-            f"[supervisor] {job.name} exit={result}",
+            f"[supervisor] {job.name} exit={result} "
+            f"process_tree_peak_rss_mb={peak_mb if peak_mb is not None else 'unavailable'}",
             flush=True,
         )
         return JobResult("completed" if result == 0 else "failed", "ok" if result == 0 else "child_nonzero")
