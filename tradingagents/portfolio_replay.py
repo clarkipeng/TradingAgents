@@ -82,3 +82,40 @@ def validate_portfolio_replay_manifest(manifest: Mapping[str, Any]) -> None:
     expected = hashlib.sha256(canonical_json(unsigned).encode("utf-8")).hexdigest()
     if manifest["digest"] != expected:
         raise ValueError("portfolio replay manifest digest mismatch")
+
+
+def replay_portfolio_day(
+    store: Any,
+    scenario_id: str,
+    *,
+    replay_worker: Any,
+    replay_cio: Any,
+) -> dict[str, Any]:
+    """Replay every named stream through caller-owned real graph entrypoints.
+
+    Factories stay outside this small coordinator so it cannot accidentally
+    construct a live provider.  Each callback must report consumed LLM/tool
+    counts; a partial tape is therefore a hard replay failure.
+    """
+    scenario = store.get_scenario(scenario_id)
+    if scenario is None:
+        raise KeyError(f"unknown scenario: {scenario_id}")
+    manifest = scenario.metadata.get("replay_manifest")
+    if not isinstance(manifest, Mapping):
+        raise ValueError("portfolio scenario has no replay manifest")
+    validate_portfolio_replay_manifest(manifest)
+    workers = []
+    for stream in manifest["workers"]:
+        result = replay_worker(stream["ticker"], stream["run_id"])
+        _assert_consumed(stream, result)
+        workers.append(result)
+    cio = replay_cio(manifest["cio"]["run_id"])
+    _assert_consumed(manifest["cio"], cio)
+    return {"scenario_id": scenario_id, "workers": workers, "cio": cio}
+
+
+def _assert_consumed(stream: Mapping[str, Any], result: Mapping[str, Any]) -> None:
+    if result.get("llm_call_count") != stream["llm_call_count"]:
+        raise ValueError("portfolio replay did not consume its complete LLM stream")
+    if result.get("tool_call_count") != stream["tool_call_count"]:
+        raise ValueError("portfolio replay did not consume its complete tool stream")
