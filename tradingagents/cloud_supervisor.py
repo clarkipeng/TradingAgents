@@ -16,9 +16,12 @@ from __future__ import annotations
 
 import os
 import signal
+import hashlib
+import json
 import sqlite3
 import subprocess
 import sys
+import tarfile
 import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
@@ -39,6 +42,9 @@ POLLER_RESTART_BACKOFF_CAP = 600.0
 POLLER_HEALTHY_RESET = 1800.0
 
 TICK_SECONDS = 20.0
+SCHEDULE_LEDGER_NAME = "schedule-outcomes.json"
+BACKUP_MANIFEST_NAME = "temporal-latest.manifest.json"
+BACKUP_ARTIFACTS_NAME = "temporal-latest.artifacts.tar"
 CHILD_STOP_GRACE_SECONDS = 30.0
 
 
@@ -52,6 +58,56 @@ class JobResult:
     @property
     def successful(self) -> bool:
         return self.status == "completed"
+
+
+class ScheduleLedger:
+    """Small durable scheduler ledger owned by the supervisor process."""
+
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        self.outcomes: dict[str, dict[str, str]] = {}
+        if path.exists():
+            try:
+                payload = json.loads(path.read_text())
+                if isinstance(payload, dict) and isinstance(payload.get("outcomes"), dict):
+                    self.outcomes = {
+                        str(key): value for key, value in payload["outcomes"].items()
+                        if isinstance(value, dict) and isinstance(value.get("status"), str)
+                    }
+            except (OSError, json.JSONDecodeError):
+                print("[supervisor] schedule ledger unreadable code=ledger_corrupt", flush=True)
+
+    @staticmethod
+    def key(job: ScheduledJob, slot: datetime) -> str:
+        return f"{job.name}|{slot.date().isoformat()}"
+
+    def _save(self) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        partial = self.path.with_suffix(self.path.suffix + ".partial")
+        partial.write_text(json.dumps({"schema_version": 1, "outcomes": self.outcomes}, sort_keys=True))
+        partial.replace(self.path)
+
+    def recover_running(self) -> None:
+        changed = False
+        for outcome in self.outcomes.values():
+            if outcome.get("status") == "running":
+                outcome.update(status="pending", code="interrupted")
+                changed = True
+        if changed:
+            self._save()
+
+    def mark(self, job: ScheduledJob, slot: datetime, status: str, code: str) -> None:
+        self.outcomes[self.key(job, slot)] = {
+            "job": job.name,
+            "logical_date": slot.date().isoformat(),
+            "status": status,
+            "code": code,
+        }
+        # Keep a bounded history while retaining all recent logical dates.
+        if len(self.outcomes) > 500:
+            keep = sorted(self.outcomes)[-400:]
+            self.outcomes = {key: self.outcomes[key] for key in keep}
+        self._save()
 
 
 def _stop_process_group(process: subprocess.Popen, *, grace: float = CHILD_STOP_GRACE_SECONDS) -> None:
@@ -111,7 +167,7 @@ class ScheduledJob:
 
 
 def due_jobs(
-    jobs: list[ScheduledJob], now: datetime, fired: set[tuple[str, str]]
+    jobs: list[ScheduledJob], now: datetime, fired: set[tuple[str, str]] | Mapping[str, Mapping[str, str]]
 ) -> list[tuple[ScheduledJob, datetime]]:
     """Jobs whose current slot has not fired yet, in table order."""
     due: list[tuple[ScheduledJob, datetime]] = []
@@ -120,12 +176,23 @@ def due_jobs(
         if slot is None:
             continue
         key = (job.name, slot.isoformat())
-        if key not in fired:
+        durable_key = f"{job.name}|{slot.date().isoformat()}"
+        already_done = (
+            key in fired
+            if isinstance(fired, set)
+            else fired.get(durable_key, {}).get("status") in {"completed", "running", "failed"}
+        )
+        if not already_done:
             due.append((job, slot))
     return due
 
 
-def backup_store(store_dir: Path, backup_dir: Path) -> Path:
+def backup_store(
+    store_dir: Path,
+    backup_dir: Path,
+    *,
+    artifact_paths: list[Path] | None = None,
+) -> Path:
     """Vacuum the store database into a single overwritten backup slot.
 
     One slot, not a rotation: full copies of a multi-GB store filled the
@@ -134,6 +201,10 @@ def backup_store(store_dir: Path, backup_dir: Path) -> Path:
     copy. This file exists so both have one consistent artifact to take.
     """
     source = store_dir / "temporal.sqlite3"
+    if artifact_paths is not None:
+        for artifact_path in artifact_paths:
+            if not artifact_path.exists():
+                raise FileNotFoundError("required backup artifact is missing")
     backup_dir.mkdir(parents=True, exist_ok=True)
     target = backup_dir / "temporal-latest.sqlite3"
     partial = backup_dir / "temporal-latest.sqlite3.partial"
@@ -144,6 +215,32 @@ def backup_store(store_dir: Path, backup_dir: Path) -> Path:
     finally:
         conn.close()
     partial.replace(target)
+    if artifact_paths is not None:
+        artifacts = []
+        for artifact_path in artifact_paths:
+            if not artifact_path.exists():
+                raise FileNotFoundError("required backup artifact is missing")
+            for item in sorted(path for path in artifact_path.rglob("*") if path.is_file()):
+                digest = hashlib.sha256(item.read_bytes()).hexdigest()
+                artifacts.append({"path": str(item.relative_to(store_dir)), "sha256": digest})
+        archive_partial = backup_dir / (BACKUP_ARTIFACTS_NAME + ".partial")
+        with tarfile.open(archive_partial, "w") as archive:
+            for artifact_path in artifact_paths:
+                archive.add(artifact_path, arcname=artifact_path.relative_to(store_dir))
+        archive_partial.replace(backup_dir / BACKUP_ARTIFACTS_NAME)
+        manifest_partial = backup_dir / (BACKUP_MANIFEST_NAME + ".partial")
+        manifest = {
+            "schema_version": 1,
+            "database": target.name,
+            "database_sha256": hashlib.sha256(target.read_bytes()).hexdigest(),
+            "artifacts_archive": BACKUP_ARTIFACTS_NAME,
+            "artifacts_archive_sha256": hashlib.sha256(
+                (backup_dir / BACKUP_ARTIFACTS_NAME).read_bytes()
+            ).hexdigest(),
+            "artifacts": artifacts,
+        }
+        manifest_partial.write_text(json.dumps(manifest, sort_keys=True) + "\n")
+        manifest_partial.replace(backup_dir / BACKUP_MANIFEST_NAME)
     return target
 
 
@@ -216,7 +313,11 @@ def build_jobs(env: Mapping[str, str]) -> list[ScheduledJob]:
 
     def backup(slot: datetime) -> Callable[[], None]:
         def run() -> None:
-            target = backup_store(Path(store), Path(store).parent / "backups")
+            target = backup_store(
+                Path(store),
+                Path(store).parent / "backups",
+                artifact_paths=[Path(store) / "artifacts"],
+            )
             print(f"[supervisor] backup wrote {target}", flush=True)
 
         return run
@@ -264,6 +365,12 @@ class PollerChild:
             key: value
             for key, value in env.items()
             if not key.startswith("MEDIA_POLLER_")
+            and key not in {
+                "MEDIA_HEALTH_PORT",
+                "TRADINGAGENTS_ALERT_WEBHOOK_URL",
+                "MEDIA_REQUIRE_ALERT_WEBHOOK",
+                "MEDIA_COLLECTION_ENABLED",
+            }
         }
         self.child_env.update(
             {
@@ -273,6 +380,10 @@ class PollerChild:
                     "TRADER_MEDIA_SOURCES", "stocktwits,reddit,news"
                 ),
                 "MEDIA_POLLER_TRADING_HOURS": "true",
+                "MEDIA_POLLER_ALLOW_MACRO": "false",
+                "MEDIA_POLLER_PAUSE_POLICY": "ticker",
+                "MEDIA_POLLER_HEALTH_ENDPOINT": "disabled",
+                "MEDIA_POLLER_ALERT_IDENTITY": "ticker-poller",
             }
         )
         self.process: subprocess.Popen | None = None
@@ -379,7 +490,8 @@ def main() -> int:
         time.sleep(60)
     jobs = build_jobs(env)
     poller = PollerChild(env)
-    fired: set[tuple[str, str]] = set()
+    ledger = ScheduleLedger(Path(env.get("TRADINGAGENTS_TEMPORAL_STORE", "/data/temporal")) / SCHEDULE_LEDGER_NAME)
+    ledger.recover_running()
     stopping = False
 
     def handle_term(signum, frame) -> None:  # noqa: ANN001
@@ -397,15 +509,12 @@ def main() -> int:
     while not stopping:
         poller.ensure_running(time.monotonic())
         now = datetime.now(tz=SCHEDULE_TZ)
-        for job, slot in due_jobs(jobs, now, fired):
-            fired.add((job.name, slot.isoformat()))
-            run_job(job, slot)
+        for job, slot in due_jobs(jobs, now, ledger.outcomes):
+            ledger.mark(job, slot, "running", "started")
+            result = run_job(job, slot)
+            ledger.mark(job, slot, result.status, result.code)
             if stopping:
                 break
-        # Keep the fired set from growing without bound across long uptimes.
-        if len(fired) > 1000:
-            cutoff = (now - timedelta(days=2)).isoformat()
-            fired = {key for key in fired if key[1] >= cutoff}
         time.sleep(TICK_SECONDS)
 
     print("[supervisor] stopping; terminating poller", flush=True)
