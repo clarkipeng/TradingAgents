@@ -11,12 +11,13 @@ Integration branch/worktree: `cdt/8224-ta-audit-lead`, `/Users/clarkpeng/.local/
 | `84744bc` | Portfolio seal metadata now contains a versioned, digest-validated manifest with explicit independent ticker streams and a separate CIO stream. | `test_portfolio_run.py test_portfolio_replay.py test_temporal_full_trace_replay.py` — 17 passed |
 | `604b42e` | Verified market snapshot is an actual temporal tool boundary and replays from its tape. | `test_market_data_validator.py test_temporal_dataflow_adapter.py` — 14 passed |
 | `13272c3` | Model calls reserve a durable, idempotent daily token/cost budget before provider execution. | `test_model_budget.py test_temporal_langchain_adapter.py test_portfolio_run.py` — 26 passed |
+| `febc449` | Analysts-only portfolio sweeps omit unused decision-memory reads by construction. | `test_analysts_only_memory.py test_temporal_full_trace_replay.py test_analyst_execution.py` — 9 passed |
 
 Combined candidate proof: 54 passed (`portfolio_run`, `portfolio_replay`, `model_budget`, `temporal_core`, `temporal_langchain_adapter`, `temporal_full_trace_replay`, `market_data_validator`, `temporal_dataflow_adapter`, `temporal_simulation`), using London's required Python and `PYTHONPATH=$PWD`; import path resolved into this worktree.
 
 ## Coverage ledger
 
-Implemented/partially implemented: 1 (manifest membership only), 3 (verified-market boundary), 4–5 (quote validity, deterministic execution path), 7–8 (universe filtering and affordable accounting), 17–18/27 (budget boundary only), C1 (wall-clock capture), C2 (accounting component), C3 (durable reservation component).
+Implemented/partially implemented: 1 (manifest membership only), 3 (verified-market boundary), 4–5 (quote validity, deterministic execution path), 7–8 (universe filtering and affordable accounting), 17–18/27 (budget boundary only), 28 (analysts-only unused memory omission), C1 (wall-clock capture), C2 (accounting component), C3 (durable reservation component).
 
 Awaiting owner implementation: 2, 6, 9–16, 19–26, 28–33, C4, full P4/P5/P6. These remain residuals, not completion claims. In particular, replay still needs an actual portfolio-composition replay entrypoint and complete-stream-consumption assertion; new model budget usage reconciliation and backup inclusion of `model-budget.sqlite` must be integrated by the store/ops owner.
 
