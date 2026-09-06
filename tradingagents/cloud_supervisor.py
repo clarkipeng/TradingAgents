@@ -15,7 +15,6 @@ second claim, imports and discovery re-run for free, and backups overwrite.
 from __future__ import annotations
 
 import os
-import resource
 import signal
 import sqlite3
 import subprocess
@@ -40,6 +39,38 @@ POLLER_RESTART_BACKOFF_CAP = 600.0
 POLLER_HEALTHY_RESET = 1800.0
 
 TICK_SECONDS = 20.0
+CHILD_STOP_GRACE_SECONDS = 30.0
+
+
+@dataclass(frozen=True)
+class JobResult:
+    """Sanitized result of one scheduled attempt."""
+
+    status: str
+    code: str
+
+    @property
+    def successful(self) -> bool:
+        return self.status == "completed"
+
+
+def _stop_process_group(process: subprocess.Popen, *, grace: float = CHILD_STOP_GRACE_SECONDS) -> None:
+    """Stop and reap a child plus descendants, including timeout paths."""
+    if process.poll() is not None:
+        process.wait()
+        return
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        pass
+    try:
+        process.wait(timeout=grace)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        process.wait()
 
 
 def universe_tickers(universe_file: Path) -> str:
@@ -272,41 +303,58 @@ class PollerChild:
         if now_monotonic < self.restart_at:
             return
         print(f"[supervisor] starting poller: {' '.join(self.argv)}", flush=True)
-        self.process = subprocess.Popen(self.argv, env=self.child_env)
+        self.process = subprocess.Popen(
+            self.argv,
+            env=self.child_env,
+            start_new_session=True,
+        )
         self.started_at = now_monotonic
 
     def terminate(self) -> None:
         if self.process is not None and self.process.poll() is None:
-            self.process.terminate()
-            try:
-                self.process.wait(timeout=60)
-            except subprocess.TimeoutExpired:
-                self.process.kill()
+            _stop_process_group(self.process)
+        elif self.process is not None:
+            self.process.wait()
 
 
-def run_job(job: ScheduledJob, slot: datetime) -> None:
+def run_job(job: ScheduledJob, slot: datetime) -> JobResult:
     built = job.build(slot)
     print(f"[supervisor] firing {job.name} for slot {slot.isoformat()}", flush=True)
     if callable(built):
         try:
             built()
             print(f"[supervisor] {job.name} ok", flush=True)
+            return JobResult("completed", "ok")
         except Exception as exc:  # noqa: BLE001 - the schedule must survive any job
-            print(f"[supervisor] {job.name} failed: {exc!r}", flush=True)
-        return
+            print(
+                f"[supervisor] {job.name} failed code=callable_failure "
+                f"type={type(exc).__name__}",
+                flush=True,
+            )
+            return JobResult("failed", "callable_failure")
+    process: subprocess.Popen | None = None
     try:
-        result = subprocess.run(built, timeout=job.timeout_seconds)
-        # Max RSS across reaped children, for right-sizing machine memory
-        # from observed peaks instead of guesses (Linux reports KiB).
-        peak_mb = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss // 1024
+        process = subprocess.Popen(built, start_new_session=True)
+        result = process.wait(timeout=job.timeout_seconds)
         print(
-            f"[supervisor] {job.name} exit={result.returncode} child_peak_rss={peak_mb}MB",
+            f"[supervisor] {job.name} exit={result}",
             flush=True,
         )
+        return JobResult("completed" if result == 0 else "failed", "ok" if result == 0 else "child_nonzero")
     except subprocess.TimeoutExpired:
-        print(f"[supervisor] {job.name} timed out after {job.timeout_seconds}s", flush=True)
+        if process is not None:
+            _stop_process_group(process)
+        print(f"[supervisor] {job.name} failed code=deadline", flush=True)
+        return JobResult("failed", "deadline")
     except Exception as exc:  # noqa: BLE001 - the schedule must survive any job
-        print(f"[supervisor] {job.name} failed to launch: {exc!r}", flush=True)
+        if process is not None:
+            _stop_process_group(process)
+        print(
+            f"[supervisor] {job.name} failed code=launch_failure "
+            f"type={type(exc).__name__}",
+            flush=True,
+        )
+        return JobResult("failed", "launch_failure")
 
 
 def store_is_seeded(env: Mapping[str, str]) -> bool:
