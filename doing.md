@@ -19,6 +19,13 @@ See it: `tradingagents temporal-portfolio-report` (on the cloud store).
 - Cloud Postgres (the news middle layer): ~$30-70 - planned to be removed after a clean week, the biggest safe cut.
 Everything else this week made days cheaper by not wasting them: no more OOM re-runs, no more liquidate-and-rebuy fee churn.
 
+## Waste pass done (Sunday)
+- BRK.B is finally quotable (broker dot vs Yahoo dash - it failed every single day before).
+- Rebalancing no longer chases sub-0.2% jitter (fees were pure waste).
+- The CIO now reads 5x more of the research it pays for, without the constant "Hold" noise.
+- Machine memory gets measured Monday and downsized if the data agrees.
+- Next structural cut (after Monday proves clean): fold the X collector into the trader machine and drop the Postgres middle layer (~$30-70/month + one moving part).
+
 ## Running right now
 Nothing. Monday 5:45pm the scheduled day runs hands-off on the fixed build - the first true end-to-end unattended day.
 
