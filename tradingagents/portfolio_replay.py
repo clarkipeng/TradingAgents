@@ -31,6 +31,7 @@ def build_portfolio_replay_manifest(
     *,
     parent_run_id: str,
     tickers: Iterable[str],
+    instrument_contexts: Mapping[str, str] | None = None,
     graph_version: str = "portfolio-graph-v1",
     prompt_version: str = "portfolio-cio-v1",
     execution_policy: str = "close-legacy-v1",
@@ -48,6 +49,7 @@ def build_portfolio_replay_manifest(
             "llm_digest": stream_digest(calls),
             "tool_call_count": len(traces),
             "tool_digest": stream_digest(traces),
+            "instrument_context": (instrument_contexts or {}).get(ticker),
         })
     cio_calls = store.list_llm_calls(None, temporal_run_id=parent_run_id)
     cio_traces = store.list_tool_traces(parent_run_id)

@@ -285,6 +285,7 @@ def _run_portfolio_day(
 
         ratings: dict[str, str] = {}
         briefs: dict[str, str] = {}
+        instrument_contexts: dict[str, str] = {}
         failures: list[str] = []
         def research_one(ticker):
             try:
@@ -295,19 +296,21 @@ def _run_portfolio_day(
                     research = budgeted_call(research_fn, ticker, context)
                 if research is None:
                     reason = "deadline_exceeded" if deadline_breached else "research_call_ceiling"
-                    return ticker, None, None, reason
-                return ticker, research["rating"], research.get("brief", ""), None
+                    return ticker, None, None, None, reason
+                return ticker, research["rating"], research.get("brief", ""), research.get("instrument_context"), None
             except Exception as error:  # noqa: BLE001 - one ticker never kills the day
-                return ticker, None, None, f"{ticker}: {type(error).__name__}"
+                return ticker, None, None, None, f"{ticker}: {type(error).__name__}"
         pool = ThreadPoolExecutor(max_workers=MAX_RESEARCH_WORKERS)
         futures = [pool.submit(research_one, ticker) for ticker in tickers]
         try:
             remaining = PORTFOLIO_DAY_DEADLINE_SECONDS - (time.monotonic() - started)
             for future in as_completed(futures, timeout=max(remaining, 0.1)):
-                ticker, rating, brief, failure = future.result()
+                ticker, rating, brief, instrument_context, failure = future.result()
                 if rating is not None:
                     ratings[ticker] = rating
                     briefs[ticker] = brief
+                    if isinstance(instrument_context, str):
+                        instrument_contexts[ticker] = instrument_context
                 if failure:
                     failures.append(failure)
         except TimeoutError:
@@ -437,6 +440,7 @@ def _run_portfolio_day(
     from tradingagents.portfolio_replay import build_portfolio_replay_manifest
     replay_manifest = build_portfolio_replay_manifest(
         store, parent_run_id=context.run_id or "", tickers=tickers,
+        instrument_contexts=instrument_contexts,
     )
     summary["state_evidence_id"] = store.complete_portfolio_day(
         day, _claim_id, as_of=as_of, state=final_state,
@@ -590,7 +594,11 @@ def production_day_inputs(store: TemporalStore, *, deep_model: str = "gpt-5.4",
         brief = json.dumps(reports, ensure_ascii=False, sort_keys=True)[:2000]
         if not brief:
             raise ValueError("empty analyst brief")
-        return {"rating": "Hold", "brief": brief}
+        return {
+            "rating": "Hold",
+            "brief": brief,
+            "instrument_context": worker_context.instrument_context,
+        }
 
     def complete(prompt: str) -> str:
         return cio_model.invoke(prompt).content

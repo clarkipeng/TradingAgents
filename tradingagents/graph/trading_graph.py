@@ -596,7 +596,12 @@ class TradingAgentsGraph:
                     past_context,
                     captured_at=temporal.clock.as_of,
                 )
-        if historical:
+        if temporal is not None and temporal.instrument_context is not None:
+            # A replay must use the exact captured prompt input. Resolving the
+            # ticker again would make strict tape matching depend on mutable
+            # company metadata.
+            instrument_context = temporal.instrument_context
+        elif historical:
             # Current profile metadata (name, sector, description) can encode
             # mergers/reclassifications that happened after the simulated date.
             # Keep only the user-supplied symbol/type in historical mode.
@@ -607,6 +612,8 @@ class TradingAgentsGraph:
             )
         else:
             instrument_context = self.resolve_instrument_context(company_name, asset_type)
+            if temporal is not None:
+                temporal.instrument_context = instrument_context
         init_agent_state = self.propagator.create_initial_state(
             company_name,
             trade_date,

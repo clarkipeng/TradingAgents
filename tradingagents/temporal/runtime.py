@@ -28,6 +28,7 @@ class TemporalContext:
     run_id: str | None = None
     source_run_id: str | None = None
     model_budget: object | None = None
+    instrument_context: str | None = None
     _invalid: bool = False
 
     def invalidate(self) -> None:
@@ -75,7 +76,7 @@ class TemporalContext:
             raise KeyError(f"unknown scenario: {scenario_id}")
         if use_capture_tape and scenario.capture_run_id is None:
             raise ValueError(f"scenario has no capture run: {scenario_id}")
-        return cls.at(
+        context = cls.at(
             mode,
             scenario.as_of,
             scenario_id=scenario.scenario_id,
@@ -83,6 +84,11 @@ class TemporalContext:
             run_id=run_id,
             source_run_id=scenario.capture_run_id if use_capture_tape else source_run_id,
         )
+        instrument_context = scenario.metadata.get("instrument_context")
+        if instrument_context is not None and not isinstance(instrument_context, str):
+            raise ValueError("scenario instrument_context must be a string")
+        context.instrument_context = instrument_context
+        return context
 
 
 _CURRENT_CONTEXT: ContextVar[TemporalContext | None] = ContextVar("temporal_context", default=None)

@@ -46,6 +46,7 @@ def test_full_trace_replay_runs_graph_without_sources_or_model_provider(tmp_path
     recorder = LangChainTapeRecorder(store)
     captured_model = FakeListChatModel(responses=["analysis: HOLD"], callbacks=[recorder])
     captured = _graph(_config(tmp_path), captured_model, captured_model)
+    captured.resolve_instrument_context = lambda *_args: "Captured NVDA identity"
     captured.memory_log.get_past_context = lambda *_args: "captured prior research"
     capture_context = TemporalContext.at(
         TemporalMode.LIVE_CAPTURE,
@@ -69,7 +70,11 @@ def test_full_trace_replay_runs_graph_without_sources_or_model_provider(tmp_path
         "golden",
         as_of=capture_context.clock.as_of,
         basis="forward-captured",
-        metadata={"ticker": "NVDA", "trade_date": "2025-01-02"},
+        metadata={
+            "ticker": "NVDA",
+            "trade_date": "2025-01-02",
+            "instrument_context": capture_context.instrument_context,
+        },
         capture_run_id=capture_context.run_id,
     )
 
@@ -79,6 +84,9 @@ def test_full_trace_replay_runs_graph_without_sources_or_model_provider(tmp_path
     # Replay blocks ambient decision-memory input and prompt verification stays
     # enabled, ignoring only LangChain's fresh per-message UUIDs.
     replay = _graph(_config(tmp_path), tape, tape)
+    replay.resolve_instrument_context = lambda *_args: (_ for _ in ()).throw(
+        AssertionError("replay must not resolve mutable instrument identity")
+    )
 
     def forbidden_memory(*_args, **_kwargs):
         raise AssertionError("full-trace replay must use the sealed scenario snapshot")
