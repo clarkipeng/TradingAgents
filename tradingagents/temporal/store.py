@@ -230,6 +230,14 @@ class TemporalStore:
                     created_at TEXT NOT NULL,
                     capture_run_id TEXT
                 );
+                CREATE TABLE IF NOT EXISTS scenario_evidence (
+                    scenario_id TEXT NOT NULL REFERENCES scenarios(scenario_id),
+                    evidence_id TEXT NOT NULL REFERENCES evidence(evidence_id),
+                    PRIMARY KEY (scenario_id, evidence_id)
+                );
+                CREATE TABLE IF NOT EXISTS scenario_evidence_pins (
+                    scenario_id TEXT PRIMARY KEY REFERENCES scenarios(scenario_id)
+                );
                 CREATE TABLE IF NOT EXISTS scenario_rubrics (
                     scenario_id TEXT PRIMARY KEY REFERENCES scenarios(scenario_id),
                     material_evidence_ids_json TEXT NOT NULL,
@@ -1064,6 +1072,17 @@ class TemporalStore:
                         capture_run_id,
                     ),
                 )
+                # New seals pin membership once. Later ingestion eligible at
+                # the same historical cutoff creates a new world; it cannot
+                # silently mutate this scenario or invalidate its pagination.
+                connection.execute(
+                    "INSERT INTO scenario_evidence(scenario_id, evidence_id) "
+                    "SELECT ?, evidence_id FROM evidence WHERE available_at <= ?",
+                    (scenario_id, format_timestamp(definition_time)),
+                )
+                connection.execute(
+                    "INSERT INTO scenario_evidence_pins(scenario_id) VALUES (?)", (scenario_id,)
+                )
                 return ScenarioDefinition(
                     scenario_id,
                     definition_time,
@@ -1092,10 +1111,20 @@ class TemporalStore:
         return self._scenario_from_row(row) if row is not None else None
 
     def verify_scenario_corpus(self, scenario_id: str) -> bool:
-        """Return whether the current eligible corpus still matches a sealed scenario."""
+        """Verify a pinned new-world membership, retaining legacy hash semantics."""
         scenario = self.get_scenario(scenario_id)
         if scenario is None:
             raise KeyError(f"unknown scenario: {scenario_id}")
+        with self._connect() as connection:
+            pinned = connection.execute(
+                "SELECT 1 FROM scenario_evidence_pins WHERE scenario_id = ?", (scenario_id,)
+            ).fetchone()
+            if pinned is not None:
+                missing = connection.execute(
+                    "SELECT 1 FROM scenario_evidence se LEFT JOIN evidence e ON e.evidence_id = se.evidence_id "
+                    "WHERE se.scenario_id = ? AND e.evidence_id IS NULL LIMIT 1", (scenario_id,)
+                ).fetchone()
+                return missing is None
         return scenario.corpus_hash == self.corpus_hash(as_of=scenario.as_of)
 
     def seal_scenario_rubric(

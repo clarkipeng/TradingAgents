@@ -167,7 +167,9 @@ def test_scenario_definition_seals_time_basis_and_builds_context(tmp_path):
     )
     assert store.verify_scenario_corpus("nvda-earnings") is True
     store.record("corpus.document", {"url": "late-import"}, {"text": "NVDA"}, available_at=at(9))
-    assert store.verify_scenario_corpus("nvda-earnings") is False
+    # Newly imported historical evidence defines a new world; it cannot alter
+    # the membership sealed for this scenario.
+    assert store.verify_scenario_corpus("nvda-earnings") is True
     with pytest.raises(ValueError, match="already sealed"):
         store.seal_scenario(
             "nvda-earnings",
