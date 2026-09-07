@@ -39,7 +39,7 @@ Combined candidate proof: 206 passed (`cloud_supervisor`, `poller_window`, portf
 | 14 | Implemented by ops: isolated hook retry/backoff. |
 | 15 | Implemented by store: document-cluster index. |
 | 16 | Implemented by store: evidence availability index. |
-| 17 | Remaining P5: vintage-safe OHLCV/profile cache. |
+| 17 | Partial P5: bounded in-process OHLCV reuse is keyed to provider file path and exact on-disk vintage; profile-cache parity remains. |
 | 18 | Remaining P5: measured tool-message compaction. |
 | 19 | Implemented by store: atomic traces and reduced call overhead. |
 | 20 | Partial P4: membership pins and byte-preserving streamed legacy digest landed; retained generation policy remains. |
@@ -85,6 +85,7 @@ reconciled and archived after its corrective slice landed.
 | `c85bd19` | The legacy test fixture explicitly removes P4 pin rows, proving old seals still reject corpus drift. | Revised combined suite: 211 passed. |
 | `69042fb` | Captured instrument context is recorded for portfolio workers and reused verbatim by graph replay, preventing mutable identity lookup from changing strict prompts. | `test_temporal_full_trace_replay.py test_portfolio_run.py test_portfolio_lifecycle.py test_portfolio_replay.py` — 28 passed. |
 | `d24fad5` | Legacy corpus-hash bytes are streamed from SQLite instead of materializing the full canonical ID payload. | `test_ranking_equivalence.py test_temporal_core.py test_temporal_evaluation.py` — 29 passed. |
+| `e59d984` | Reuses bounded immutable OHLCV disk vintages within a process without sharing mutable frames. | `test_ohlcv_cache_freshness.py test_no_data_handling.py test_date_boundaries.py test_stockstats_date_column.py` — 20 passed. |
 
 The Sol reviewer was `c9836aea-6030-4b3b-86e1-75c8af909039`, session
 `28867288-0080-4d9d-903a-9cd04a2742a3`, branch `cdt/c983-ta-sol-review`.
