@@ -42,7 +42,7 @@ Combined candidate proof: 206 passed (`cloud_supervisor`, `poller_window`, portf
 | 17 | Remaining P5: vintage-safe OHLCV/profile cache. |
 | 18 | Remaining P5: measured tool-message compaction. |
 | 19 | Implemented by store: atomic traces and reduced call overhead. |
-| 20 | Partial P4: membership pins landed; streaming legacy digest/cache work remains. |
+| 20 | Partial P4: membership pins and byte-preserving streamed legacy digest landed; retained generation policy remains. |
 | 21 | Implemented by store: indexed media lookup. |
 | 22 | Implemented by store: SQL corpus overview. |
 | 23 | Remaining P4: FTS migration/removal after reader proof. |
@@ -84,6 +84,7 @@ reconciled and archived after its corrective slice landed.
 | `d203e1d` | Claim containment exceeds the two-hour day deadline; child research shares the day budget; model reservations use explicit nonzero Decimal estimates; replay verifies stream digests and failed ticker membership. | Focused portfolio/budget/replay/lifecycle/LangChain suite: 41 passed. |
 | `c85bd19` | The legacy test fixture explicitly removes P4 pin rows, proving old seals still reject corpus drift. | Revised combined suite: 211 passed. |
 | `69042fb` | Captured instrument context is recorded for portfolio workers and reused verbatim by graph replay, preventing mutable identity lookup from changing strict prompts. | `test_temporal_full_trace_replay.py test_portfolio_run.py test_portfolio_lifecycle.py test_portfolio_replay.py` — 28 passed. |
+| `d24fad5` | Legacy corpus-hash bytes are streamed from SQLite instead of materializing the full canonical ID payload. | `test_ranking_equivalence.py test_temporal_core.py test_temporal_evaluation.py` — 29 passed. |
 
 The Sol reviewer was `c9836aea-6030-4b3b-86e1-75c8af909039`, session
 `28867288-0080-4d9d-903a-9cd04a2742a3`, branch `cdt/c983-ta-sol-review`.
