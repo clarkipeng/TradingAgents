@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import bisect
 import fcntl
 import hashlib
 import json
@@ -50,6 +49,24 @@ _STOPWORDS = frozenset(
 )
 
 
+def _stream_corpus_digest(cutoff: str, rows: Iterable[sqlite3.Row]) -> str:
+    """Hash the old canonical corpus JSON without constructing its ID array."""
+    digest = hashlib.sha256()
+    # ``canonical_json`` sorts these two keys as ``as_of``, then
+    # ``evidence_ids``. Individual strings use exactly its JSON encoding.
+    digest.update(b'{"as_of":')
+    digest.update(canonical_json(cutoff).encode("utf-8"))
+    digest.update(b',"evidence_ids":[')
+    first = True
+    for row in rows:
+        if not first:
+            digest.update(b",")
+        digest.update(canonical_json(row["evidence_id"]).encode("utf-8"))
+        first = False
+    digest.update(b"]}")
+    return digest.hexdigest()
+
+
 def _significant_title_tokens(title: str) -> list[str]:
     return [
         token
@@ -71,7 +88,7 @@ class TemporalStore:
         # cache. One build at a time; only the freshest index is retained.
         self._eligible_index_lock = threading.Lock()
         self._corpus_hash_lock = threading.Lock()
-        self._corpus_hash_cache: dict[str, tuple[int, int, str, tuple[str, ...]]] = {}
+        self._corpus_hash_cache: dict[str, tuple[int, int, str]] = {}
         self._pending_cluster_keys: set[str] | None = None
         self._thread_connections = threading.local()
         self._connection_lock = threading.Lock()
@@ -943,11 +960,9 @@ class TemporalStore:
     def corpus_hash(self, *, as_of: datetime) -> str:
         """Digest the exact evidence corpus eligible at one virtual time.
 
-        Same digest as always, maintained incrementally: evidence is
-        append-only, so (count, max rowid) at the cutoff identifies the
-        eligible set exactly, and on growth only the delta rows are fetched
-        and merged into the cached sorted id list. The full refetch was
-        O(corpus) per search and dominated research days as the corpus grew.
+        The legacy digest bytes are preserved, but IDs are streamed from SQLite
+        rather than materializing a large canonical JSON list under the cache
+        lock. A fresh eligible row invalidates this small freshness cache.
         """
         cutoff = format_timestamp(parse_timestamp(as_of))
         with self._connect() as connection:
@@ -959,37 +974,15 @@ class TemporalStore:
                 cached = self._corpus_hash_cache.get(cutoff)
                 if cached is not None and (cached[0], cached[1]) == (count, max_rowid):
                     return cached[2]
-                if (
-                    cached is not None
-                    and count > cached[0]
-                    and max_rowid > cached[1]
-                    and count - cached[0] <= max_rowid - cached[1]
-                ):
-                    delta = connection.execute(
-                        "SELECT evidence_id FROM evidence WHERE rowid > ? AND available_at <= ?",
-                        (cached[1], cutoff),
-                    ).fetchall()
-                    ids = cached[3]
-                    if len(delta) == count - cached[0]:
-                        ids = list(ids)
-                        for row in delta:
-                            bisect.insort(ids, row["evidence_id"])
-                    else:
-                        ids = None
-                else:
-                    ids = None
-                if ids is None:
-                    ids = [
-                        row["evidence_id"]
-                        for row in connection.execute(
-                            "SELECT evidence_id FROM evidence WHERE available_at <= ? ORDER BY evidence_id",
-                            (cutoff,),
-                        )
-                    ]
-                payload = {"as_of": cutoff, "evidence_ids": ids}
-                digest = hashlib.sha256(canonical_json(payload).encode("utf-8")).hexdigest()
+                digest = _stream_corpus_digest(
+                    cutoff,
+                    connection.execute(
+                        "SELECT evidence_id FROM evidence WHERE available_at <= ? ORDER BY evidence_id",
+                        (cutoff,),
+                    ),
+                )
                 self._corpus_hash_cache.clear()
-                self._corpus_hash_cache[cutoff] = (count, max_rowid, digest, tuple(ids))
+                self._corpus_hash_cache[cutoff] = (count, max_rowid, digest)
                 return digest
 
     def seal_scenario_snapshot(
