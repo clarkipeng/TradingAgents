@@ -21,6 +21,46 @@ Combined candidate proof: 206 passed (`cloud_supervisor`, `poller_window`, portf
 
 ## Coverage ledger
 
+| ID | State |
+| --- | --- |
+| 1 | Partial: explicit worker/CIO tape manifest and stream checks landed; production composition replay remains. |
+| 2 | Partial: captured instrument context now has prompt parity; full portfolio replay wiring remains. |
+| 3 | Implemented: verified-market snapshots use the temporal tool boundary. |
+| 4 | Implemented: quote failures are isolated and coverage is enforced. |
+| 5 | Partial: latest eligible quote validation landed; adjustment/session policy remains. |
+| 6 | Implemented: stale claim containment exceeds the permitted day deadline. |
+| 7 | Partial: outcome handling and eligible universe filtering landed; all typed policy paths remain. |
+| 8 | Implemented: shared cost policy, Decimal arithmetic, and affordable deterministic buys. |
+| 9 | Implemented by ops: process-group stop/escalate/reap. |
+| 10 | Implemented: durable CLI failure exit; alert coverage remains. |
+| 11 | Implemented by ops: logical-date scheduling. |
+| 12 | Implemented by ops: manifest-based single-slot backup restore. |
+| 13 | Implemented by ops: scoped poller capabilities. |
+| 14 | Implemented by ops: isolated hook retry/backoff. |
+| 15 | Implemented by store: document-cluster index. |
+| 16 | Implemented by store: evidence availability index. |
+| 17 | Remaining P5: vintage-safe OHLCV/profile cache. |
+| 18 | Remaining P5: measured tool-message compaction. |
+| 19 | Implemented by store: atomic traces and reduced call overhead. |
+| 20 | Partial P4: membership pins landed; streaming legacy digest/cache work remains. |
+| 21 | Implemented by store: indexed media lookup. |
+| 22 | Implemented by store: SQL corpus overview. |
+| 23 | Remaining P4: FTS migration/removal after reader proof. |
+| 24 | Remaining P4: generation candidate publication policy. |
+| 25 | Implemented by store: owned SQLite lifecycle. |
+| 26 | Remaining: move long HTTP/reindex work outside outer locks. |
+| 27 | Remaining P5: prompt/cache optimization experiment. |
+| 28 | Implemented: analysts-only excludes unused memory work. |
+| 29 | Implemented by store: unreachable retrieval removal. |
+| 30 | Implemented by store: duplicate trace indexes removed. |
+| 31 | Remaining P4: retention/reachability and artifact backfill. |
+| 32 | Implemented by ops: compatible timeout handling. |
+| 33 | Implemented by ops: durable schedule retention. |
+| C1 | Implemented: live capture timestamps use observation time. |
+| C2 | Partial: accounting path is explicit; next-session execution policy remains. |
+| C3 | Partial: shared Decimal reservation ledger; returned-usage reconciliation/backup inclusion remain. |
+| C4 | Implemented by ops: per-job process-tree measurement. |
+
 Implemented/partially implemented: 1 (manifest membership only), 3 (verified-market boundary), 4–5 (quote validity, deterministic execution path), 7–8 (universe filtering and affordable accounting), 9–16, 19, 21–22, 25, 29–30, 33 (Luna integration), 17–18/27 (budget boundary only), 28 (analysts-only unused memory omission), 32 (Luna integration), C1 (wall-clock capture), C2 (accounting component), C3 (durable reservation component), C4 (process-tree sampling).
 
 Awaiting owner implementation: 2, 6, 17–18, 20, 23–24, 26–27, 31, full P4/P5/P6. These remain residuals, not completion claims. In particular, replay still needs an actual production portfolio-composition replay entrypoint; model-budget usage reconciliation and backup inclusion of `model-budget.sqlite` remain required.
