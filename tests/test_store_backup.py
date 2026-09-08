@@ -5,8 +5,8 @@ from pathlib import Path
 import pytest
 
 from tradingagents.model_budget import DailyModelBudget
-from tradingagents.temporal import TemporalStore
 from tradingagents.store_backup import BackupError, backup_store, restore_unit
+from tradingagents.temporal import TemporalStore
 
 
 def _store(tmp_path: Path) -> tuple[Path, Path, str, str]:
@@ -68,3 +68,73 @@ def test_restore_refuses_nonempty_destination_without_replacing_it(tmp_path: Pat
     with pytest.raises(BackupError, match="not_empty"):
         restore_unit(backups / "temporal-latest", destination)
     assert (destination / "sentinel").read_text() == "keep"
+
+
+def test_archive_corruption_between_catalog_and_publication_keeps_old_unit(tmp_path, monkeypatch):
+    import tradingagents.store_backup as backup_module
+
+    store, backups, _evidence, _artifact = _store(tmp_path)
+    backup_store(store, backups)
+    previous = (backups / "temporal-latest").resolve()
+    original = backup_module._write_artifact_archive
+
+    def corrupted_archive(root, target, members):
+        first = root / members[0]["path"]
+        first.write_bytes(b"x" * first.stat().st_size)
+        original(root, target, members)
+
+    monkeypatch.setattr(backup_module, "_write_artifact_archive", corrupted_archive)
+    with pytest.raises(BackupError, match="artifact hash"):
+        backup_store(store, backups)
+    assert (backups / "temporal-latest").resolve() == previous
+    backup_module.verify_unit(previous)
+
+
+def test_backup_refuses_live_portfolio_chain(tmp_path):
+    from tradingagents.portfolio_run import _portfolio_chain_lock
+
+    store, backups, _evidence, _artifact = _store(tmp_path)
+    with TemporalStore(store) as temporal, _portfolio_chain_lock(temporal) as owned:
+        assert owned
+        with pytest.raises(BackupError, match="active_writer"):
+            backup_store(store, backups)
+
+
+@pytest.mark.parametrize("corrupt", [False, True])
+def test_actual_sync_script_installs_a_root_store_or_preserves_prior_mirror(tmp_path, monkeypatch, corrupt):
+    import os
+    import subprocess
+
+    store, backups, evidence, _artifact = _store(tmp_path)
+    backup_store(store, backups)
+    mirror = tmp_path / "mirror"
+    mirror.mkdir()
+    (mirror / "sentinel").write_text("prior mirror")
+    binary_dir = tmp_path / "bin"
+    binary_dir.mkdir()
+    fly = binary_dir / "flyctl"
+    fly.write_text('''#!/usr/bin/env python3
+import os, pathlib, shutil, sys
+if sys.argv[1:3] == ["ssh", "console"]:
+    print("temporal-latest")
+else:
+    name = pathlib.Path(sys.argv[-2]).name
+    shutil.copyfile(pathlib.Path(os.environ["BACKUP_FIXTURE_UNIT"]) / name, sys.argv[-1])
+    if name == "model-budget.sqlite" and os.environ.get("BACKUP_FIXTURE_CORRUPT") == "1":
+        pathlib.Path(sys.argv[-1]).write_bytes(b"corrupted transport")
+''')
+    fly.chmod(0o755)
+    monkeypatch.setenv("PATH", str(binary_dir) + os.pathsep + os.environ["PATH"])
+    monkeypatch.setenv("TRADER_STORE_MIRROR", str(mirror))
+    monkeypatch.setenv("BACKUP_FIXTURE_UNIT", str(backups / "temporal-latest"))
+    monkeypatch.setenv("BACKUP_FIXTURE_CORRUPT", "1" if corrupt else "0")
+    result = subprocess.run(["sh", "scripts/sync_store_down.sh"], capture_output=True, text=True)
+    assert result.returncode == (1 if corrupt else 0)
+    if corrupt:
+        assert (mirror / "sentinel").read_text() == "prior mirror"
+    else:
+        assert (mirror / "temporal.sqlite3").is_file()
+        with TemporalStore(mirror) as restored:
+            assert restored.get_evidence(evidence).response == {"value": "first"}
+        budget = DailyModelBudget(mirror, "2026-09-07", max_tokens=100, max_cost="10")
+        assert budget.reserve("ambiguous-call", estimated_tokens=99, estimated_cost="9").estimated_tokens == 10
