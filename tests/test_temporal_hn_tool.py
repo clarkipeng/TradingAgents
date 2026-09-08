@@ -14,7 +14,7 @@ UTC = timezone.utc
 
 def test_hn_tool_captures_and_replays_the_fixed_daily_feed(tmp_path, monkeypatch):
     store = TemporalStore(tmp_path)
-    captured_at = datetime(2025, 1, 2, 16, tzinfo=UTC)
+    captured_at = datetime.now(UTC)
     rows = [
         {
             "source": "hacker_news",
@@ -38,9 +38,9 @@ def test_hn_tool_captures_and_replays_the_fixed_daily_feed(tmp_path, monkeypatch
         captured = get_hacker_news.func()
     store.seal_scenario(
         "hn-scenario",
-        as_of=captured_at,
+        as_of=datetime.now(UTC),
         basis="forward-captured",
-        metadata={"ticker": "NVDA", "trade_date": "2025-01-02"},
+        metadata={"ticker": "NVDA", "trade_date": captured_at.date().isoformat()},
         capture_run_id=capture.run_id,
     )
 

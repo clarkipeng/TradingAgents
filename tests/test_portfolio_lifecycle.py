@@ -8,6 +8,7 @@ import pytest
 
 from tradingagents import portfolio_run
 from tradingagents.temporal import TemporalStore
+from tradingagents.temporal.store import PORTFOLIO_CLAIM_STALE_SECONDS
 
 
 def test_concurrent_claims_allow_one_owner(tmp_path):
@@ -118,7 +119,7 @@ def test_abandoned_claim_recovers_after_staleness(tmp_path):
 
     store = TemporalStore(tmp_path)
     stale_moment = datetime.now(timezone.utc) - timedelta(
-        seconds=portfolio_run.PORTFOLIO_CLAIM_STALE_SECONDS + 60
+        seconds=PORTFOLIO_CLAIM_STALE_SECONDS + 60
     )
     store.claim_portfolio_day("2026-09-01", "dead-owner", claimed_at=stale_moment)
 
