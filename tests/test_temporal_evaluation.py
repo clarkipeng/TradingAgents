@@ -448,6 +448,16 @@ def test_tradingagents_replay_refuses_a_scenario_with_corpus_drift(tmp_path):
         basis="archive-reconstructed",
         metadata={"ticker": "NVDA", "trade_date": "2025-01-02"},
     )
+    # Seals created before the P4 membership table retain their canonical
+    # corpus-hash reader.  Model that legacy database state explicitly rather
+    # than treating a new pinned seal as an old one.
+    with store._connect() as connection:
+        connection.execute(
+            "DELETE FROM scenario_evidence_pins WHERE scenario_id = ?", ("empty-world",)
+        )
+        connection.execute(
+            "DELETE FROM scenario_evidence WHERE scenario_id = ?", ("empty-world",)
+        )
     store.record(
         "corpus.document",
         {"url": "backfilled"},

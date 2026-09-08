@@ -1,6 +1,8 @@
 import logging
 import os
 import time
+from collections import OrderedDict
+from threading import Lock
 from typing import Annotated
 
 import pandas as pd
@@ -24,6 +26,9 @@ MAX_OHLCV_STALE_DAYS = 10
 # up today's close soon after it publishes, long enough that a day with no bar
 # at all (weekend, holiday) cannot trigger a download on every call.
 OHLCV_CACHE_TTL_SECONDS = 900
+_OHLCV_MEMORY_CACHE_MAX_ENTRIES = 32
+_ohlcv_memory_cache: OrderedDict[str, tuple[tuple[int, int], pd.DataFrame]] = OrderedDict()
+_ohlcv_memory_cache_lock = Lock()
 
 
 def yf_retry(func, max_retries=3, base_delay=2.0):
@@ -151,6 +156,29 @@ def _needs_same_day_refresh(data_file, curr_date_dt, today_date) -> bool:
     return time.time() - os.path.getmtime(data_file) > OHLCV_CACHE_TTL_SECONDS
 
 
+def _read_cached_ohlcv(data_file: str) -> pd.DataFrame:
+    """Read one immutable on-disk vintage at most once per process.
+
+    The cache key includes the exact path plus its mtime/size vintage. Callers
+    receive a deep copy so indicator normalization cannot mutate a shared
+    frame, and replacing a downloaded file always invalidates this layer.
+    """
+    stat = os.stat(data_file)
+    vintage = (stat.st_mtime_ns, stat.st_size)
+    with _ohlcv_memory_cache_lock:
+        cached = _ohlcv_memory_cache.get(data_file)
+        if cached is not None and cached[0] == vintage:
+            _ohlcv_memory_cache.move_to_end(data_file)
+            return cached[1].copy(deep=True)
+    frame = pd.read_csv(data_file, on_bad_lines="skip", encoding="utf-8")
+    with _ohlcv_memory_cache_lock:
+        _ohlcv_memory_cache[data_file] = (vintage, frame.copy(deep=True))
+        _ohlcv_memory_cache.move_to_end(data_file)
+        while len(_ohlcv_memory_cache) > _OHLCV_MEMORY_CACHE_MAX_ENTRIES:
+            _ohlcv_memory_cache.popitem(last=False)
+    return frame
+
+
 def load_ohlcv(symbol: str, curr_date: str) -> pd.DataFrame:
     """Fetch OHLCV data with caching, filtered to prevent look-ahead bias.
 
@@ -187,7 +215,7 @@ def load_ohlcv(symbol: str, curr_date: str) -> pd.DataFrame:
     # re-fetch rather than serving the poisoned file forever.
     data = None
     if os.path.exists(data_file):
-        cached = pd.read_csv(data_file, on_bad_lines="skip", encoding="utf-8")
+        cached = _read_cached_ohlcv(data_file)
         # Serve the cache only when it is usable and not a stale snapshot of the
         # day being requested (#1150); otherwise fall through and refetch.
         if (
@@ -213,6 +241,9 @@ def load_ohlcv(symbol: str, curr_date: str) -> pd.DataFrame:
                 symbol, canonical, "Yahoo Finance returned no rows"
             )
         downloaded.to_csv(data_file, index=False, encoding="utf-8")
+        # The write created a new captured vintage; publish it for sibling
+        # indicator calls without rereading the CSV.
+        _read_cached_ohlcv(data_file)
         data = downloaded
 
     data = _clean_dataframe(data)

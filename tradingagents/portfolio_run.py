@@ -14,7 +14,8 @@ import math
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal
+from decimal import Decimal, ROUND_DOWN, localcontext
+from tradingagents.model_budget import DailyModelBudget
 
 from tradingagents.temporal import TemporalRunInvalidError, TemporalStore
 from tradingagents.temporal.clock import format_timestamp, parse_timestamp
@@ -45,6 +46,12 @@ PORTFOLIO_DAY_POLICY = {
     "minimum_ticker_coverage": 0.8,
     "max_workers": 4,
     "complete_held_quote_coverage": True,
+    "model_token_budget": 1_000_000,
+    "model_cost_budget": "100",
+    # Conservative, explicit pre-call estimate for the configured model tier.
+    # Returned usage reconciliation can only refine this reservation; it must
+    # never turn a request into an uncharged one.
+    "model_cost_per_token": "0.0001",
 }
 MAX_RESEARCH_WORKERS = PORTFOLIO_DAY_POLICY["max_workers"]
 MIN_TICKER_COVERAGE = PORTFOLIO_DAY_POLICY["minimum_ticker_coverage"]
@@ -254,6 +261,11 @@ def _run_portfolio_day(
         TemporalMode.LIVE_CAPTURE, as_of, store=store,
         run_id=run_id or str(uuid.uuid4()),
     )
+    context.model_budget = DailyModelBudget(
+        store.root, day, max_tokens=PORTFOLIO_DAY_POLICY["model_token_budget"],
+        max_cost=PORTFOLIO_DAY_POLICY["model_cost_budget"],
+        cost_per_token=PORTFOLIO_DAY_POLICY["model_cost_per_token"],
+    )
     with temporal_context(context):
         research_calls = 0
         import threading
@@ -273,6 +285,7 @@ def _run_portfolio_day(
 
         ratings: dict[str, str] = {}
         briefs: dict[str, str] = {}
+        instrument_contexts: dict[str, str] = {}
         failures: list[str] = []
         def research_one(ticker):
             try:
@@ -283,19 +296,21 @@ def _run_portfolio_day(
                     research = budgeted_call(research_fn, ticker, context)
                 if research is None:
                     reason = "deadline_exceeded" if deadline_breached else "research_call_ceiling"
-                    return ticker, None, None, reason
-                return ticker, research["rating"], research.get("brief", ""), None
+                    return ticker, None, None, None, reason
+                return ticker, research["rating"], research.get("brief", ""), research.get("instrument_context"), None
             except Exception as error:  # noqa: BLE001 - one ticker never kills the day
-                return ticker, None, None, f"{ticker}: {type(error).__name__}"
+                return ticker, None, None, None, f"{ticker}: {type(error).__name__}"
         pool = ThreadPoolExecutor(max_workers=MAX_RESEARCH_WORKERS)
         futures = [pool.submit(research_one, ticker) for ticker in tickers]
         try:
             remaining = PORTFOLIO_DAY_DEADLINE_SECONDS - (time.monotonic() - started)
             for future in as_completed(futures, timeout=max(remaining, 0.1)):
-                ticker, rating, brief, failure = future.result()
+                ticker, rating, brief, instrument_context, failure = future.result()
                 if rating is not None:
                     ratings[ticker] = rating
                     briefs[ticker] = brief
+                    if isinstance(instrument_context, str):
+                        instrument_contexts[ticker] = instrument_context
                 if failure:
                     failures.append(failure)
         except TimeoutError:
@@ -320,10 +335,14 @@ def _run_portfolio_day(
         quotes: dict[str, Decimal] = {}
         for symbol in symbols:
             price = quote_fn(symbol, day)
-            if price is None:
+            try:
+                quote = Decimal(str(price)) if price is not None else None
+                if quote is None or not quote.is_finite() or quote <= 0:
+                    raise ValueError("unusable quote")
+            except (ValueError, ArithmeticError):
                 failures.append(f"{symbol}: no quote")
             else:
-                quotes[symbol] = Decimal(str(price))
+                quotes[symbol] = quote
 
         if not quotes:
             logger.warning(
@@ -361,7 +380,10 @@ def _run_portfolio_day(
         if plan.get("hold_book"):
             orders = []
         else:
-            orders = rebalance_orders(prior, plan["weights"], quotes, submitted_at=as_of)
+            orders = rebalance_orders(
+                prior, plan["weights"], quotes, submitted_at=as_of,
+                fee_bps=fee_bps, slippage_bps=slippage_bps,
+            )
 
         simulator = PortfolioSimulator(
             prior["cash"], fee_bps=fee_bps, slippage_bps=slippage_bps
@@ -374,9 +396,14 @@ def _run_portfolio_day(
             quote = MarketQuote(order.symbol, quotes[order.symbol], as_of)
             try:
                 fill = simulator.fill_from_quote(order, quote, filled_at=as_of)
-            except Exception as error:  # noqa: BLE001 - skip infeasible, keep the day
-                failures.append(f"{order.symbol}: {type(error).__name__}")
-                continue
+            except Exception as error:  # noqa: BLE001 - a planner/simulator disagreement is not a successful day
+                return {
+                    "status": "failed_unsealed", "reason": "execution_policy_error",
+                    "scenario_id": scenario_id, "day": day, "coverage": coverage,
+                    "research_call_count": research_calls,
+                    "elapsed_seconds": round(time.monotonic() - started, 3),
+                    "failures": failures + [f"{order.symbol}: {type(error).__name__}"],
+                }
             fills.append({
                 "symbol": fill.symbol,
                 "side": fill.side.value,
@@ -410,11 +437,17 @@ def _run_portfolio_day(
         "research_call_count": research_calls,
         "elapsed_seconds": round(time.monotonic() - started, 3),
     }
+    from tradingagents.portfolio_replay import build_portfolio_replay_manifest
+    replay_manifest = build_portfolio_replay_manifest(
+        store, parent_run_id=context.run_id or "", tickers=tickers,
+        instrument_contexts=instrument_contexts,
+    )
     summary["state_evidence_id"] = store.complete_portfolio_day(
         day, _claim_id, as_of=as_of, state=final_state,
         scenario_metadata={"kind": "portfolio-day", "trade_date": day, "tickers": tickers,
                            "summary": {"coverage": summary["coverage"], "research_call_count": research_calls,
-                                       "elapsed_seconds": summary["elapsed_seconds"]}},
+                                       "elapsed_seconds": summary["elapsed_seconds"]},
+                           "replay_manifest": replay_manifest},
         capture_run_id=context.run_id or "", decision=json.dumps(plan, sort_keys=True),
         report=json.dumps(summary, sort_keys=True),
     )
@@ -538,6 +571,7 @@ def production_day_inputs(store: TemporalStore, *, deep_model: str = "gpt-5.4",
             store=context.store,
             run_id=f"{context.run_id}:research:{ticker}",
         )
+        worker_context.model_budget = context.model_budget
         final_state, _signal = worker_graph().propagate(
             ticker, context.clock.as_of.date().isoformat(), temporal=worker_context
         )
@@ -560,7 +594,11 @@ def production_day_inputs(store: TemporalStore, *, deep_model: str = "gpt-5.4",
         brief = json.dumps(reports, ensure_ascii=False, sort_keys=True)[:2000]
         if not brief:
             raise ValueError("empty analyst brief")
-        return {"rating": "Hold", "brief": brief}
+        return {
+            "rating": "Hold",
+            "brief": brief,
+            "instrument_context": worker_context.instrument_context,
+        }
 
     def complete(prompt: str) -> str:
         return cio_model.invoke(prompt).content
@@ -602,6 +640,8 @@ def rebalance_orders(
     quotes: dict[str, Decimal],
     *,
     submitted_at: datetime,
+    fee_bps: Decimal | str | float = 0,
+    slippage_bps: Decimal | str | float = 0,
 ) -> list[Order]:
     """Whole-share orders moving the portfolio to its target weights.
 
@@ -611,37 +651,46 @@ def rebalance_orders(
     fees to chase noise is pure waste - but a full exit (target weight zero
     on a held position) is a deliberate signal and always executes.
     """
-    cash = Decimal(str(state["cash"]))
-    positions = {symbol: Decimal(str(qty)) for symbol, qty in state["positions"].items()}
-    equity = cash + sum(
-        qty * quotes[symbol] for symbol, qty in positions.items() if symbol in quotes
-    )
-    band = equity * REBALANCE_BAND
+    with localcontext() as decimal_context:
+        # Local policy prevents callers' global Decimal context from changing
+        # executable quantities or cash conservation.
+        decimal_context.prec = 28
+        decimal_context.rounding = ROUND_DOWN
+        cash = Decimal(str(state["cash"]))
+        positions = {symbol: Decimal(str(qty)) for symbol, qty in state["positions"].items()}
+        equity = cash + sum(qty * quotes[symbol] for symbol, qty in positions.items())
+        band = equity * REBALANCE_BAND
+        fee_rate = Decimal(str(fee_bps)) / Decimal("10000")
+        slip_rate = Decimal(str(slippage_bps)) / Decimal("10000")
 
-    deltas: list[tuple[str, Decimal]] = []
-    for symbol in sorted(set(positions) | set(weights)):
-        if symbol not in quotes:
-            continue
-        target_value = equity * Decimal(str(weights.get(symbol, 0.0)))
-        target_shares = Decimal(int(target_value / quotes[symbol]))
-        change = target_shares - positions.get(symbol, Decimal("0"))
-        if not change:
-            continue
-        full_exit = weights.get(symbol, 0.0) == 0.0 and positions.get(symbol)
-        if not full_exit and abs(change) * quotes[symbol] < band:
-            continue
-        deltas.append((symbol, change))
+        sells: list[tuple[str, Decimal]] = []
+        buys: list[tuple[str, Decimal]] = []
+        for symbol in sorted(set(positions) | set(weights)):
+            target_value = equity * Decimal(str(weights.get(symbol, 0.0)))
+            target_shares = (target_value / quotes[symbol]).to_integral_value(rounding=ROUND_DOWN)
+            change = target_shares - positions.get(symbol, Decimal("0"))
+            if not change:
+                continue
+            full_exit = weights.get(symbol, 0.0) == 0.0 and positions.get(symbol)
+            if not full_exit and abs(change) * quotes[symbol] < band:
+                continue
+            (buys if change > 0 else sells).append((symbol, abs(change)))
 
-    orders = []
-    for sequence, (symbol, change) in enumerate(
-        sorted(deltas, key=lambda item: item[1] > 0), start=1
-    ):
-        side = OrderSide.BUY if change > 0 else OrderSide.SELL
-        orders.append(Order(
-            f"rebalance-{submitted_at:%Y%m%d}-{sequence}",
-            symbol,
-            side,
-            abs(change),
-            submitted_at,
-        ))
-    return orders
+        # The exact sell proceeds and buy costs use the simulator's policy.
+        # Plan sells first, then allocate remaining cash in ticker order. This
+        # gives deterministic residual cash rather than infeasible orders.
+        for symbol, quantity in sells:
+            gross = quotes[symbol] / (Decimal("1") + slip_rate) * quantity
+            cash += gross * (Decimal("1") - fee_rate)
+        affordable: list[tuple[str, Decimal]] = []
+        for symbol, desired in buys:
+            unit_cost = quotes[symbol] * (Decimal("1") + slip_rate) * (Decimal("1") + fee_rate)
+            quantity = min(desired, (cash / unit_cost).to_integral_value(rounding=ROUND_DOWN))
+            if quantity:
+                affordable.append((symbol, quantity))
+                cash -= unit_cost * quantity
+
+        ordered = [(symbol, OrderSide.SELL, quantity) for symbol, quantity in sells]
+        ordered += [(symbol, OrderSide.BUY, quantity) for symbol, quantity in affordable]
+        return [Order(f"rebalance-{submitted_at:%Y%m%d}-{sequence}", symbol, side, quantity, submitted_at)
+                for sequence, (symbol, side, quantity) in enumerate(ordered, start=1)]

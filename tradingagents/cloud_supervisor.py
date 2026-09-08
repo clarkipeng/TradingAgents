@@ -15,11 +15,13 @@ second claim, imports and discovery re-run for free, and backups overwrite.
 from __future__ import annotations
 
 import os
-import resource
 import signal
+import hashlib
+import json
 import sqlite3
 import subprocess
 import sys
+import tarfile
 import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
@@ -40,6 +42,121 @@ POLLER_RESTART_BACKOFF_CAP = 600.0
 POLLER_HEALTHY_RESET = 1800.0
 
 TICK_SECONDS = 20.0
+SCHEDULE_LEDGER_NAME = "schedule-outcomes.json"
+BACKUP_MANIFEST_NAME = "temporal-latest.manifest.json"
+BACKUP_ARTIFACTS_NAME = "temporal-latest.artifacts.tar"
+CHILD_STOP_GRACE_SECONDS = 30.0
+
+
+@dataclass(frozen=True)
+class JobResult:
+    """Sanitized result of one scheduled attempt."""
+
+    status: str
+    code: str
+
+    @property
+    def successful(self) -> bool:
+        return self.status == "completed"
+
+
+class ScheduleLedger:
+    """Small durable scheduler ledger owned by the supervisor process."""
+
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        self.outcomes: dict[str, dict[str, str]] = {}
+        if path.exists():
+            try:
+                payload = json.loads(path.read_text())
+                if isinstance(payload, dict) and isinstance(payload.get("outcomes"), dict):
+                    self.outcomes = {
+                        str(key): value for key, value in payload["outcomes"].items()
+                        if isinstance(value, dict) and isinstance(value.get("status"), str)
+                    }
+            except (OSError, json.JSONDecodeError):
+                print("[supervisor] schedule ledger unreadable code=ledger_corrupt", flush=True)
+
+    @staticmethod
+    def key(job: ScheduledJob, slot: datetime) -> str:
+        return f"{job.name}|{slot.date().isoformat()}"
+
+    def _save(self) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        partial = self.path.with_suffix(self.path.suffix + ".partial")
+        partial.write_text(json.dumps({"schema_version": 1, "outcomes": self.outcomes}, sort_keys=True))
+        partial.replace(self.path)
+
+    def recover_running(self) -> None:
+        changed = False
+        for outcome in self.outcomes.values():
+            if outcome.get("status") == "running":
+                outcome.update(status="pending", code="interrupted")
+                changed = True
+        if changed:
+            self._save()
+
+    def mark(self, job: ScheduledJob, slot: datetime, status: str, code: str) -> None:
+        self.outcomes[self.key(job, slot)] = {
+            "job": job.name,
+            "logical_date": slot.date().isoformat(),
+            "status": status,
+            "code": code,
+        }
+        # Keep a bounded history while retaining all recent logical dates.
+        if len(self.outcomes) > 500:
+            keep = sorted(self.outcomes)[-400:]
+            self.outcomes = {key: self.outcomes[key] for key in keep}
+        self._save()
+
+
+def _stop_process_group(process: subprocess.Popen, *, grace: float = CHILD_STOP_GRACE_SECONDS) -> None:
+    """Stop and reap a child plus descendants, including timeout paths."""
+    if process.poll() is not None:
+        process.wait()
+        return
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        pass
+    try:
+        process.wait(timeout=grace)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        process.wait()
+
+
+def _process_tree_rss_mb(root_pid: int) -> int | None:
+    """Best-effort instantaneous RSS for a process tree on Linux."""
+    proc_root = Path("/proc")
+    if not proc_root.exists():
+        return None
+    parents: dict[int, int] = {}
+    rss: dict[int, int] = {}
+    for entry in proc_root.iterdir():
+        if not entry.name.isdigit():
+            continue
+        try:
+            status = (entry / "status").read_text()
+            parent = next(line for line in status.splitlines() if line.startswith("PPid:"))
+            resident = next(line for line in status.splitlines() if line.startswith("VmRSS:"))
+            pid = int(entry.name)
+            parents[pid] = int(parent.split()[1])
+            rss[pid] = int(resident.split()[1])
+        except (OSError, StopIteration, ValueError):
+            continue
+    members = {root_pid}
+    changed = True
+    while changed:
+        changed = False
+        for pid, parent in parents.items():
+            if parent in members and pid not in members:
+                members.add(pid)
+                changed = True
+    return max(0, sum(rss.get(pid, 0) for pid in members) // 1024)
 
 
 def universe_tickers(universe_file: Path) -> str:
@@ -80,7 +197,7 @@ class ScheduledJob:
 
 
 def due_jobs(
-    jobs: list[ScheduledJob], now: datetime, fired: set[tuple[str, str]]
+    jobs: list[ScheduledJob], now: datetime, fired: set[tuple[str, str]] | Mapping[str, Mapping[str, str]]
 ) -> list[tuple[ScheduledJob, datetime]]:
     """Jobs whose current slot has not fired yet, in table order."""
     due: list[tuple[ScheduledJob, datetime]] = []
@@ -89,12 +206,23 @@ def due_jobs(
         if slot is None:
             continue
         key = (job.name, slot.isoformat())
-        if key not in fired:
+        durable_key = f"{job.name}|{slot.date().isoformat()}"
+        already_done = (
+            key in fired
+            if isinstance(fired, set)
+            else fired.get(durable_key, {}).get("status") in {"completed", "running", "failed"}
+        )
+        if not already_done:
             due.append((job, slot))
     return due
 
 
-def backup_store(store_dir: Path, backup_dir: Path) -> Path:
+def backup_store(
+    store_dir: Path,
+    backup_dir: Path,
+    *,
+    artifact_paths: list[Path] | None = None,
+) -> Path:
     """Vacuum the store database into a single overwritten backup slot.
 
     One slot, not a rotation: full copies of a multi-GB store filled the
@@ -103,6 +231,10 @@ def backup_store(store_dir: Path, backup_dir: Path) -> Path:
     copy. This file exists so both have one consistent artifact to take.
     """
     source = store_dir / "temporal.sqlite3"
+    if artifact_paths is not None:
+        for artifact_path in artifact_paths:
+            if not artifact_path.exists():
+                raise FileNotFoundError("required backup artifact is missing")
     backup_dir.mkdir(parents=True, exist_ok=True)
     target = backup_dir / "temporal-latest.sqlite3"
     partial = backup_dir / "temporal-latest.sqlite3.partial"
@@ -113,6 +245,32 @@ def backup_store(store_dir: Path, backup_dir: Path) -> Path:
     finally:
         conn.close()
     partial.replace(target)
+    if artifact_paths is not None:
+        artifacts = []
+        for artifact_path in artifact_paths:
+            if not artifact_path.exists():
+                raise FileNotFoundError("required backup artifact is missing")
+            for item in sorted(path for path in artifact_path.rglob("*") if path.is_file()):
+                digest = hashlib.sha256(item.read_bytes()).hexdigest()
+                artifacts.append({"path": str(item.relative_to(store_dir)), "sha256": digest})
+        archive_partial = backup_dir / (BACKUP_ARTIFACTS_NAME + ".partial")
+        with tarfile.open(archive_partial, "w") as archive:
+            for artifact_path in artifact_paths:
+                archive.add(artifact_path, arcname=artifact_path.relative_to(store_dir))
+        archive_partial.replace(backup_dir / BACKUP_ARTIFACTS_NAME)
+        manifest_partial = backup_dir / (BACKUP_MANIFEST_NAME + ".partial")
+        manifest = {
+            "schema_version": 1,
+            "database": target.name,
+            "database_sha256": hashlib.sha256(target.read_bytes()).hexdigest(),
+            "artifacts_archive": BACKUP_ARTIFACTS_NAME,
+            "artifacts_archive_sha256": hashlib.sha256(
+                (backup_dir / BACKUP_ARTIFACTS_NAME).read_bytes()
+            ).hexdigest(),
+            "artifacts": artifacts,
+        }
+        manifest_partial.write_text(json.dumps(manifest, sort_keys=True) + "\n")
+        manifest_partial.replace(backup_dir / BACKUP_MANIFEST_NAME)
     return target
 
 
@@ -185,7 +343,11 @@ def build_jobs(env: Mapping[str, str]) -> list[ScheduledJob]:
 
     def backup(slot: datetime) -> Callable[[], None]:
         def run() -> None:
-            target = backup_store(Path(store), Path(store).parent / "backups")
+            target = backup_store(
+                Path(store),
+                Path(store).parent / "backups",
+                artifact_paths=[Path(store) / "artifacts"],
+            )
             print(f"[supervisor] backup wrote {target}", flush=True)
 
         return run
@@ -233,6 +395,12 @@ class PollerChild:
             key: value
             for key, value in env.items()
             if not key.startswith("MEDIA_POLLER_")
+            and key not in {
+                "MEDIA_HEALTH_PORT",
+                "TRADINGAGENTS_ALERT_WEBHOOK_URL",
+                "MEDIA_REQUIRE_ALERT_WEBHOOK",
+                "MEDIA_COLLECTION_ENABLED",
+            }
         }
         self.child_env.update(
             {
@@ -242,6 +410,10 @@ class PollerChild:
                     "TRADER_MEDIA_SOURCES", "stocktwits,reddit,news"
                 ),
                 "MEDIA_POLLER_TRADING_HOURS": "true",
+                "MEDIA_POLLER_ALLOW_MACRO": "false",
+                "MEDIA_POLLER_PAUSE_POLICY": "ticker",
+                "MEDIA_POLLER_HEALTH_ENDPOINT": "disabled",
+                "MEDIA_POLLER_ALERT_IDENTITY": "ticker-poller",
             }
         )
         self.process: subprocess.Popen | None = None
@@ -272,41 +444,72 @@ class PollerChild:
         if now_monotonic < self.restart_at:
             return
         print(f"[supervisor] starting poller: {' '.join(self.argv)}", flush=True)
-        self.process = subprocess.Popen(self.argv, env=self.child_env)
+        self.process = subprocess.Popen(
+            self.argv,
+            env=self.child_env,
+            start_new_session=True,
+        )
         self.started_at = now_monotonic
 
     def terminate(self) -> None:
         if self.process is not None and self.process.poll() is None:
-            self.process.terminate()
-            try:
-                self.process.wait(timeout=60)
-            except subprocess.TimeoutExpired:
-                self.process.kill()
+            _stop_process_group(self.process)
+        elif self.process is not None:
+            self.process.wait()
 
 
-def run_job(job: ScheduledJob, slot: datetime) -> None:
+def run_job(job: ScheduledJob, slot: datetime) -> JobResult:
     built = job.build(slot)
     print(f"[supervisor] firing {job.name} for slot {slot.isoformat()}", flush=True)
     if callable(built):
         try:
             built()
             print(f"[supervisor] {job.name} ok", flush=True)
+            return JobResult("completed", "ok")
         except Exception as exc:  # noqa: BLE001 - the schedule must survive any job
-            print(f"[supervisor] {job.name} failed: {exc!r}", flush=True)
-        return
+            print(
+                f"[supervisor] {job.name} failed code=callable_failure "
+                f"type={type(exc).__name__}",
+                flush=True,
+            )
+            return JobResult("failed", "callable_failure")
+    process: subprocess.Popen | None = None
     try:
-        result = subprocess.run(built, timeout=job.timeout_seconds)
-        # Max RSS across reaped children, for right-sizing machine memory
-        # from observed peaks instead of guesses (Linux reports KiB).
-        peak_mb = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss // 1024
+        process = subprocess.Popen(built, start_new_session=True)
+        deadline = time.monotonic() + job.timeout_seconds
+        peak_mb: int | None = None
+        while True:
+            sample = _process_tree_rss_mb(process.pid)
+            if sample is not None:
+                peak_mb = max(peak_mb or 0, sample)
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise subprocess.TimeoutExpired(built, job.timeout_seconds)
+            try:
+                result = process.wait(timeout=min(1.0, remaining))
+                break
+            except subprocess.TimeoutExpired:
+                continue
         print(
-            f"[supervisor] {job.name} exit={result.returncode} child_peak_rss={peak_mb}MB",
+            f"[supervisor] {job.name} exit={result} "
+            f"process_tree_peak_rss_mb={peak_mb if peak_mb is not None else 'unavailable'}",
             flush=True,
         )
+        return JobResult("completed" if result == 0 else "failed", "ok" if result == 0 else "child_nonzero")
     except subprocess.TimeoutExpired:
-        print(f"[supervisor] {job.name} timed out after {job.timeout_seconds}s", flush=True)
+        if process is not None:
+            _stop_process_group(process)
+        print(f"[supervisor] {job.name} failed code=deadline", flush=True)
+        return JobResult("failed", "deadline")
     except Exception as exc:  # noqa: BLE001 - the schedule must survive any job
-        print(f"[supervisor] {job.name} failed to launch: {exc!r}", flush=True)
+        if process is not None:
+            _stop_process_group(process)
+        print(
+            f"[supervisor] {job.name} failed code=launch_failure "
+            f"type={type(exc).__name__}",
+            flush=True,
+        )
+        return JobResult("failed", "launch_failure")
 
 
 def store_is_seeded(env: Mapping[str, str]) -> bool:
@@ -331,7 +534,8 @@ def main() -> int:
         time.sleep(60)
     jobs = build_jobs(env)
     poller = PollerChild(env)
-    fired: set[tuple[str, str]] = set()
+    ledger = ScheduleLedger(Path(env.get("TRADINGAGENTS_TEMPORAL_STORE", "/data/temporal")) / SCHEDULE_LEDGER_NAME)
+    ledger.recover_running()
     stopping = False
 
     def handle_term(signum, frame) -> None:  # noqa: ANN001
@@ -349,15 +553,12 @@ def main() -> int:
     while not stopping:
         poller.ensure_running(time.monotonic())
         now = datetime.now(tz=SCHEDULE_TZ)
-        for job, slot in due_jobs(jobs, now, fired):
-            fired.add((job.name, slot.isoformat()))
-            run_job(job, slot)
+        for job, slot in due_jobs(jobs, now, ledger.outcomes):
+            ledger.mark(job, slot, "running", "started")
+            result = run_job(job, slot)
+            ledger.mark(job, slot, result.status, result.code)
             if stopping:
                 break
-        # Keep the fired set from growing without bound across long uptimes.
-        if len(fired) > 1000:
-            cutoff = (now - timedelta(days=2)).isoformat()
-            fired = {key for key in fired if key[1] >= cutoff}
         time.sleep(TICK_SECONDS)
 
     print("[supervisor] stopping; terminating poller", flush=True)

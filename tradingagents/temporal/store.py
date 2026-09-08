@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import bisect
 import fcntl
 import hashlib
 import json
@@ -40,7 +39,7 @@ from .ranking import RANKER_VERSION, EligibleChunkIndex, build_eligible_index, r
 # runs their writes). Writers wait; they must never lose work to a peer.
 # A portfolio-day claim older than this is abandoned: the deadline policy
 # bounds a healthy run to a fraction of it, so only a dead owner exceeds it.
-PORTFOLIO_CLAIM_STALE_SECONDS = 3600.0
+PORTFOLIO_CLAIM_STALE_SECONDS = 10800.0
 
 _SQLITE_BUSY_TIMEOUT_SECONDS = 180.0
 
@@ -48,6 +47,24 @@ _TITLE_TOKEN_MIN_LENGTH = 4
 _STOPWORDS = frozenset(
     ["the", "this", "that", "with", "from", "what", "when", "where", "will", "would", "could", "should", "have", "been", "were", "their", "about", "after", "before", "over", "under", "into", "out", "for", "and", "are", "was", "were", "has", "had", "its", "his", "her", "our", "your", "they", "them", "then", "than", "thus", "here", "there", "these", "those", "says", "said", "say", "new", "now", "how", "why", "not", "but", "all", "can", "may", "more", "most", "other", "some", "such", "only", "also", "just", "like", "near", "amid", "upon", "per"]
 )
+
+
+def _stream_corpus_digest(cutoff: str, rows: Iterable[sqlite3.Row]) -> str:
+    """Hash the old canonical corpus JSON without constructing its ID array."""
+    digest = hashlib.sha256()
+    # ``canonical_json`` sorts these two keys as ``as_of``, then
+    # ``evidence_ids``. Individual strings use exactly its JSON encoding.
+    digest.update(b'{"as_of":')
+    digest.update(canonical_json(cutoff).encode("utf-8"))
+    digest.update(b',"evidence_ids":[')
+    first = True
+    for row in rows:
+        if not first:
+            digest.update(b",")
+        digest.update(canonical_json(row["evidence_id"]).encode("utf-8"))
+        first = False
+    digest.update(b"]}")
+    return digest.hexdigest()
 
 
 def _significant_title_tokens(title: str) -> list[str]:
@@ -71,8 +88,11 @@ class TemporalStore:
         # cache. One build at a time; only the freshest index is retained.
         self._eligible_index_lock = threading.Lock()
         self._corpus_hash_lock = threading.Lock()
-        self._corpus_hash_cache: dict[str, tuple[int, int, str, tuple[str, ...]]] = {}
+        self._corpus_hash_cache: dict[str, tuple[int, int, str]] = {}
         self._pending_cluster_keys: set[str] | None = None
+        self._thread_connections = threading.local()
+        self._connection_lock = threading.Lock()
+        self._owned_connections: set[sqlite3.Connection] = set()
         self.artifacts_dir.mkdir(parents=True, exist_ok=True)
         self._initialize()
         from .retriever import TemporalRetriever
@@ -81,21 +101,55 @@ class TemporalStore:
 
     @contextmanager
     def _connect(self) -> Iterator[sqlite3.Connection]:
-        connection = sqlite3.connect(self.database_path, timeout=_SQLITE_BUSY_TIMEOUT_SECONDS)
-        connection.row_factory = sqlite3.Row
-        # WAL pairs with NORMAL: commits stop fsyncing individually (a real
-        # cost on network-backed volumes) while the database stays consistent
-        # across crashes; at worst the tail of un-checkpointed transactions is
-        # lost, and every writer here is re-runnable or re-importable.
-        connection.execute("PRAGMA synchronous=NORMAL")
+        connection = getattr(self._thread_connections, "connection", None)
+        if connection is None:
+            # Connections are still used by one owning thread at a time, but
+            # the registry lets the explicit store lifecycle close every
+            # thread-owned connection at shutdown.
+            connection = sqlite3.connect(
+                self.database_path,
+                timeout=_SQLITE_BUSY_TIMEOUT_SECONDS,
+                check_same_thread=False,
+            )
+            connection.row_factory = sqlite3.Row
+            # WAL pairs with NORMAL: commits stop fsyncing individually (a real
+            # cost on network-backed volumes) while the database stays consistent
+            # across crashes; at worst the tail of un-checkpointed transactions is
+            # lost, and every writer here is re-runnable or re-importable.
+            connection.execute("PRAGMA synchronous=NORMAL")
+            self._thread_connections.connection = connection
+            with self._connection_lock:
+                self._owned_connections.add(connection)
         try:
             yield connection
             connection.commit()
         except BaseException:
             connection.rollback()
             raise
-        finally:
+
+    def close(self) -> None:
+        """Close every thread-owned connection at the store lifecycle boundary."""
+        with self._connection_lock:
+            connections = tuple(self._owned_connections)
+            self._owned_connections.clear()
+        for connection in connections:
             connection.close()
+        if hasattr(self._thread_connections, "connection"):
+            del self._thread_connections.connection
+
+    def __enter__(self) -> "TemporalStore":
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        self.close()
+
+    def __del__(self) -> None:
+        # Tests and short-lived CLI commands often rely on object lifetime;
+        # explicit close() remains the production lifecycle boundary.
+        try:
+            self.close()
+        except (AttributeError, sqlite3.Error):
+            pass
 
     @contextmanager
     def write_lock(self) -> Iterator[None]:
@@ -156,6 +210,8 @@ class TemporalStore:
                 );
                 CREATE INDEX IF NOT EXISTS evidence_lookup
                 ON evidence(tool, request_key, available_at, observed_at, evidence_id);
+                CREATE INDEX IF NOT EXISTS evidence_available
+                ON evidence(available_at, evidence_id);
                 CREATE TABLE IF NOT EXISTS llm_calls (
                     call_id TEXT PRIMARY KEY,
                     run_id TEXT NOT NULL UNIQUE,
@@ -190,6 +246,14 @@ class TemporalStore:
                     artifact_hash TEXT NOT NULL REFERENCES artifacts(content_hash),
                     created_at TEXT NOT NULL,
                     capture_run_id TEXT
+                );
+                CREATE TABLE IF NOT EXISTS scenario_evidence (
+                    scenario_id TEXT NOT NULL REFERENCES scenarios(scenario_id),
+                    evidence_id TEXT NOT NULL REFERENCES evidence(evidence_id),
+                    PRIMARY KEY (scenario_id, evidence_id)
+                );
+                CREATE TABLE IF NOT EXISTS scenario_evidence_pins (
+                    scenario_id TEXT PRIMARY KEY REFERENCES scenarios(scenario_id)
                 );
                 CREATE TABLE IF NOT EXISTS scenario_rubrics (
                     scenario_id TEXT PRIMARY KEY REFERENCES scenarios(scenario_id),
@@ -237,6 +301,7 @@ class TemporalStore:
                     UNIQUE(parent_evidence_id, logical_position)
                 );
                 CREATE INDEX IF NOT EXISTS documents_available ON documents(available_at, doc_key);
+                CREATE INDEX IF NOT EXISTS documents_cluster ON documents(cluster_key, doc_key);
                 CREATE TABLE IF NOT EXISTS document_chunks (
                     chunk_id TEXT PRIMARY KEY,
                     doc_key TEXT NOT NULL REFERENCES documents(doc_key),
@@ -261,8 +326,6 @@ class TemporalStore:
                     invoked_at TEXT NOT NULL,
                     UNIQUE(run_id, sequence)
                 );
-                CREATE INDEX IF NOT EXISTS tool_traces_run
-                ON tool_traces(run_id, sequence);
                 CREATE TABLE IF NOT EXISTS search_traces (
                     trace_id TEXT PRIMARY KEY,
                     run_id TEXT NOT NULL,
@@ -278,8 +341,12 @@ class TemporalStore:
                     generation_id INTEGER NOT NULL DEFAULT 0,
                     UNIQUE(run_id, sequence)
                 );
-                CREATE INDEX IF NOT EXISTS search_traces_run
-                ON search_traces(run_id, sequence);
+                CREATE TABLE IF NOT EXISTS trace_sequences (
+                    run_id TEXT NOT NULL,
+                    trace_kind TEXT NOT NULL,
+                    next_sequence INTEGER NOT NULL,
+                    PRIMARY KEY(run_id, trace_kind)
+                );
                 """
             )
 
@@ -292,6 +359,13 @@ class TemporalStore:
                 connection.execute("ALTER TABLE evidence ADD COLUMN event_at TEXT")
             if "source_published_at" not in columns:
                 connection.execute("ALTER TABLE evidence ADD COLUMN source_published_at TEXT")
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS evidence_media_post_lookup ON evidence("
+                "json_extract(response_json, '$.metadata.media_post.source'), "
+                "json_extract(response_json, '$.metadata.media_post.ticker'), "
+                "available_at DESC, evidence_id) "
+                "WHERE tool = 'corpus.document' AND is_error = 0"
+            )
             portfolio_columns = {row[1] for row in connection.execute("PRAGMA table_info(portfolio_days)")}
             if portfolio_columns and "state_evidence_id" not in portfolio_columns:
                 connection.execute("ALTER TABLE portfolio_days ADD COLUMN state_evidence_id TEXT")
@@ -334,6 +408,11 @@ class TemporalStore:
                 "ON llm_calls(temporal_run_id, temporal_sequence) "
                 "WHERE temporal_run_id IS NOT NULL"
             )
+            # These indexes duplicate the automatically maintained B-trees
+            # backing UNIQUE(run_id, sequence). Remove them for existing
+            # stores; the constraints remain the sole trace lookup indexes.
+            connection.execute("DROP INDEX IF EXISTS tool_traces_run")
+            connection.execute("DROP INDEX IF EXISTS search_traces_run")
 
     def claim_portfolio_day(self, day: str, claim_id: str, *, claimed_at: datetime) -> dict:
         stamp = format_timestamp(parse_timestamp(claimed_at))
@@ -414,6 +493,38 @@ class TemporalStore:
         if row is None:
             raise KeyError(f"unknown artifact: {content_hash}")
         return (self.artifacts_dir / row["path"]).read_bytes()
+
+    def artifact_reachability_report(self) -> dict[str, Any]:
+        """Return a read-only retention plan rooted in durable records.
+
+        This deliberately does not delete anything. Callers must back up and
+        review this report before reclaiming only the unreferenced artifacts.
+        """
+        references = """
+            SELECT artifact_hash AS content_hash FROM evidence
+            UNION SELECT request_artifact_hash FROM llm_calls
+            UNION SELECT response_artifact_hash FROM llm_calls WHERE response_artifact_hash IS NOT NULL
+            UNION SELECT artifact_hash FROM scenarios
+            UNION SELECT artifact_hash FROM scenario_snapshots
+            UNION SELECT artifact_hash FROM scenario_rubrics
+            UNION SELECT report_artifact_hash FROM research_runs WHERE report_artifact_hash IS NOT NULL
+        """
+        with self._connect() as connection:
+            rows = connection.execute(
+                "SELECT content_hash, byte_length, path, content_hash IN (" + references + ") AS reachable "
+                "FROM artifacts ORDER BY content_hash"
+            ).fetchall()
+        reachable = [row for row in rows if row["reachable"]]
+        unreachable = [row for row in rows if not row["reachable"]]
+        missing = [row["content_hash"] for row in reachable if not (self.artifacts_dir / row["path"]).is_file()]
+        return {
+            "reachable_count": len(reachable),
+            "reachable_bytes": sum(row["byte_length"] for row in reachable),
+            "unreferenced_count": len(unreachable),
+            "unreferenced_bytes": sum(row["byte_length"] for row in unreachable),
+            "unreferenced_hashes": tuple(row["content_hash"] for row in unreachable),
+            "missing_reachable_hashes": tuple(missing),
+        }
 
     def record(
         self,
@@ -601,6 +712,7 @@ class TemporalStore:
                     extractor_version TEXT NOT NULL, cluster_key TEXT NOT NULL, UNIQUE(parent_evidence_id, logical_position)
                 );
                 CREATE INDEX {documents_table}_available ON {documents_table}(available_at, doc_key);
+                CREATE INDEX {documents_table}_cluster ON {documents_table}(cluster_key, doc_key);
                 CREATE TABLE {chunks_table} (
                     chunk_id TEXT PRIMARY KEY, doc_key TEXT NOT NULL, chunk_index INTEGER NOT NULL,
                     token_start INTEGER NOT NULL, token_end INTEGER NOT NULL, body TEXT NOT NULL,
@@ -671,6 +783,10 @@ class TemporalStore:
             """)
             count = connection.execute("SELECT COUNT(*) FROM documents").fetchone()[0]
         self._eligible_index_cache.clear()
+        # Reindex is an explicit maintenance boundary; publish its durable
+        # generation to the main database before returning to callers.
+        with self._connect() as connection:
+            connection.execute("PRAGMA wal_checkpoint(TRUNCATE)")
         return count
 
     @staticmethod
@@ -876,11 +992,9 @@ class TemporalStore:
     def corpus_hash(self, *, as_of: datetime) -> str:
         """Digest the exact evidence corpus eligible at one virtual time.
 
-        Same digest as always, maintained incrementally: evidence is
-        append-only, so (count, max rowid) at the cutoff identifies the
-        eligible set exactly, and on growth only the delta rows are fetched
-        and merged into the cached sorted id list. The full refetch was
-        O(corpus) per search and dominated research days as the corpus grew.
+        The legacy digest bytes are preserved, but IDs are streamed from SQLite
+        rather than materializing a large canonical JSON list under the cache
+        lock. A fresh eligible row invalidates this small freshness cache.
         """
         cutoff = format_timestamp(parse_timestamp(as_of))
         with self._connect() as connection:
@@ -892,37 +1006,15 @@ class TemporalStore:
                 cached = self._corpus_hash_cache.get(cutoff)
                 if cached is not None and (cached[0], cached[1]) == (count, max_rowid):
                     return cached[2]
-                if (
-                    cached is not None
-                    and count > cached[0]
-                    and max_rowid > cached[1]
-                    and count - cached[0] <= max_rowid - cached[1]
-                ):
-                    delta = connection.execute(
-                        "SELECT evidence_id FROM evidence WHERE rowid > ? AND available_at <= ?",
-                        (cached[1], cutoff),
-                    ).fetchall()
-                    ids = cached[3]
-                    if len(delta) == count - cached[0]:
-                        ids = list(ids)
-                        for row in delta:
-                            bisect.insort(ids, row["evidence_id"])
-                    else:
-                        ids = None
-                else:
-                    ids = None
-                if ids is None:
-                    ids = [
-                        row["evidence_id"]
-                        for row in connection.execute(
-                            "SELECT evidence_id FROM evidence WHERE available_at <= ? ORDER BY evidence_id",
-                            (cutoff,),
-                        )
-                    ]
-                payload = {"as_of": cutoff, "evidence_ids": ids}
-                digest = hashlib.sha256(canonical_json(payload).encode("utf-8")).hexdigest()
+                digest = _stream_corpus_digest(
+                    cutoff,
+                    connection.execute(
+                        "SELECT evidence_id FROM evidence WHERE available_at <= ? ORDER BY evidence_id",
+                        (cutoff,),
+                    ),
+                )
                 self._corpus_hash_cache.clear()
-                self._corpus_hash_cache[cutoff] = (count, max_rowid, digest, tuple(ids))
+                self._corpus_hash_cache[cutoff] = (count, max_rowid, digest)
                 return digest
 
     def seal_scenario_snapshot(
@@ -1005,6 +1097,17 @@ class TemporalStore:
                         capture_run_id,
                     ),
                 )
+                # New seals pin membership once. Later ingestion eligible at
+                # the same historical cutoff creates a new world; it cannot
+                # silently mutate this scenario or invalidate its pagination.
+                connection.execute(
+                    "INSERT INTO scenario_evidence(scenario_id, evidence_id) "
+                    "SELECT ?, evidence_id FROM evidence WHERE available_at <= ?",
+                    (scenario_id, format_timestamp(definition_time)),
+                )
+                connection.execute(
+                    "INSERT INTO scenario_evidence_pins(scenario_id) VALUES (?)", (scenario_id,)
+                )
                 return ScenarioDefinition(
                     scenario_id,
                     definition_time,
@@ -1033,10 +1136,20 @@ class TemporalStore:
         return self._scenario_from_row(row) if row is not None else None
 
     def verify_scenario_corpus(self, scenario_id: str) -> bool:
-        """Return whether the current eligible corpus still matches a sealed scenario."""
+        """Verify a pinned new-world membership, retaining legacy hash semantics."""
         scenario = self.get_scenario(scenario_id)
         if scenario is None:
             raise KeyError(f"unknown scenario: {scenario_id}")
+        with self._connect() as connection:
+            pinned = connection.execute(
+                "SELECT 1 FROM scenario_evidence_pins WHERE scenario_id = ?", (scenario_id,)
+            ).fetchone()
+            if pinned is not None:
+                missing = connection.execute(
+                    "SELECT 1 FROM scenario_evidence se LEFT JOIN evidence e ON e.evidence_id = se.evidence_id "
+                    "WHERE se.scenario_id = ? AND e.evidence_id IS NULL LIMIT 1", (scenario_id,)
+                ).fetchone()
+                return missing is None
         return scenario.corpus_hash == self.corpus_hash(as_of=scenario.as_of)
 
     def seal_scenario_rubric(
@@ -1243,7 +1356,8 @@ class TemporalStore:
                     temporal_sequence,
                 ),
             )
-        return self.get_llm_call(run_id)
+            row = connection.execute("SELECT * FROM llm_calls WHERE run_id = ?", (run_id,)).fetchone()
+        return self._llm_call_from_row(row)
 
     def finish_llm_call(
         self,
@@ -1269,9 +1383,10 @@ class TemporalStore:
                 """,
                 (response_json, response_hash, error_json, format_timestamp(completed), run_id),
             ).rowcount
+            row = connection.execute("SELECT * FROM llm_calls WHERE run_id = ?", (run_id,)).fetchone()
         if not updated:
             raise KeyError(f"unknown LLM run: {run_id}")
-        return self.get_llm_call(run_id)
+        return self._llm_call_from_row(row)
 
     def get_llm_call(self, run_id: str) -> LLMCallRecord:
         with self._connect() as connection:
@@ -1323,128 +1438,6 @@ class TemporalStore:
             query, as_of=as_of, limit=limit, page=page, date_from=date_from,
             date_to=date_to, source=source, corpus_hash_pin=corpus_hash_pin,
         )
-        # Kept below only as a source-compatible migration marker; retrieval is
-        # owned by TemporalRetriever and this branch is unreachable.
-        if limit < 1:
-            raise ValueError("limit must be positive")
-        if page < 1:
-            raise ValueError("page must be positive")
-        parsed_as_of = parse_timestamp(as_of)
-        start = (date_from[:10] if isinstance(date_from, str) and len(date_from) == 10 else parse_timestamp(date_from).date().isoformat()) if date_from else None
-        end = (date_to[:10] if isinstance(date_to, str) and len(date_to) == 10 else parse_timestamp(date_to).date().isoformat()) if date_to else None
-        if start and end and start > end:
-            raise ValueError("date_from must be on or before date_to")
-        cutoff = format_timestamp(parsed_as_of)
-        corpus_hash = self.corpus_hash(as_of=parsed_as_of)
-        if page > 1 and corpus_hash_pin != corpus_hash:
-            raise ValueError("page > 1 requires a matching page-1 corpus_hash pin")
-        index = self.eligible_index(
-            cutoff=cutoff, generation_id=self.active_generation_id()
-        )
-        # Date/source filters restrict results, never ranking statistics:
-        # scores stay a pure function of (eligible corpus, query, ranker),
-        # so the cached eligible index is reused across filtered views.
-        filtered: set[str] | None = None
-        if start or end or source:
-            predicates = ["d.available_at <= ?"]
-            parameters: list[Any] = [cutoff]
-            if start:
-                predicates.append("substr(d.available_at, 1, 10) >= ?")
-                parameters.append(start)
-            if end:
-                predicates.append("substr(d.available_at, 1, 10) <= ?")
-                parameters.append(end)
-            if source:
-                predicates.append("(d.source_domain = ? OR e.source = ? OR d.source_domain LIKE ?)")
-                parameters.extend((source, source, f"%{source}%"))
-            with self._connect() as connection:
-                filtered = {
-                    row["doc_key"]
-                    for row in connection.execute(
-                        "SELECT d.doc_key FROM documents d"
-                        " JOIN evidence e ON e.evidence_id = d.parent_evidence_id"
-                        f" WHERE {' AND '.join(predicates)}",
-                        parameters,
-                    ).fetchall()
-                }
-        cluster_by_key = index.cluster_by_doc_key
-        if not query.strip():
-            # Empty query is calendar browsing: eligible documents by recency
-            # within the filters, cluster-collapsed, deterministically ordered.
-            with self._connect() as connection:
-                rows = connection.execute(
-                    "SELECT doc_key, cluster_key FROM documents WHERE available_at <= ?"
-                    " ORDER BY available_at DESC, doc_key ASC",
-                    (cutoff,),
-                ).fetchall()
-            best: dict[str, dict[str, Any]] = {}
-            for row in rows:
-                if filtered is not None and row["doc_key"] not in filtered:
-                    continue
-                best.setdefault(row["cluster_key"], {"doc_key": row["doc_key"], "cluster_key": row["cluster_key"], "rank": 0.0})
-            ordered = list(best.values())
-        else:
-            candidate_limit = max(limit * 8 * page, 32)
-            candidates = rank(index, query, candidate_limit)
-            best = {}
-            for doc_key, score in candidates:
-                if filtered is not None and doc_key not in filtered:
-                    continue
-                cluster = cluster_by_key[doc_key]
-                if cluster not in best or (-score, doc_key) < (-float(best[cluster]["rank"]), best[cluster]["doc_key"]):
-                    best[cluster] = {"doc_key": doc_key, "cluster_key": cluster, "rank": score}
-            ordered = sorted(best.values(), key=lambda row: (-float(row["rank"]), row["doc_key"]))
-        selected_candidates = ordered[(page - 1) * limit : page * limit]
-        selected_keys = [row["doc_key"] for row in selected_candidates]
-        placeholders = ",".join("?" for _ in selected_keys)
-        with self._connect() as connection:
-            hydrated_rows = connection.execute(
-                f"""
-                SELECT d.*, e.*, json_extract(e.response_json, '$.metadata') AS metadata_json
-                FROM documents d
-                JOIN evidence e ON e.evidence_id = d.parent_evidence_id
-                WHERE d.doc_key IN ({placeholders})
-                """,
-                selected_keys,
-            ).fetchall()
-            hydrated = {row["doc_key"]: row for row in hydrated_rows}
-            siblings = {
-                row["cluster_key"]: tuple(r["doc_key"] for r in connection.execute(
-                    "SELECT doc_key FROM documents WHERE cluster_key=? AND doc_key<>? ORDER BY doc_key",
-                    (row["cluster_key"], row["doc_key"])).fetchall())
-                for row in selected_candidates
-            }
-        results = tuple(TemporalSearchResult(
-            evidence=self._search_evidence_from_row(hydrated[row["doc_key"]]),
-            rank=float(row["rank"]),
-            document=TemporalDocument(
-                doc_key=row["doc_key"], parent_evidence_id=hydrated[row["doc_key"]]["parent_evidence_id"],
-                title=hydrated[row["doc_key"]]["title"], body=hydrated[row["doc_key"]]["body"],
-                source_domain=hydrated[row["doc_key"]]["source_domain"],
-                canonical_url=hydrated[row["doc_key"]]["canonical_url"],
-                published_at=parse_timestamp(hydrated[row["doc_key"]]["published_at"])
-                if hydrated[row["doc_key"]]["published_at"] else None,
-                available_at=parse_timestamp(hydrated[row["doc_key"]]["available_at"]),
-                doc_kind=hydrated[row["doc_key"]]["doc_kind"],
-                siblings=siblings[row["cluster_key"]],
-            ),
-        ) for row in selected_candidates)
-        return TemporalSearchResponse(
-            results=results,
-            manifest=SearchManifest(
-                query=query,
-                as_of=parsed_as_of,
-                ranker_version=RANKER_VERSION,
-                corpus_hash=corpus_hash,
-                evidence_ids=tuple(result.evidence.evidence_id for result in results),
-                index_state_hash=index.index_state_hash,
-                page=page,
-                limit=limit,
-                date_from=start,
-                date_to=end,
-                source=source,
-            ),
-        )
 
     def fetch_document(self, doc_key: str, *, as_of: datetime, page: int = 1, page_chars: int = 4000) -> dict[str, Any]:
         """Read one eligible normalized document in bounded sequential character pages."""
@@ -1477,11 +1470,18 @@ class TemporalStore:
             predicates.append("(d.source_domain = ? OR e.source = ? OR d.source_domain LIKE ?)")
             params.extend((source, source, f"%{source}%"))
         with self._connect() as connection:
-            rows = connection.execute(f"SELECT d.source_domain, d.available_at FROM documents d JOIN evidence e ON e.evidence_id=d.parent_evidence_id WHERE {' AND '.join(predicates)} ORDER BY d.available_at", params).fetchall()
-        domains = sorted({row["source_domain"] for row in rows})
-        return {"as_of": cutoff, "source": source, "document_count": len(rows),
-                "source_counts": {domain: sum(row["source_domain"] == domain for row in rows) for domain in domains},
-                "date_span": {"from": rows[0]["available_at"][:10] if rows else None, "to": rows[-1]["available_at"][:10] if rows else None},
+            rows = connection.execute(
+                f"SELECT d.source_domain, COUNT(*) AS document_count, "
+                f"MIN(d.available_at) AS first_available, MAX(d.available_at) AS last_available "
+                f"FROM documents d JOIN evidence e ON e.evidence_id=d.parent_evidence_id "
+                f"WHERE {' AND '.join(predicates)} GROUP BY d.source_domain ORDER BY d.source_domain",
+                params,
+            ).fetchall()
+        return {"as_of": cutoff, "source": source,
+                "document_count": sum(row["document_count"] for row in rows),
+                "source_counts": {row["source_domain"]: row["document_count"] for row in rows},
+                "date_span": {"from": min((row["first_available"][:10] for row in rows), default=None),
+                              "to": max((row["last_available"][:10] for row in rows), default=None)},
                 "corpus_hash": self.corpus_hash(as_of=as_of)}
 
     @staticmethod
@@ -1518,10 +1518,7 @@ class TemporalStore:
             # Tool nodes may also run concurrently; sequence allocation is an
             # ordered tape operation rather than a best-effort counter.
             connection.execute("BEGIN IMMEDIATE")
-            sequence = connection.execute(
-                "SELECT COALESCE(MAX(sequence), 0) + 1 FROM tool_traces WHERE run_id = ?",
-                (run_id,),
-            ).fetchone()[0]
+            sequence = self._next_trace_sequence(connection, run_id, "tool")
             identity = {
                 "run_id": run_id,
                 "sequence": sequence,
@@ -1573,10 +1570,7 @@ class TemporalStore:
         invoked = parse_timestamp(invoked_at or datetime.now(timezone.utc))
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            sequence = connection.execute(
-                "SELECT COALESCE(MAX(sequence), 0) + 1 FROM search_traces WHERE run_id = ?",
-                (run_id,),
-            ).fetchone()[0]
+            sequence = self._next_trace_sequence(connection, run_id, "search")
             identity = {
                 "run_id": run_id,
                 "sequence": sequence,
@@ -1622,6 +1616,27 @@ class TemporalStore:
             manifest,
             invoked,
         )
+
+    @staticmethod
+    def _next_trace_sequence(
+        connection: sqlite3.Connection, run_id: str, trace_kind: str
+    ) -> int:
+        """Allocate a per-run trace sequence without rescanning trace history."""
+        table = "tool_traces" if trace_kind == "tool" else "search_traces"
+        connection.execute(
+            "INSERT OR IGNORE INTO trace_sequences(run_id, trace_kind, next_sequence) "
+            f"SELECT ?, ?, COALESCE(MAX(sequence), 0) + 1 FROM {table} WHERE run_id = ?",
+            (run_id, trace_kind, run_id),
+        )
+        sequence = connection.execute(
+            "SELECT next_sequence FROM trace_sequences WHERE run_id = ? AND trace_kind = ?",
+            (run_id, trace_kind),
+        ).fetchone()[0]
+        connection.execute(
+            "UPDATE trace_sequences SET next_sequence = ? WHERE run_id = ? AND trace_kind = ?",
+            (sequence + 1, run_id, trace_kind),
+        )
+        return sequence
 
     def list_tool_traces(self, run_id: str) -> list[ToolTraceRecord]:
         with self._connect() as connection:

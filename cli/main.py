@@ -1566,6 +1566,12 @@ def temporal_portfolio_run(
     )
     summary = run_portfolio_day(temporal_store, symbols, day=date, **inputs)
     typer.echo(json.dumps(summary, indent=2, sort_keys=True))
+    # A non-sealed execution can have no per-ticker failures (for example a
+    # budget or ownership outcome). The durable day outcome is the CLI success
+    # authority, not incidental stderr.
+    if summary.get("status") == "failed_unsealed":
+        typer.echo(f"portfolio day failed: {summary.get('reason', 'unknown')}", err=True)
+        raise typer.Exit(code=1)
     if summary.get("failures"):
         typer.echo(f"failures: {', '.join(summary['failures'])}", err=True)
 

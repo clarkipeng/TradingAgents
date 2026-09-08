@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
+from datetime import datetime, timezone
 from typing import Any
 
 from .models import TemporalMode, TemporalOutcome, request_key
@@ -53,17 +54,20 @@ class TemporalGateway:
             self._record_trace(tool, request, context, evidence.evidence_id)
             return TemporalOutcome(value=evidence.response, evidence=evidence)
 
+        # A virtual clock selects evidence.  It never changes when a live
+        # response was observed: otherwise a backfill can label today's
+        # mutable provider response as historical evidence.
+        observed_at = datetime.now(timezone.utc)
         try:
             value = live_call()
         except Exception as error:
             if context.mode is TemporalMode.LIVE_CAPTURE:
-                captured_at = context.clock.as_of
                 evidence = self.store.record_error(
                     tool,
                     request,
                     error,
-                    available_at=captured_at,
-                    observed_at=captured_at,
+                    available_at=observed_at,
+                    observed_at=observed_at,
                     source=source,
                 )
                 self._record_trace(tool, request, context, evidence.evidence_id)
@@ -71,7 +75,7 @@ class TemporalGateway:
         if context.mode is TemporalMode.LIVE:
             return TemporalOutcome(value=value, evidence=None)
 
-        captured_at = context.clock.as_of
+        captured_at = observed_at
         evidence = self.store.record(
             tool,
             request,

@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
+
 import pandas as pd
 import pytest
 
 import tradingagents.dataflows.market_data_validator as validator
+from tradingagents.temporal import TemporalContext, TemporalMode, TemporalStore, temporal_context
 
 
 def _sample_ohlcv() -> pd.DataFrame:
@@ -74,3 +77,14 @@ class TestTool:
             {"symbol": "COF", "curr_date": "2026-05-20"}
         )
         assert "Verified market data snapshot for COF" in out
+
+    def test_tool_capture_and_replay_use_the_temporal_boundary(self, tmp_path, monkeypatch):
+        from tradingagents.agents.utils.market_data_validation_tools import get_verified_market_snapshot
+        monkeypatch.setattr(validator, "load_ohlcv", lambda s, d: _sample_ohlcv())
+        store = TemporalStore(tmp_path)
+        captured = TemporalContext.at(TemporalMode.LIVE_CAPTURE, datetime.now(timezone.utc), store=store)
+        with temporal_context(captured):
+            value = get_verified_market_snapshot.invoke({"symbol": "COF", "curr_date": "2026-05-20"})
+        replay = TemporalContext.at(TemporalMode.REPLAY, datetime.now(timezone.utc) + timedelta(seconds=1), store=store)
+        with temporal_context(replay):
+            assert get_verified_market_snapshot.invoke({"symbol": "COF", "curr_date": "2026-05-20"}) == value

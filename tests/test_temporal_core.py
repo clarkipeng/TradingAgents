@@ -40,6 +40,13 @@ def test_store_deduplicates_artifacts_and_selects_latest_eligible(tmp_path):
     assert store.latest_eligible("news", request, as_of=at(10)).evidence_id == second.evidence_id
 
 
+def test_store_context_closes_all_owned_connections(tmp_path):
+    with TemporalStore(tmp_path) as store:
+        store.record("news", {"ticker": "NVDA"}, {"headline": "captured"}, available_at=at(9))
+        assert store._owned_connections
+    assert not store._owned_connections
+
+
 def test_replay_never_invokes_live_call(tmp_path):
     store = TemporalStore(tmp_path)
     gateway = TemporalGateway(store)
@@ -160,7 +167,9 @@ def test_scenario_definition_seals_time_basis_and_builds_context(tmp_path):
     )
     assert store.verify_scenario_corpus("nvda-earnings") is True
     store.record("corpus.document", {"url": "late-import"}, {"text": "NVDA"}, available_at=at(9))
-    assert store.verify_scenario_corpus("nvda-earnings") is False
+    # Newly imported historical evidence defines a new world; it cannot alter
+    # the membership sealed for this scenario.
+    assert store.verify_scenario_corpus("nvda-earnings") is True
     with pytest.raises(ValueError, match="already sealed"):
         store.seal_scenario(
             "nvda-earnings",

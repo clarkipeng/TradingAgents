@@ -107,3 +107,27 @@ def test_load_ohlcv_reuses_fresh_same_day_cache(tmp_path, monkeypatch):
 
     monkeypatch.setattr(su.yf, "download", _fail_download)
     su.load_ohlcv("AAPL", TODAY.strftime("%Y-%m-%d"))
+
+
+@pytest.mark.unit
+def test_load_ohlcv_reuses_one_immutable_disk_vintage_in_process(tmp_path, monkeypatch):
+    monkeypatch.setattr(su, "get_config", lambda: {"data_cache_dir": str(tmp_path)})
+    monkeypatch.setattr(su.pd.Timestamp, "today", staticmethod(lambda: TODAY))
+    start = (TODAY - pd.DateOffset(years=5)).strftime("%Y-%m-%d")
+    end = (TODAY + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+    cache_file = tmp_path / f"AAPL-YFin-data-{start}-{end}.csv"
+    pd.DataFrame({"Date": ["2026-07-18"], "Close": [100.0]}).to_csv(cache_file, index=False)
+    su._ohlcv_memory_cache.clear()
+    reads = []
+    original_read_csv = su.pd.read_csv
+
+    def counting_read_csv(*args, **kwargs):
+        reads.append(args[0])
+        return original_read_csv(*args, **kwargs)
+
+    monkeypatch.setattr(su.pd, "read_csv", counting_read_csv)
+    first = su.load_ohlcv("AAPL", TODAY.strftime("%Y-%m-%d"))
+    second = su.load_ohlcv("AAPL", TODAY.strftime("%Y-%m-%d"))
+    assert len(reads) == 1
+    first.loc[:, "Close"] = 7
+    assert second["Close"].iloc[0] == 100.0
