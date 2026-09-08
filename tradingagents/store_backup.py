@@ -64,7 +64,7 @@ def _sqlite_snapshot(source: Path, target: Path) -> None:
         source_db.close()
 
 
-def _artifact_members(store_dir: Path, database: Path) -> list[dict[str, object]]:
+def _catalog_members(database: Path) -> list[dict[str, object]]:
     connection = sqlite3.connect(database)
     try:
         try:
@@ -73,18 +73,23 @@ def _artifact_members(store_dir: Path, database: Path) -> list[dict[str, object]
             raise BackupError("artifact catalog unavailable") from exc
     finally:
         connection.close()
-    root = store_dir.resolve()
     members: list[dict[str, object]] = []
     for content_hash, relative, byte_length in rows:
         relative_path = _safe_relative(str(relative))
-        path = (store_dir / relative_path).resolve()
+        members.append({"path": (Path("artifacts") / relative_path).as_posix(), "sha256": content_hash, "byte_length": byte_length})
+    return members
+
+
+def _artifact_members(store_dir: Path, database: Path) -> list[dict[str, object]]:
+    members = _catalog_members(database)
+    root = (store_dir / "artifacts").resolve()
+    for member in members:
+        relative = _safe_relative(str(member["path"]))
+        path = (store_dir / relative).resolve()
         if not path.is_file() or root not in path.parents:
             raise BackupError("referenced artifact is missing")
-        actual_size = path.stat().st_size
-        actual_hash = _sha256(path)
-        if actual_hash != content_hash or actual_size != byte_length:
+        if _sha256(path) != member["sha256"] or path.stat().st_size != member["byte_length"]:
             raise BackupError("referenced artifact failed hash validation")
-        members.append({"path": relative_path.as_posix(), "sha256": actual_hash, "byte_length": actual_size})
     return members
 
 
@@ -131,7 +136,10 @@ def verify_unit(unit: Path) -> dict[str, object]:
             if item.islnk() or item.issym() or not item.isfile():
                 raise BackupError("backup archive contains unsafe member")
             names.append(relative.as_posix())
-    expected = sorted(str(item["path"]) for item in payload.get("artifacts", []))
+    expected_members = _catalog_members(unit / DATABASE_NAME)
+    if expected_members != payload.get("artifacts", []):
+        raise BackupError("backup catalog membership mismatch")
+    expected = sorted(str(item["path"]) for item in expected_members)
     if names != expected:
         raise BackupError("backup artifact membership mismatch")
     return payload
@@ -146,7 +154,7 @@ def backup_store(store_dir: Path, backup_dir: Path, *, budget_path: Path | None 
     store_dir = Path(store_dir)
     backup_dir = Path(backup_dir)
     database = store_dir / DATABASE_NAME
-    budget = Path(budget_path) if budget_path else store_dir.parent / BUDGET_NAME
+    budget = Path(budget_path) if budget_path else store_dir / BUDGET_NAME
     lock_path = store_dir / "mutator.lock"
     backup_dir.mkdir(parents=True, exist_ok=True)
     lock = lock_path.open("a+")
@@ -179,6 +187,9 @@ def backup_store(store_dir: Path, backup_dir: Path, *, budget_path: Path | None 
             latest_tmp = backup_dir / f".{UNIT_NAME}.{uuid.uuid4().hex}.link"
             latest_tmp.symlink_to(published.name)
             os.replace(latest_tmp, backup_dir / UNIT_NAME)
+            for prior in backup_dir.glob("unit-*"):
+                if prior != published:
+                    shutil.rmtree(prior, ignore_errors=True)
             return backup_dir / UNIT_NAME / DATABASE_NAME
         except BaseException:
             shutil.rmtree(incoming, ignore_errors=True)
@@ -188,8 +199,7 @@ def backup_store(store_dir: Path, backup_dir: Path, *, budget_path: Path | None 
         lock.close()
 
 
-def restore_unit(unit: Path, destination: Path, *, providers_disabled: bool = True,
-                 budget_destination: Path | None = None) -> Path:
+def restore_unit(unit: Path, destination: Path, *, providers_disabled: bool = True) -> Path:
     """Restore a verified unit into an empty destination via a staging dir."""
     if not providers_disabled:
         raise BackupError("providers_disabled_required")
@@ -202,7 +212,7 @@ def restore_unit(unit: Path, destination: Path, *, providers_disabled: bool = Tr
     try:
         (staging / "artifacts").mkdir()
         shutil.copy2(Path(unit) / DATABASE_NAME, staging / DATABASE_NAME)
-        shutil.copy2(Path(unit) / BUDGET_NAME, staging.parent / BUDGET_NAME)
+        shutil.copy2(Path(unit) / BUDGET_NAME, staging / BUDGET_NAME)
         with tarfile.open(Path(unit) / ARTIFACTS_NAME, "r") as archive:
             for item in archive.getmembers():
                 relative = _safe_relative(item.name)
@@ -217,11 +227,6 @@ def restore_unit(unit: Path, destination: Path, *, providers_disabled: bool = Tr
         if destination.exists():
             destination.rmdir()
         staging.rename(destination)
-        # The budget ledger belongs beside the temporal store.  Its copy is
-        # installed only after the complete store staging tree is verified.
-        restored_budget = staging.parent / BUDGET_NAME
-        if restored_budget.exists():
-            restored_budget.replace(budget_destination or (destination.parent / BUDGET_NAME))
         return destination
     except BaseException:
         shutil.rmtree(staging, ignore_errors=True)
@@ -236,12 +241,11 @@ def main(argv: list[str] | None = None) -> int:
     restore = sub.add_parser("restore")
     restore.add_argument("unit", type=Path)
     restore.add_argument("destination", type=Path)
-    restore.add_argument("--budget-destination", type=Path)
     args = parser.parse_args(argv)
     if args.command == "verify-unit":
         verify_unit(args.unit)
     else:
-        restore_unit(args.unit, args.destination, budget_destination=args.budget_destination)
+        restore_unit(args.unit, args.destination)
     print("ok")
     return 0
 
