@@ -4,6 +4,7 @@ import pytest
 
 from tradingagents.portfolio_replay import (
     build_portfolio_replay_manifest,
+    replay_production_portfolio_day,
     replay_portfolio_day,
     stream_digest,
     validate_portfolio_replay_manifest,
@@ -72,3 +73,32 @@ def test_portfolio_replay_rejects_matching_counts_with_wrong_stream_digest(tmp_p
                 "tool_digest": stream_digest([]),
             },
         )
+
+
+def test_production_portfolio_replay_calls_each_named_worker_graph_offline(tmp_path):
+    store = TemporalStore(tmp_path)
+    manifest = build_portfolio_replay_manifest(
+        store, parent_run_id="day-1", tickers=["MSFT", "NVDA"]
+    )
+    store.seal_scenario(
+        "portfolio-2026-09-06",
+        as_of=datetime(2026, 9, 6, tzinfo=timezone.utc),
+        basis="forward-captured",
+        metadata={"trade_date": "2026-09-06", "replay_manifest": manifest},
+    )
+    seen = []
+
+    class Graph:
+        def propagate(self, ticker, day, *, temporal):
+            seen.append((ticker, day, temporal.source_run_id))
+            return {"ticker": ticker}, "Hold"
+
+    replay = replay_production_portfolio_day(
+        store,
+        "portfolio-2026-09-06",
+        worker_graph_factory=lambda tape: Graph(),
+        cio_entrypoint=lambda tape: {"weights": {}},
+    )
+
+    assert [item[:2] for item in seen] == [("MSFT", "2026-09-06"), ("NVDA", "2026-09-06")]
+    assert [item["ticker"] for item in replay["workers"]] == ["MSFT", "NVDA"]
