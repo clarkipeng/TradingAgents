@@ -142,7 +142,8 @@ def _build_temporal_search_tool(expected_store: TemporalStore | None = None) -> 
         try:
             response = store.search(query, as_of=context.clock.as_of, limit=limit, page=page,
                                     date_from=date_from, date_to=date_to, source=source,
-                                    corpus_hash_pin=corpus_hash)
+                                    corpus_hash_pin=corpus_hash,
+                                    generation_id=context.retrieval_generation)
         except (KeyError, ValueError) as error:
             # Same degrade contract as temporal_fetch: bad model arguments
             # (malformed dates, stale corpus pins) come back as a payload.
