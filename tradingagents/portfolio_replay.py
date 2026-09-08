@@ -164,9 +164,20 @@ def replay_production_portfolio_day(
     def cio(source_run_id: str) -> Mapping[str, Any]:
         stream = manifest["cio"]
         tape = TapeChatModel.from_store(store, source_run_id=source_run_id)
-        result = cio_entrypoint(tape)
+        context = TemporalContext.at(
+            TemporalMode.REPLAY, scenario.as_of, scenario_id=scenario_id,
+            store=store, source_run_id=source_run_id,
+        )
+        # The CIO is a first-class stream, not an unscoped post-processing
+        # callback.  This makes any current/future CIO tool call consume the
+        # parent's ordered tape under the same no-network replay boundary.
+        with temporal_context(context):
+            result = cio_entrypoint(tape)
+        context.ensure_valid()
         if tape._cursor != len(tape.calls):
             raise ValueError("portfolio replay did not consume its complete LLM stream")
+        if len(store.list_tool_traces(context.run_id)) != stream["tool_call_count"]:
+            raise ValueError("portfolio replay did not consume its complete tool stream")
         return {
             "result": result, "llm_call_count": stream["llm_call_count"],
             "llm_digest": stream["llm_digest"], "tool_call_count": stream["tool_call_count"],
