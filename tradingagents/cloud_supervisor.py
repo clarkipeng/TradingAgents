@@ -16,12 +16,9 @@ from __future__ import annotations
 
 import os
 import signal
-import hashlib
 import json
-import sqlite3
 import subprocess
 import sys
-import tarfile
 import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
@@ -43,8 +40,6 @@ POLLER_HEALTHY_RESET = 1800.0
 
 TICK_SECONDS = 20.0
 SCHEDULE_LEDGER_NAME = "schedule-outcomes.json"
-BACKUP_MANIFEST_NAME = "temporal-latest.manifest.json"
-BACKUP_ARTIFACTS_NAME = "temporal-latest.artifacts.tar"
 CHILD_STOP_GRACE_SECONDS = 30.0
 
 
@@ -58,6 +53,32 @@ class JobResult:
     @property
     def successful(self) -> bool:
         return self.status == "completed"
+
+
+def verify_local_p6_evidence(path: Path) -> JobResult:
+    """Fail closed unless local cutover, rollback, and restore proof exists.
+
+    This is deliberately an evidence reader, not a deployment driver.  It
+    cannot turn an absent observation into permission to mutate production.
+    """
+    try:
+        evidence = json.loads(Path(path).read_text())
+    except (OSError, json.JSONDecodeError):
+        return JobResult("failed", "evidence_unavailable")
+    if not isinstance(evidence, dict):
+        return JobResult("failed", "evidence_invalid")
+    required = {
+        "preflight": "passed",
+        "cutover": "verified",
+        "rollback": "verified",
+        "backup_restore": "verified",
+        "providers": "disabled",
+    }
+    if any(evidence.get(key) != value for key, value in required.items()):
+        return JobResult("failed", "evidence_incomplete")
+    if not isinstance(evidence.get("observed_at"), str) or not evidence["observed_at"]:
+        return JobResult("failed", "evidence_timestamp_missing")
+    return JobResult("completed", "p6_local_gate_verified")
 
 
 class ScheduleLedger:
@@ -223,55 +244,12 @@ def backup_store(
     *,
     artifact_paths: list[Path] | None = None,
 ) -> Path:
-    """Vacuum the store database into a single overwritten backup slot.
+    """Publish one verified backup unit; retained for supervisor callers."""
+    from store_backup import backup_store as publish_backup
 
-    One slot, not a rotation: full copies of a multi-GB store filled the
-    volume in three days. History comes from Fly's scheduled volume
-    snapshots (5-day retention); the laptop's nightly pull is the offsite
-    copy. This file exists so both have one consistent artifact to take.
-    """
-    source = store_dir / "temporal.sqlite3"
-    if artifact_paths is not None:
-        for artifact_path in artifact_paths:
-            if not artifact_path.exists():
-                raise FileNotFoundError("required backup artifact is missing")
-    backup_dir.mkdir(parents=True, exist_ok=True)
-    target = backup_dir / "temporal-latest.sqlite3"
-    partial = backup_dir / "temporal-latest.sqlite3.partial"
-    partial.unlink(missing_ok=True)
-    conn = sqlite3.connect(f"file:{source}?mode=ro", uri=True, timeout=300)
-    try:
-        conn.execute("VACUUM INTO ?", (str(partial),))
-    finally:
-        conn.close()
-    partial.replace(target)
-    if artifact_paths is not None:
-        artifacts = []
-        for artifact_path in artifact_paths:
-            if not artifact_path.exists():
-                raise FileNotFoundError("required backup artifact is missing")
-            for item in sorted(path for path in artifact_path.rglob("*") if path.is_file()):
-                digest = hashlib.sha256(item.read_bytes()).hexdigest()
-                artifacts.append({"path": str(item.relative_to(store_dir)), "sha256": digest})
-        archive_partial = backup_dir / (BACKUP_ARTIFACTS_NAME + ".partial")
-        with tarfile.open(archive_partial, "w") as archive:
-            for artifact_path in artifact_paths:
-                archive.add(artifact_path, arcname=artifact_path.relative_to(store_dir))
-        archive_partial.replace(backup_dir / BACKUP_ARTIFACTS_NAME)
-        manifest_partial = backup_dir / (BACKUP_MANIFEST_NAME + ".partial")
-        manifest = {
-            "schema_version": 1,
-            "database": target.name,
-            "database_sha256": hashlib.sha256(target.read_bytes()).hexdigest(),
-            "artifacts_archive": BACKUP_ARTIFACTS_NAME,
-            "artifacts_archive_sha256": hashlib.sha256(
-                (backup_dir / BACKUP_ARTIFACTS_NAME).read_bytes()
-            ).hexdigest(),
-            "artifacts": artifacts,
-        }
-        manifest_partial.write_text(json.dumps(manifest, sort_keys=True) + "\n")
-        manifest_partial.replace(backup_dir / BACKUP_MANIFEST_NAME)
-    return target
+    if artifact_paths not in (None, [store_dir / "artifacts"]):
+        raise ValueError("custom artifact roots are no longer supported")
+    return publish_backup(store_dir, backup_dir)
 
 
 def build_jobs(env: Mapping[str, str]) -> list[ScheduledJob]:
