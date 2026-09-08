@@ -168,6 +168,7 @@ def replay_production_portfolio_day(
         context = TemporalContext.at(
             TemporalMode.REPLAY, scenario.as_of, scenario_id=scenario_id,
             store=store, source_run_id=source_run_id,
+            retrieval_generation=scenario.metadata.get("retrieval_generation"),
         )
         context.instrument_context = stream.get("instrument_context")
         with temporal_context(context):
@@ -190,6 +191,7 @@ def replay_production_portfolio_day(
         context = TemporalContext.at(
             TemporalMode.REPLAY, scenario.as_of, scenario_id=scenario_id,
             store=store, source_run_id=source_run_id,
+            retrieval_generation=scenario.metadata.get("retrieval_generation"),
         )
         # The CIO is a first-class stream, not an unscoped post-processing
         # callback.  This makes any current/future CIO tool call consume the

@@ -1558,6 +1558,14 @@ class TemporalStore:
         generation_id: int | None = None,
     ) -> TemporalSearchResponse:
         """Search eligible normalized chunks and aggregate to one result per document cluster."""
+        if generation_id is None:
+            # A temporal run pins the retrieval world at its start.  The
+            # adapter need not remember a second argument for every search.
+            from .runtime import current_context
+
+            context = current_context()
+            if context is not None and context.store is self:
+                generation_id = context.retrieval_generation
         return self.retriever.search(
             query, as_of=as_of, limit=limit, page=page, date_from=date_from,
             date_to=date_to, source=source, corpus_hash_pin=corpus_hash_pin,

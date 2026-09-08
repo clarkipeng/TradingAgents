@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 import pytest
 
 from cli.temporal_retrieval_bench import run_benchmark
-from tradingagents.temporal import TemporalStore
+from tradingagents.temporal import TemporalContext, TemporalMode, TemporalStore, temporal_context
 from tradingagents.temporal.documents import extract_document, stable_chunk_id, stable_doc_key
 
 UTC = timezone.utc
@@ -118,6 +118,21 @@ def test_incremental_cluster_assignments_match_full_reindex(tmp_path):
     rebuilt = cluster_map()
     assert len(set(rebuilt.values())) == 1  # the titles genuinely cluster
     assert incremental == rebuilt
+
+
+def test_temporal_context_pins_generation_across_later_publication(tmp_path):
+    store = TemporalStore(tmp_path)
+    store.record("corpus.document", {"url": "https://example.com/a"}, {"text": "alpha", "metadata": {}}, available_at=at(9))
+    store.reindex_documents()
+    pinned = store.active_generation_id()
+    store.record("corpus.document", {"url": "https://example.com/b"}, {"text": "beta", "metadata": {}}, available_at=at(9))
+    store.reindex_documents()
+    assert store.active_generation_id() > pinned
+
+    context = TemporalContext.at(TemporalMode.LIVE_CAPTURE, at(10), store=store, retrieval_generation=pinned)
+    with temporal_context(context):
+        assert store.search("alpha", as_of=at(10)).results
+        assert not store.search("beta", as_of=at(10)).results
 
 
 def test_reindex_publishes_a_complete_generation_and_traces_it(tmp_path):
