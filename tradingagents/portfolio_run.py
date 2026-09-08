@@ -671,39 +671,17 @@ def production_day_inputs(store: TemporalStore, *, deep_model: str = "gpt-5.4",
                 worker_context.ensure_valid()
             except TemporalRunInvalidError:
                 context.invalidate()
-        reports = {
-            key.removesuffix("_report"): final_state.get(key, "")
-            for key in ("market_report", "sentiment_report", "news_report", "fundamentals_report")
-            if final_state.get(key)
-        }
-        # The CIO decides on these briefs alone; 400 chars threw away nearly
-        # all of the research it just paid for. 2000 chars per ticker costs
-        # about two cents a day at the deep model's input price.
-        brief = json.dumps(reports, ensure_ascii=False, sort_keys=True)[:2000]
-        if not brief:
-            raise ValueError("empty analyst brief")
-        return {
-            "rating": "Hold",
-            "brief": brief,
-            "instrument_context": worker_context.instrument_context,
-        }
+        return portfolio_research_result(final_state, worker_context.instrument_context)
 
     def complete(prompt: str) -> str:
         return cio_model.invoke(prompt).content
 
     def quote(symbol: str, day: str):
-        start = format_timestamp(
-            parse_timestamp(f"{day}T00:00:00Z") - timedelta(days=7)
-        )[:10]
+        request = portfolio_close_request(symbol, day)
+        start = request["start"]
         context = current_context()
         if context is None or context.store is None:
             raise RuntimeError("portfolio quote requires a temporal context")
-        request = {
-            "symbol": symbol,
-            "start": start,
-            "end": day,
-            "series": "close-v1",
-        }
 
         def fetch_close() -> str | None:
             payload = route_to_vendor("get_stock_data", symbol, start, day)
@@ -733,6 +711,23 @@ def production_day_inputs(store: TemporalStore, *, deep_model: str = "gpt-5.4",
         "quote_fn": quote,
         "replay_graph_config": replay_graph_config,
     }
+
+
+def portfolio_research_result(final_state: dict, instrument_context: str | None = None) -> dict:
+    """The retained v1 analyst-to-CIO contract, shared by capture and replay."""
+    reports = {
+        key.removesuffix("_report"): final_state[key]
+        for key in ("market_report", "sentiment_report", "news_report", "fundamentals_report")
+        if final_state.get(key)
+    }
+    brief = json.dumps(reports, ensure_ascii=False, sort_keys=True)[:2000]
+    return {"rating": "Hold", "brief": brief, "instrument_context": instrument_context}
+
+
+def portfolio_close_request(symbol: str, day: str) -> dict:
+    """The retained v1 close lookup identity, shared by capture and replay."""
+    start = format_timestamp(parse_timestamp(f"{day}T00:00:00Z") - timedelta(days=7))[:10]
+    return {"symbol": symbol, "start": start, "end": day, "series": "close-v1"}
 
 
 def _last_close(payload, *, through: str | None = None) -> Decimal | None:

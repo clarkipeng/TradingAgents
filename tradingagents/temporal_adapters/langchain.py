@@ -398,6 +398,7 @@ class TapeChatModel(BaseChatModel):
     calls: tuple[LLMCallRecord, ...]
     structured_output_replay: bool = False
     verify_prompts: bool = True
+    match_parallel_prompts: bool = False
     _cursor: int = PrivateAttr(default=0)
     _consumed: set[int] = PrivateAttr(default_factory=set)
 
@@ -414,6 +415,7 @@ class TapeChatModel(BaseChatModel):
         source_run_id: str | None = None,
         structured_output_replay: bool = False,
         verify_prompts: bool = True,
+        match_parallel_prompts: bool = False,
     ) -> TapeChatModel:
         calls = tuple(
             call
@@ -424,6 +426,7 @@ class TapeChatModel(BaseChatModel):
             calls=calls,
             structured_output_replay=structured_output_replay,
             verify_prompts=verify_prompts,
+            match_parallel_prompts=match_parallel_prompts,
         )
 
     @classmethod
@@ -487,7 +490,9 @@ class TapeChatModel(BaseChatModel):
         return ChatResult(generations=[ChatGeneration(message=message)])
 
     def _matching_call_index(self, messages: list[BaseMessage]) -> int | None:
-        for index, call in enumerate(self.calls):
+        indices = range(len(self.calls)) if self.match_parallel_prompts else (self._cursor,)
+        for index in indices:
+            call = self.calls[index]
             if index in self._consumed:
                 continue
             if not self.verify_prompts or self._messages_match(call, messages):
