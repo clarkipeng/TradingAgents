@@ -132,6 +132,34 @@ def test_reindex_publishes_a_complete_generation_and_traces_it(tmp_path):
     assert response.manifest.index_state_hash
 
 
+def test_search_and_fetch_keep_using_the_pinned_generation_after_publish(tmp_path):
+    store = TemporalStore(tmp_path)
+    store.record("corpus.document", {"url": "https://example.com/a"}, {"text": "alpha", "metadata": {}}, available_at=at(9))
+    store.reindex_documents()
+    first = store.search("alpha", as_of=at(10))
+    pinned_generation = first.manifest.generation_id
+
+    store.record("corpus.document", {"url": "https://example.com/b"}, {"text": "beta", "metadata": {}}, available_at=at(9))
+    store.reindex_documents()
+    assert store.active_generation_id() != pinned_generation
+
+    old = store.search("beta", as_of=at(10), generation_id=pinned_generation)
+    assert old.results == ()
+    fetched = store.fetch_document(first.results[0].doc_key, as_of=at(10), generation_id=pinned_generation)
+    assert fetched["body"] == "alpha"
+
+
+def test_new_stores_do_not_create_legacy_evidence_fts_copy(tmp_path):
+    TemporalStore(tmp_path)
+    connection = sqlite3.connect(tmp_path / "temporal.sqlite3")
+    try:
+        assert connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='evidence_fts'"
+        ).fetchone() is None
+    finally:
+        connection.close()
+
+
 def test_deferred_clustering_batches_the_refresh_and_matches_reindex(tmp_path, monkeypatch):
     """Bulk imports must not pay a full-corpus cluster scan per row (measured
     live: 8.7s/post at 17k documents). Inside deferred_clustering() inserts

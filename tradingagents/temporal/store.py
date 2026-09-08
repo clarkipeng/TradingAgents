@@ -176,6 +176,33 @@ class TemporalStore:
                 "SELECT active_generation FROM temporal_index_state WHERE singleton=1"
             ).fetchone()[0]
 
+    @staticmethod
+    def _safe_table_name(name: str) -> str:
+        if not re.fullmatch(r"[A-Za-z0-9_]+", name):
+            raise ValueError("unsafe index table name")
+        return name
+
+    def generation_tables(self, generation_id: int | None = None) -> tuple[str, str, str]:
+        """Resolve one pinned generation, including pre-versioning stores."""
+        requested = self.active_generation_id() if generation_id is None else int(generation_id)
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT documents_table, chunks_table, fts_table "
+                "FROM temporal_index_generations WHERE generation_id=?", (requested,)
+            ).fetchone()
+            if row is None and requested == 0:
+                row = ("documents", "document_chunks", "document_chunks_fts")
+        if row is None:
+            raise KeyError(f"unknown retrieval generation: {requested}")
+        tables = tuple(self._safe_table_name(value) for value in row)
+        with self._connect() as connection:
+            exists = connection.execute(
+                "SELECT 1 FROM sqlite_master WHERE type IN ('table','view') AND name=?", (tables[0],)
+            ).fetchone()
+        if exists is None:
+            raise KeyError(f"unavailable retrieval generation: {requested}")
+        return tables
+
     def _initialize(self) -> None:
         with self._connect() as connection:
             # WAL is an invariant, not inherited file state: a copy made with
@@ -281,10 +308,6 @@ class TemporalStore:
                     failure_code TEXT,
                     state_evidence_id TEXT
                 );
-                CREATE VIRTUAL TABLE IF NOT EXISTS evidence_fts USING fts5(
-                    evidence_id UNINDEXED,
-                    content
-                );
                 CREATE TABLE IF NOT EXISTS documents (
                     doc_key TEXT PRIMARY KEY,
                     parent_evidence_id TEXT NOT NULL REFERENCES evidence(evidence_id),
@@ -347,6 +370,12 @@ class TemporalStore:
                     next_sequence INTEGER NOT NULL,
                     PRIMARY KEY(run_id, trace_kind)
                 );
+                CREATE TABLE IF NOT EXISTS temporal_index_generations (
+                    generation_id INTEGER PRIMARY KEY,
+                    documents_table TEXT NOT NULL,
+                    chunks_table TEXT NOT NULL,
+                    fts_table TEXT NOT NULL
+                );
                 """
             )
 
@@ -383,6 +412,15 @@ class TemporalStore:
             connection.execute(
                 "INSERT OR IGNORE INTO temporal_index_state(singleton, active_generation, evidence_high_water) "
                 "VALUES (1, 0, COALESCE((SELECT MAX(rowid) FROM evidence), 0))"
+            )
+            active_generation = connection.execute(
+                "SELECT active_generation FROM temporal_index_state WHERE singleton=1"
+            ).fetchone()[0]
+            connection.execute(
+                "INSERT OR IGNORE INTO temporal_index_generations"
+                "(generation_id, documents_table, chunks_table, fts_table) "
+                "VALUES (?, 'documents', 'document_chunks', 'document_chunks_fts')",
+                (active_generation,),
             )
             scenario_columns = {row["name"] for row in connection.execute("PRAGMA table_info(scenarios)")}
             if "corpus_hash" not in scenario_columns:
@@ -526,6 +564,49 @@ class TemporalStore:
             "missing_reachable_hashes": tuple(missing),
         }
 
+    def retention_plan(self, *, before: datetime,
+                       protected_run_ids: Iterable[str] = ()) -> dict[str, Any]:
+        """Describe reclaimable trace rows without deleting or rewriting data.
+
+        Retention is intentionally a two-step contract: this report is the
+        auditable dry run, while an owning maintenance job may later apply a
+        reviewed plan after archiving its protected runs.  Sealed scenarios
+        and evidence are never age-pruned by this API.
+        """
+        cutoff = format_timestamp(parse_timestamp(before))
+        protected = tuple(dict.fromkeys(protected_run_ids))
+        with self._connect() as connection:
+            params: list[Any] = [cutoff, *protected]
+            exclusion = ""
+            if protected:
+                exclusion = " AND run_id NOT IN (" + ",".join("?" for _ in protected) + ")"
+            counts = {
+                "llm_calls": connection.execute(
+                    "SELECT COUNT(*) FROM llm_calls WHERE completed_at IS NOT NULL AND completed_at < ?" + exclusion,
+                    params,
+                ).fetchone()[0],
+                "tool_traces": connection.execute(
+                    "SELECT COUNT(*) FROM tool_traces WHERE invoked_at < ?" + exclusion,
+                    params,
+                ).fetchone()[0],
+                "search_traces": connection.execute(
+                    "SELECT COUNT(*) FROM search_traces WHERE invoked_at < ?" + exclusion,
+                    params,
+                ).fetchone()[0],
+            }
+            duplicate_payloads = connection.execute(
+                "SELECT COUNT(*) FROM llm_calls WHERE response_json IS NOT NULL "
+                "AND response_artifact_hash IS NOT NULL"
+            ).fetchone()[0]
+        return {
+            "before": cutoff,
+            "protected_run_ids": protected,
+            "candidate_trace_rows": counts,
+            "inline_payloads_with_artifacts": duplicate_payloads,
+            "artifacts": self.artifact_reachability_report(),
+            "destructive_action": "none",
+        }
+
     def record(
         self,
         tool: str,
@@ -613,12 +694,13 @@ class TemporalStore:
                     int(record.is_error),
                 ),
             )
-            connection.execute("DELETE FROM evidence_fts WHERE evidence_id = ?", (record.evidence_id,))
-            if record.tool == "corpus.document" and not record.is_error:
-                connection.execute(
-                    "INSERT INTO evidence_fts(evidence_id, content) VALUES (?, ?)",
-                    (record.evidence_id, response_json),
-                )
+            active_generation = connection.execute(
+                "SELECT active_generation FROM temporal_index_state WHERE singleton=1"
+            ).fetchone()[0]
+            # Published generations are immutable snapshots.  Once the first
+            # snapshot exists, evidence ingestion waits for the next rebuild
+            # instead of mutating the table retained for pinned readers.
+            if record.tool == "corpus.document" and not record.is_error and active_generation == 0:
                 self._maintain_document(connection, record)
                 doc_key = stable_doc_key(record.evidence_id, 0)
                 if self._pending_cluster_keys is not None:
@@ -772,6 +854,11 @@ class TemporalStore:
                 self._refresh_document_clusters(connection, remainder_keys, table=documents_table)
             self._migrate_rubric_document_keys(connection, documents_table=documents_table)
             old_suffix = f"_old{generation}"
+            previous_generation = generation - 1
+            connection.execute(
+                "UPDATE temporal_index_generations SET documents_table=?, chunks_table=?, fts_table=? WHERE generation_id=?",
+                (f"documents{old_suffix}", f"document_chunks{old_suffix}", f"document_chunks_fts{old_suffix}", previous_generation),
+            )
             connection.executescript(f"""
                 ALTER TABLE documents RENAME TO documents{old_suffix};
                 ALTER TABLE document_chunks RENAME TO document_chunks{old_suffix};
@@ -779,6 +866,9 @@ class TemporalStore:
                 ALTER TABLE {documents_table} RENAME TO documents;
                 ALTER TABLE {chunks_table} RENAME TO document_chunks;
                 ALTER TABLE {fts_table} RENAME TO document_chunks_fts;
+                INSERT OR REPLACE INTO temporal_index_generations
+                    (generation_id, documents_table, chunks_table, fts_table)
+                    VALUES ({generation}, 'documents', 'document_chunks', 'document_chunks_fts');
                 UPDATE temporal_index_state SET active_generation={generation}, evidence_high_water=(SELECT COALESCE(MAX(rowid), 0) FROM evidence) WHERE singleton=1;
             """)
             count = connection.execute("SELECT COUNT(*) FROM documents").fetchone()[0]
@@ -867,7 +957,11 @@ class TemporalStore:
             tokens_by_key[row["doc_key"]] = tokens
             for token in tokens:
                 token_index.setdefault(token, []).append(row["doc_key"])
-        ubiquitous_cutoff = max(8, len(rows) // 20)
+        # This is a policy version, not a corpus-size heuristic.  A title
+        # that is a candidate today must remain a candidate after unrelated
+        # documents arrive, otherwise the same generation changes merely by
+        # growing the store.
+        ubiquitous_cutoff = 8
 
         for keys in by_url.values():
             for key in keys[1:]:
@@ -974,17 +1068,23 @@ class TemporalStore:
         the cache keeps only the newest key so a long process never
         accumulates indexes across cutoffs (a live OOM path at 190k docs).
         """
+        documents_table, chunks_table, _fts_table = self.generation_tables(
+            None if generation_id is None else int(generation_id)
+        )
         with self._connect() as connection:
             freshness = connection.execute(
-                "SELECT COUNT(*), COALESCE(MAX(rowid), 0) FROM documents WHERE available_at <= ?",
+                f"SELECT COUNT(*), COALESCE(MAX(rowid), 0) FROM {documents_table} WHERE available_at <= ?",
                 (cutoff,),
             ).fetchone()
-        key = (generation_id, cutoff, freshness[0], freshness[1])
+        key = (generation_id, documents_table, chunks_table, cutoff, freshness[0], freshness[1])
         with self._eligible_index_lock:
             index = self._eligible_index_cache.get(key)
             if index is None:
                 with self._connect() as connection:
-                    index = build_eligible_index(connection, as_of=cutoff)
+                    index = build_eligible_index(
+                        connection, as_of=cutoff,
+                        documents_table=documents_table, chunks_table=chunks_table,
+                    )
                 self._eligible_index_cache.clear()
                 self._eligible_index_cache[key] = index
             return index
@@ -1432,21 +1532,25 @@ class TemporalStore:
         date_to: str | None = None,
         source: str | None = None,
         corpus_hash_pin: str | None = None,
+        generation_id: int | None = None,
     ) -> TemporalSearchResponse:
         """Search eligible normalized chunks and aggregate to one result per document cluster."""
         return self.retriever.search(
             query, as_of=as_of, limit=limit, page=page, date_from=date_from,
             date_to=date_to, source=source, corpus_hash_pin=corpus_hash_pin,
+            generation_id=generation_id,
         )
 
-    def fetch_document(self, doc_key: str, *, as_of: datetime, page: int = 1, page_chars: int = 4000) -> dict[str, Any]:
+    def fetch_document(self, doc_key: str, *, as_of: datetime, page: int = 1,
+                       page_chars: int = 4000, generation_id: int | None = None) -> dict[str, Any]:
         """Read one eligible normalized document in bounded sequential character pages."""
         if page < 1 or not 1 <= page_chars <= 4000:
             raise ValueError("page must be positive and page_chars must be between 1 and 4000")
+        documents_table, _chunks_table, _fts_table = self.generation_tables(generation_id)
         with self._connect() as connection:
-            row = connection.execute("""SELECT d.*, e.observed_at, e.ingested_at, e.evidence_id,
+            row = connection.execute(f"""SELECT d.*, e.observed_at, e.ingested_at, e.evidence_id,
                 e.event_at, e.source_published_at
-                FROM documents d JOIN evidence e ON e.evidence_id=d.parent_evidence_id
+                FROM {documents_table} d JOIN evidence e ON e.evidence_id=d.parent_evidence_id
                 WHERE d.doc_key=? AND d.available_at <= ?""", (doc_key, format_timestamp(parse_timestamp(as_of)))).fetchone()
         if row is None:
             raise KeyError(f"unknown or ineligible document: {doc_key}")

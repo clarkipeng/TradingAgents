@@ -29,3 +29,20 @@ def test_artifact_reachability_report_detects_missing_referenced_bytes(tmp_path)
     (store.artifacts_dir / artifact_hash[:2] / artifact_hash[2:]).unlink()
 
     assert store.artifact_reachability_report()["missing_reachable_hashes"] == (artifact_hash,)
+
+
+def test_retention_plan_is_non_destructive_and_protects_runs(tmp_path):
+    store = TemporalStore(tmp_path)
+    run = store.begin_llm_call("run-protected", {"prompt": "fixture"}, started_at=datetime(2026, 9, 1, tzinfo=timezone.utc))
+    store.finish_llm_call("run-protected", response={"answer": "fixture"}, completed_at=datetime(2026, 9, 1, 1, tzinfo=timezone.utc))
+    before = (tmp_path / "temporal.sqlite3").read_bytes()
+
+    plan = store.retention_plan(
+        before=datetime(2026, 9, 2, tzinfo=timezone.utc),
+        protected_run_ids=(run.run_id,),
+    )
+
+    assert plan["destructive_action"] == "none"
+    assert plan["candidate_trace_rows"]["llm_calls"] == 0
+    assert plan["inline_payloads_with_artifacts"] == 1
+    assert (tmp_path / "temporal.sqlite3").read_bytes() == before
