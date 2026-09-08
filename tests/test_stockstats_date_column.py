@@ -31,6 +31,20 @@ def test_rate_limit_retry_warns_only_on_terminal_exhaustion(monkeypatch, caplog)
     assert messages[-1] == "Yahoo Finance rate-limit retries exhausted"
 
 
+def test_profile_cache_is_keyed_by_vintage_and_bounded(monkeypatch):
+    su._profile_cache.clear()
+    calls = []
+
+    def fetch():
+        calls.append(1)
+        return {"longName": "Fixture"}
+
+    assert su.cached_profile("AAPL", "2026-09-07", fetch) == {"longName": "Fixture"}
+    assert su.cached_profile("AAPL", "2026-09-07", fetch) == {"longName": "Fixture"}
+    assert su.cached_profile("AAPL", "2026-09-08", fetch) == {"longName": "Fixture"}
+    assert len(calls) == 2
+
+
 def _ohlcv(date_col: str) -> pd.DataFrame:
     """OHLCV frame whose date column is named `date_col`."""
     dates = pd.bdate_range("2026-04-01", periods=10)

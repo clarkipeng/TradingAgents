@@ -1,4 +1,5 @@
 import logging
+import json
 import os
 import time
 from collections import OrderedDict
@@ -26,9 +27,33 @@ MAX_OHLCV_STALE_DAYS = 10
 # up today's close soon after it publishes, long enough that a day with no bar
 # at all (weekend, holiday) cannot trigger a download on every call.
 OHLCV_CACHE_TTL_SECONDS = 900
+OHLCV_CACHE_SCHEMA_VERSION = 1
+OHLCV_CACHE_ADJUSTMENT_POLICY = "yfinance-history-v1"
+OHLCV_HISTORY_ADJUSTMENT_POLICY = OHLCV_CACHE_ADJUSTMENT_POLICY
+PROFILE_CACHE_TTL_SECONDS = 900
 _OHLCV_MEMORY_CACHE_MAX_ENTRIES = 32
 _ohlcv_memory_cache: OrderedDict[str, tuple[tuple[int, int], pd.DataFrame]] = OrderedDict()
 _ohlcv_memory_cache_lock = Lock()
+_profile_cache: OrderedDict[tuple[str, str], tuple[float, dict]] = OrderedDict()
+_profile_cache_lock = Lock()
+
+
+def cached_profile(symbol: str, vintage: str, fetcher) -> dict:
+    """Bounded same-vintage profile reuse; the fetcher remains injectable."""
+    key = (normalize_symbol(symbol), vintage)
+    now = time.monotonic()
+    with _profile_cache_lock:
+        cached = _profile_cache.get(key)
+        if cached is not None and now - cached[0] <= PROFILE_CACHE_TTL_SECONDS:
+            _profile_cache.move_to_end(key)
+            return dict(cached[1])
+    profile = dict(fetcher())
+    with _profile_cache_lock:
+        _profile_cache[key] = (now, dict(profile))
+        _profile_cache.move_to_end(key)
+        while len(_profile_cache) > _OHLCV_MEMORY_CACHE_MAX_ENTRIES:
+            _profile_cache.popitem(last=False)
+    return profile
 
 
 def yf_retry(func, max_retries=3, base_delay=2.0):
@@ -179,6 +204,103 @@ def _read_cached_ohlcv(data_file: str) -> pd.DataFrame:
     return frame
 
 
+def _cache_file_for(symbol: str, today_date: pd.Timestamp | None = None) -> str:
+    """Return the one canonical OHLCV cache path for a symbol/window."""
+    canonical = normalize_symbol(symbol)
+    safe_symbol = safe_ticker_component(canonical)
+    today = today_date if today_date is not None else pd.Timestamp.today()
+    start = (today - pd.DateOffset(years=5)).strftime("%Y-%m-%d")
+    end = (today + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+    config = get_config()
+    return os.path.join(config["data_cache_dir"], f"{safe_symbol}-YFin-data-{start}-{end}.csv")
+
+
+def _cache_metadata_path(data_file: str) -> str:
+    return f"{data_file}.meta.json"
+
+
+def _cache_policy_matches(data_file: str, policy: str) -> bool:
+    metadata_path = _cache_metadata_path(data_file)
+    if not os.path.isfile(metadata_path):
+        return True  # old cache files remain readable during migration
+    try:
+        with open(metadata_path, encoding="utf-8") as handle:
+            metadata = json.load(handle)
+    except (OSError, json.JSONDecodeError):
+        return False
+    return (
+        metadata.get("schema_version") == OHLCV_CACHE_SCHEMA_VERSION
+        and metadata.get("adjustment_policy") == policy
+    )
+
+
+def _write_cache_metadata(data_file: str, *, symbol: str, start: str, end: str) -> None:
+    payload = {
+        "schema_version": OHLCV_CACHE_SCHEMA_VERSION,
+        "provider": "yfinance",
+        "symbol": normalize_symbol(symbol),
+        "adjustment_policy": OHLCV_CACHE_ADJUSTMENT_POLICY,
+        "window_start": start,
+        "window_end_exclusive": end,
+        "captured_at": pd.Timestamp.now(tz="UTC").isoformat(),
+    }
+    temporary = f"{_cache_metadata_path(data_file)}.partial"
+    with open(temporary, "w", encoding="utf-8") as handle:
+        json.dump(payload, handle, sort_keys=True)
+    os.replace(temporary, _cache_metadata_path(data_file))
+
+
+def cache_ohlcv(symbol: str, data: pd.DataFrame, *, today_date: pd.Timestamp | None = None,
+                adjustment_policy: str = OHLCV_CACHE_ADJUSTMENT_POLICY) -> str:
+    """Persist one normalized OHLCV vintage for sibling consumers."""
+    today = today_date if today_date is not None else pd.Timestamp.today()
+    path = _cache_file_for(symbol, today)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    start = (today - pd.DateOffset(years=5)).strftime("%Y-%m-%d")
+    end = (today + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+    frame = _ensure_date_column(data.reset_index() if isinstance(data.index, pd.DatetimeIndex) else data.copy())
+    temporary = f"{path}.partial"
+    frame.to_csv(temporary, index=False, encoding="utf-8")
+    os.replace(temporary, path)
+    _write_cache_metadata(path, symbol=symbol, start=start, end=end)
+    metadata_path = _cache_metadata_path(path)
+    with open(metadata_path, encoding="utf-8") as handle:
+        metadata = json.load(handle)
+    metadata["adjustment_policy"] = adjustment_policy
+    temporary = f"{metadata_path}.partial"
+    with open(temporary, "w", encoding="utf-8") as handle:
+        json.dump(metadata, handle, sort_keys=True)
+    os.replace(temporary, metadata_path)
+    with _ohlcv_memory_cache_lock:
+        _ohlcv_memory_cache.pop(path, None)
+    return path
+
+
+def read_cached_ohlcv_window(symbol: str, start_date: str, end_date: str) -> pd.DataFrame | None:
+    """Read an existing yfinance vintage without contacting a provider."""
+    path = _cache_file_for(symbol)
+    if not os.path.isfile(path):
+        return None
+    metadata_path = _cache_metadata_path(path)
+    if os.path.isfile(metadata_path):
+        try:
+            with open(metadata_path, encoding="utf-8") as handle:
+                metadata = json.load(handle)
+        except (OSError, json.JSONDecodeError):
+            return None
+        if metadata.get("adjustment_policy") != OHLCV_HISTORY_ADJUSTMENT_POLICY:
+            return None
+    requested_end = pd.Timestamp(end_date)
+    if _needs_same_day_refresh(path, requested_end, pd.Timestamp.today()):
+        return None
+    data = _clean_dataframe(_read_cached_ohlcv(path))
+    data = data[(data["Date"] >= pd.Timestamp(start_date)) & (data["Date"] <= pd.Timestamp(end_date))]
+    if data.empty:
+        return None
+    _assert_ohlcv_not_stale(data, end_date, symbol, normalize_symbol(symbol))
+    return data
+
+
 def load_ohlcv(symbol: str, curr_date: str) -> pd.DataFrame:
     """Fetch OHLCV data with caching, filtered to prevent look-ahead bias.
 
@@ -190,7 +312,6 @@ def load_ohlcv(symbol: str, curr_date: str) -> pd.DataFrame:
     # then reject values that would escape the cache directory when
     # interpolated into the cache filename (e.g. ``../../tmp/x``).
     canonical = normalize_symbol(symbol)
-    safe_symbol = safe_ticker_component(canonical)
 
     config = get_config()
     curr_date_dt = pd.to_datetime(curr_date)
@@ -205,10 +326,7 @@ def load_ohlcv(symbol: str, curr_date: str) -> pd.DataFrame:
     end_str = (today_date + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
 
     os.makedirs(config["data_cache_dir"], exist_ok=True)
-    data_file = os.path.join(
-        config["data_cache_dir"],
-        f"{safe_symbol}-YFin-data-{start_str}-{end_str}.csv",
-    )
+    data_file = _cache_file_for(canonical, today_date)
 
     # A cached file may be empty if a prior fetch failed (unknown symbol,
     # transient rate limit). Treat an empty/columnless cache as a miss and
@@ -219,7 +337,8 @@ def load_ohlcv(symbol: str, curr_date: str) -> pd.DataFrame:
         # Serve the cache only when it is usable and not a stale snapshot of the
         # day being requested (#1150); otherwise fall through and refetch.
         if (
-            not cached.empty
+            _cache_policy_matches(data_file, OHLCV_CACHE_ADJUSTMENT_POLICY)
+            and not cached.empty
             and "Close" in cached.columns
             and not _needs_same_day_refresh(data_file, curr_date_dt, today_date)
         ):
@@ -232,7 +351,7 @@ def load_ohlcv(symbol: str, curr_date: str) -> pd.DataFrame:
             end=end_str,
             multi_level_index=False,
             progress=False,
-            auto_adjust=True,
+            auto_adjust=False,
         ))
         downloaded = _ensure_date_column(downloaded.reset_index())
         # Only cache real data — never persist an empty frame.
@@ -241,6 +360,7 @@ def load_ohlcv(symbol: str, curr_date: str) -> pd.DataFrame:
                 symbol, canonical, "Yahoo Finance returned no rows"
             )
         downloaded.to_csv(data_file, index=False, encoding="utf-8")
+        _write_cache_metadata(data_file, symbol=canonical, start=start_str, end=end_str)
         # The write created a new captured vintage; publish it for sibling
         # indicator calls without rereading the CSV.
         _read_cached_ohlcv(data_file)

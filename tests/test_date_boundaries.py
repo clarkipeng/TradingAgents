@@ -13,7 +13,8 @@ from tradingagents.dataflows.config import set_config
 
 
 @pytest.mark.unit
-def test_get_yfin_requests_inclusive_end(monkeypatch):
+def test_get_yfin_requests_inclusive_end(monkeypatch, tmp_path):
+    set_config({"data_cache_dir": str(tmp_path)})
     captured = {}
 
     class FakeTicker:
@@ -37,6 +38,34 @@ def test_get_yfin_requests_inclusive_end(monkeypatch):
     assert captured["end"] == "2025-05-10"
     # Header still reflects the requested range, not the internal +1 day.
     assert "to 2025-05-09" in out
+
+
+@pytest.mark.unit
+def test_get_yfin_reuses_shared_cached_vintage(monkeypatch, tmp_path):
+    set_config({"data_cache_dir": str(tmp_path)})
+    today = pd.Timestamp.today().normalize()
+    start = (today - pd.Timedelta(days=2)).strftime("%Y-%m-%d")
+    end = today.strftime("%Y-%m-%d")
+    calls = []
+
+    class FakeTicker:
+        def __init__(self, symbol):
+            calls.append(symbol)
+
+        def history(self, start, end):
+            calls.append((start, end))
+            return pd.DataFrame(
+                {"Open": [1.0], "High": [1.0], "Low": [1.0], "Close": [1.0], "Volume": [1]},
+                index=pd.to_datetime([today]),
+            )
+
+    monkeypatch.setattr(yfin.yf, "Ticker", FakeTicker)
+    yfin.get_YFin_data_online("AAPL", start, end)
+    first_call_count = len(calls)
+    monkeypatch.setattr(yfin.yf, "Ticker", lambda *_: (_ for _ in ()).throw(AssertionError("cache miss")))
+    out = yfin.get_YFin_data_online("AAPL", start, end)
+    assert len(calls) == first_call_count
+    assert "2026" in out or str(today.year) in out
 
 
 @pytest.mark.unit
