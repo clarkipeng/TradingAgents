@@ -12,16 +12,15 @@ import json
 import logging
 import math
 import time
-from csv import DictReader
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
+from csv import DictReader
 from datetime import date, datetime, timedelta, timezone
-from decimal import Decimal, ROUND_DOWN, localcontext
-from tradingagents.model_budget import DailyModelBudget
+from decimal import ROUND_DOWN, Decimal, localcontext
 
+from tradingagents.model_budget import DailyModelBudget
 from tradingagents.temporal import TemporalRunInvalidError, TemporalStore
 from tradingagents.temporal.clock import format_timestamp, parse_timestamp
-from tradingagents.temporal.store import PORTFOLIO_CLAIM_STALE_SECONDS
 from tradingagents.temporal.simulation import Order, OrderSide
 
 DEFAULT_CONSTRAINTS = {
@@ -151,8 +150,11 @@ def cio_allocate(
             "rationale": {},
         }
 
+    # Provider and budget failures are execution failures. Only validation of
+    # a returned proposal is eligible for the documented hold-book fallback.
+    returned = complete_llm(prompt)
     try:
-        raw = complete_llm(prompt).strip()
+        raw = returned.strip()
         if raw.startswith("```"):
             raw = raw.strip("`")
             raw = raw[raw.index("{"):raw.rindex("}") + 1]
