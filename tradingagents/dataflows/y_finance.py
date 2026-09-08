@@ -7,6 +7,7 @@ import yfinance as yf
 from dateutil.relativedelta import relativedelta
 
 from tradingagents.logging_utils import safe_exception_type
+from tradingagents.temporal import current_context
 
 from .errors import VendorError
 from .stockstats_utils import (
@@ -19,6 +20,24 @@ from .stockstats_utils import (
 from .symbol_utils import NoMarketDataError, normalize_symbol
 
 logger = logging.getLogger(__name__)
+
+
+def _run_history_cache() -> dict[tuple[str, str, str, str], pd.DataFrame] | None:
+    """Return one temporal run's private vendor-result cache, if any.
+
+    This is deliberately not a disk cache: existing yfinance calls retain
+    their adjusted/default output contract and each new temporal run observes
+    a fresh vendor result. Exact repeated requests within one run reuse an
+    immutable copy only.
+    """
+    context = current_context()
+    if context is None or context.run_id is None:
+        return None
+    cache = getattr(context, "_yfinance_history_cache", None)
+    if cache is None:
+        cache = {}
+        setattr(context, "_yfinance_history_cache", cache)
+    return cache
 
 
 def _request_error(operation: str, exc: BaseException) -> VendorError:
@@ -38,13 +57,21 @@ def get_YFin_data_online(
 
     # Resolve broker/forex symbols to Yahoo's convention (XAUUSD+ -> GC=F).
     canonical = normalize_symbol(symbol)
-    ticker = yf.Ticker(canonical)
 
     # yfinance treats ``end`` as EXCLUSIVE, so it would drop the requested
     # end_date row (and the current day when end_date is today). Request one day
     # past end_date so the requested range is actually inclusive (#986/#987).
     end_inclusive = (end_dt + relativedelta(days=1)).strftime("%Y-%m-%d")
-    data = yf_retry(lambda: ticker.history(start=start_date, end=end_inclusive))
+    identity = ("history-default-adjusted", canonical, start_date, end_inclusive)
+    cache = _run_history_cache()
+    cached = cache.get(identity) if cache is not None else None
+    if cached is None:
+        ticker = yf.Ticker(canonical)
+        data = yf_retry(lambda: ticker.history(start=start_date, end=end_inclusive))
+        if cache is not None:
+            cache[identity] = data.copy(deep=True)
+    else:
+        data = cached.copy(deep=True)
 
     # Empty result means the symbol is unknown/delisted. Raise a typed error
     # instead of returning prose: the routing layer turns it into a single
