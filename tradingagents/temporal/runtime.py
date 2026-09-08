@@ -27,6 +27,7 @@ class TemporalContext:
     store: TemporalStore | None = None
     run_id: str | None = None
     source_run_id: str | None = None
+    retrieval_generation: int | None = None
     model_budget: object | None = None
     instrument_context: str | None = None
     _invalid: bool = False
@@ -48,6 +49,7 @@ class TemporalContext:
         store: TemporalStore | str | Path | None = None,
         run_id: str | None = None,
         source_run_id: str | None = None,
+        retrieval_generation: int | None = None,
     ) -> TemporalContext:
         resolved_store = TemporalStore(store) if isinstance(store, (str, Path)) else store
         return cls(
@@ -57,6 +59,7 @@ class TemporalContext:
             store=resolved_store,
             run_id=run_id or str(uuid4()),
             source_run_id=source_run_id,
+            retrieval_generation=retrieval_generation,
         )
 
     @classmethod
@@ -83,6 +86,7 @@ class TemporalContext:
             store=store,
             run_id=run_id,
             source_run_id=scenario.capture_run_id if use_capture_tape else source_run_id,
+            retrieval_generation=scenario.metadata.get("retrieval_generation"),
         )
         instrument_context = scenario.metadata.get("instrument_context")
         if instrument_context is not None and not isinstance(instrument_context, str):

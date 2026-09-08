@@ -303,6 +303,7 @@ def _run_portfolio_day(
     context = TemporalContext.at(
         data_mode, as_of, store=store,
         run_id=run_id or str(uuid.uuid4()),
+        retrieval_generation=store.active_generation_id(),
     )
     context.model_budget = DailyModelBudget(
         store.root, day, max_tokens=PORTFOLIO_DAY_POLICY["model_token_budget"],
@@ -509,6 +510,7 @@ def _run_portfolio_day(
     summary["state_evidence_id"] = store.complete_portfolio_day(
         day, _claim_id, as_of=as_of, state=final_state,
         scenario_metadata={"kind": "portfolio-day", "trade_date": day, "tickers": tickers,
+                           "retrieval_generation": context.retrieval_generation,
                            "summary": {"coverage": summary["coverage"], "research_call_count": research_calls,
                                        "elapsed_seconds": summary["elapsed_seconds"]},
                            "replay_manifest": replay_manifest},
@@ -643,6 +645,7 @@ def production_day_inputs(store: TemporalStore, *, deep_model: str = "gpt-5.4",
             context.clock.as_of,
             store=context.store,
             run_id=f"{context.run_id}:research:{ticker}",
+            retrieval_generation=context.retrieval_generation,
         )
         worker_context.model_budget = context.model_budget
         try:
