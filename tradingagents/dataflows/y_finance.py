@@ -1,6 +1,6 @@
 import logging
+from concurrent.futures import Future
 from datetime import datetime
-from threading import Lock
 from typing import Annotated
 
 import pandas as pd
@@ -23,7 +23,7 @@ from .symbol_utils import NoMarketDataError, normalize_symbol
 logger = logging.getLogger(__name__)
 
 
-def _run_history_cache() -> tuple[dict, Lock] | None:
+def _run_history_cache() -> tuple | None:
     """Return one temporal run's private vendor-result cache, if any.
 
     This is deliberately not a disk cache: existing yfinance calls retain
@@ -34,12 +34,7 @@ def _run_history_cache() -> tuple[dict, Lock] | None:
     context = current_context()
     if context is None or context.run_id is None:
         return None
-    cache = getattr(context, "_yfinance_history_cache", None)
-    if cache is None:
-        cache = {}
-        setattr(context, "_yfinance_history_cache", cache)
-        setattr(context, "_yfinance_history_cache_lock", Lock())
-    return cache, context._yfinance_history_cache_lock
+    return context._vendor_cache, context._vendor_cache_lock
 
 
 def _request_error(operation: str, exc: BaseException) -> VendorError:
@@ -66,23 +61,41 @@ def get_YFin_data_online(
     end_inclusive = (end_dt + relativedelta(days=1)).strftime("%Y-%m-%d")
     identity = ("history-default-adjusted", canonical, start_date, end_inclusive)
     run_cache = _run_history_cache()
-    cached = None
+    future = None
+    owns_fetch = True
     if run_cache is not None:
         cache, cache_lock = run_cache
         with cache_lock:
-            cached = cache.get(identity)
-    if cached is None:
-        ticker = yf.Ticker(canonical)
-        data = yf_retry(lambda: ticker.history(start=start_date, end=end_inclusive))
-        observed_at = datetime.now()
-        if run_cache is not None:
-            with cache_lock:
-                # A frame and the observation that vouches for it are one
-                # in-run publication unit; callers receive independent copies.
-                cached = cache.setdefault(identity, (data.copy(deep=True), observed_at))
-            data, observed_at = cached[0].copy(deep=True), cached[1]
-    else:
-        data, observed_at = cached[0].copy(deep=True), cached[1]
+            future = cache.get(identity)
+            owns_fetch = future is None
+            if owns_fetch:
+                # Bound retained frames; in-flight requests remain owned until
+                # their callers finish, so eviction cannot duplicate them.
+                while len(cache) >= 32:
+                    finished = next((key for key, value in cache.items() if value.done()), None)
+                    if finished is None:
+                        break
+                    del cache[finished]
+                future = cache[identity] = Future()
+    if owns_fetch:
+        try:
+            ticker = yf.Ticker(canonical)
+            data = yf_retry(lambda: ticker.history(start=start_date, end=end_inclusive))
+            observed_at = datetime.now()
+            if data.empty:
+                raise NoMarketDataError(symbol, canonical, "empty history")
+            _assert_ohlcv_not_stale(data, end_date, symbol, canonical)
+            if future is not None:
+                future.set_result((data.copy(deep=True), observed_at))
+        except BaseException as error:
+            if future is not None:
+                future.set_exception(error)
+                with cache_lock:
+                    cache.pop(identity, None)
+            raise
+    if future is not None:
+        data, observed_at = future.result()
+        data = data.copy(deep=True)
 
     # Empty result means the symbol is unknown/delisted. Raise a typed error
     # instead of returning prose: the routing layer turns it into a single
