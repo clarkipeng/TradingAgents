@@ -660,25 +660,38 @@ def fake_deploy_env(tmp_path):
     state_dir.mkdir()
     for name, body in (("git", FAKE_GIT), ("fly", FAKE_FLY)):
         executable = bin_dir / name
-        executable.write_text(textwrap.dedent(body), encoding="utf-8")
+        # These are transport fakes, not Python-under-test.  Their generic
+        # env-based shebang used the fixture's fake python3 first, adding a
+        # second interpreter start to every Git/Fly boundary and making the
+        # wrapper's 10-second hang guard depend on host startup contention.
+        # The fakes use only the standard library, so omit site initialization
+        # as well.  Keep python3 itself intercepted below for the contracts
+        # that need it.
+        executable.write_text(
+            textwrap.dedent(body).replace(
+                "#!/usr/bin/env python3", f"#!{sys.executable} -S", 1
+            ),
+            encoding="utf-8",
+        )
         executable.chmod(0o755)
     fake_python = bin_dir / "python3"
     fake_python.write_text(
         textwrap.dedent(f"""\
-        #!{sys.executable}
-        import json
+        #!{sys.executable} -S
         import os
-        import pathlib
         import sys
 
         args = sys.argv[1:]
-        state_dir = pathlib.Path(os.environ["FAKE_STATE_DIR"])
         if args and args[0] == "-" and os.environ.get(
             "FAKE_RUNTIME_IDENTITY_FAILURE"
         ) == "true":
             sys.stdin.read()
             raise SystemExit(1)
-        if args and pathlib.Path(args[0]).name == "fenced_machine_rollback.py":
+        if args and args[0].endswith("/fenced_machine_rollback.py"):
+            import json
+            import pathlib
+
+            state_dir = pathlib.Path(os.environ["FAKE_STATE_DIR"])
             with (state_dir / "rollback-helper-calls.jsonl").open(
                 "a", encoding="utf-8"
             ) as handle:
@@ -693,7 +706,11 @@ def fake_deploy_env(tmp_path):
             print("fenced Fly rollback verified")
             raise SystemExit(0)
         real_python = os.environ["REAL_PYTHON"]
-        os.execv(real_python, [real_python, *args])
+        # The deployer's embedded validation programs only use the standard
+        # library plus this checked-out package.  Their fixture execution does
+        # not need ambient site packages, and skipping site startup prevents
+        # a host-load-dependent test hang from masquerading as a deploy fault.
+        os.execv(real_python, [real_python, "-S", *args])
     """),
         encoding="utf-8",
     )
