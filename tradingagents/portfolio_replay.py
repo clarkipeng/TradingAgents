@@ -7,6 +7,7 @@ order is not replay order; each stream is consumed only by its named worker.
 from __future__ import annotations
 
 import hashlib
+import json
 from collections.abc import Iterable, Mapping
 from typing import Any
 
@@ -120,14 +121,14 @@ def replay_production_portfolio_day(
     store: Any,
     scenario_id: str,
     *,
-    worker_graph_factory: Any,
-    cio_entrypoint: Any,
+    worker_graph_factory: Any | None = None,
+    cio_entrypoint: Any | None = None,
 ) -> dict[str, Any]:
-    """Replay named portfolio streams through real graph/CIO entrypoints.
+    """Replay production research, allocation, execution, and sealed state.
 
-    Factories are injected so this composition cannot construct a live client.
-    Each tape is private to its named worker; ordering between workers never
-    affects prompt matching or consumption.
+    The default wiring constructs the real analysts-only graph with taped
+    models, never a provider client. Optional factories remain a narrow test
+    seam; they do not bypass CIO, accounting, or final-state verification.
     """
     from tradingagents.temporal import TemporalContext, TemporalMode, temporal_context
     from tradingagents.temporal_adapters.langchain import TapeChatModel
@@ -138,6 +139,28 @@ def replay_production_portfolio_day(
     manifest = scenario.metadata.get("replay_manifest")
     if not isinstance(manifest, Mapping):
         raise ValueError("portfolio scenario has no replay manifest")
+    try:
+        summary = _portfolio_summary(store, manifest["parent_run_id"])
+    except ValueError:
+        # The explicit callback seam is retained for legacy stream assessment,
+        # whose old seals predate versioned execution inputs. New/default
+        # production replay never takes this branch.
+        if worker_graph_factory is None or cio_entrypoint is None:
+            raise
+        summary = None
+
+    if worker_graph_factory is None:
+        worker_graph_factory = _default_worker_graph_factory()
+    if cio_entrypoint is None:
+        assert summary is not None
+        from tradingagents.portfolio_run import cio_allocate
+
+        def cio_entrypoint(tape):
+            return cio_allocate(
+                summary["ratings"], briefs=summary["briefs"],
+                constraints=summary["constraints"],
+                complete_llm=lambda prompt: tape.invoke(prompt).content,
+            )
 
     def worker(ticker: str, source_run_id: str) -> Mapping[str, Any]:
         stream = next(item for item in manifest["workers"] if item["run_id"] == source_run_id)
@@ -184,7 +207,87 @@ def replay_production_portfolio_day(
             "tool_digest": stream["tool_digest"],
         }
 
-    return replay_portfolio_day(store, scenario_id, replay_worker=worker, replay_cio=cio)
+    replay = replay_portfolio_day(store, scenario_id, replay_worker=worker, replay_cio=cio)
+    if summary is not None:
+        replay["execution"] = _replay_execution(summary, replay["cio"]["result"])
+    return replay
+
+
+def _portfolio_summary(store: Any, run_id: str) -> Mapping[str, Any]:
+    record = store.get_research_run(run_id)
+    if record is None or record.report_artifact_hash is None:
+        raise ValueError("portfolio replay has no sealed output report")
+    try:
+        summary = json.loads(store.read_artifact(record.report_artifact_hash))
+    except (TypeError, ValueError) as error:
+        raise ValueError("portfolio replay has invalid sealed output report") from error
+    required = {"ratings", "briefs", "constraints", "quotes", "prior_state", "execution", "plan", "fills", "final_state"}
+    if not isinstance(summary, Mapping) or not required.issubset(summary):
+        raise ValueError("portfolio replay lacks versioned execution inputs")
+    return summary
+
+
+def _default_worker_graph_factory():
+    """Return the production graph shape with only a supplied tape model."""
+    import copy
+
+    from tradingagents.default_config import DEFAULT_CONFIG
+    from tradingagents.graph.trading_graph import TradingAgentsGraph
+
+    config = copy.deepcopy(DEFAULT_CONFIG)
+    config.update({
+        "max_debate_rounds": 0,
+        "max_risk_discuss_rounds": 0,
+        "analysts_only": True,
+        "checkpoint_enabled": False,
+        "llm_max_retries": 0,
+    })
+    return lambda tape: TradingAgentsGraph(
+        config=copy.deepcopy(config), quick_thinking_llm=tape, deep_thinking_llm=tape
+    )
+
+
+def _replay_execution(summary: Mapping[str, Any], replayed_plan: Any) -> dict[str, Any]:
+    """Recompute the sealed simulator result and reject every divergence."""
+    from datetime import datetime, timezone
+    from decimal import Decimal
+
+    from tradingagents.portfolio_run import rebalance_orders
+    from tradingagents.temporal.simulation import MarketQuote, PortfolioSimulator
+
+    if canonical_json(replayed_plan) != canonical_json(summary["plan"]):
+        raise ValueError("portfolio replay CIO plan differs from sealed plan")
+    execution = summary["execution"]
+    submitted_at = datetime.fromisoformat(f"{summary['day']}T21:30:00+00:00").astimezone(timezone.utc)
+    quotes = {symbol: Decimal(str(price)) for symbol, price in summary["quotes"].items()}
+    prior = summary["prior_state"]
+    simulator = PortfolioSimulator(
+        prior["cash"], fee_bps=execution["fee_bps"], slippage_bps=execution["slippage_bps"]
+    )
+    simulator.state.positions.update({
+        symbol: Decimal(str(quantity)) for symbol, quantity in prior["positions"].items()
+    })
+    orders = [] if replayed_plan.get("hold_book") else rebalance_orders(
+        prior, replayed_plan["weights"], quotes, submitted_at=submitted_at,
+        fee_bps=execution["fee_bps"], slippage_bps=execution["slippage_bps"],
+    )
+    fills = []
+    for order in orders:
+        fill = simulator.fill_from_quote(
+            order, MarketQuote(order.symbol, quotes[order.symbol], submitted_at), filled_at=submitted_at
+        )
+        fills.append({"symbol": fill.symbol, "side": fill.side.value,
+                      "quantity": str(fill.quantity), "price": str(fill.price)})
+    final_state = {
+        "cash": str(simulator.state.cash),
+        "positions": {symbol: str(quantity) for symbol, quantity in simulator.state.positions.items() if quantity},
+        "equity": str(simulator.marked_value({symbol: quotes[symbol] for symbol in simulator.state.positions})),
+    }
+    if canonical_json(fills) != canonical_json(summary["fills"]):
+        raise ValueError("portfolio replay fills differ from sealed result")
+    if canonical_json(final_state) != canonical_json(summary["final_state"]):
+        raise ValueError("portfolio replay state differs from sealed result")
+    return {"orders": len(orders), "fills": fills, "final_state": final_state, "matches_seal": True}
 
 
 def _assert_consumed(stream: Mapping[str, Any], result: Mapping[str, Any]) -> None:

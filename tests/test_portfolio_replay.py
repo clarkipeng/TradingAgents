@@ -9,6 +9,8 @@ from tradingagents.portfolio_replay import (
     stream_digest,
     validate_portfolio_replay_manifest,
 )
+from tradingagents.portfolio_run import run_portfolio_day
+from tradingagents.temporal_adapters.langchain import TapeMismatchError
 from tradingagents.temporal import (
     TemporalContext,
     TemporalGateway,
@@ -82,33 +84,34 @@ def test_portfolio_replay_rejects_matching_counts_with_wrong_stream_digest(tmp_p
         )
 
 
-def test_production_portfolio_replay_calls_each_named_worker_graph_offline(tmp_path):
+def test_production_portfolio_replay_recomputes_sealed_execution_with_default_wiring(tmp_path, monkeypatch):
     store = TemporalStore(tmp_path)
-    manifest = build_portfolio_replay_manifest(
-        store, parent_run_id="day-1", tickers=["MSFT", "NVDA"]
-    )
-    store.seal_scenario(
-        "portfolio-2026-09-06",
-        as_of=datetime(2026, 9, 6, tzinfo=timezone.utc),
-        basis="forward-captured",
-        metadata={"trade_date": "2026-09-06", "replay_manifest": manifest},
+    captured = run_portfolio_day(
+        store, ["MSFT", "NVDA"], day="2026-09-06",
+        research_fn=lambda ticker, _context: {"rating": "Hold", "brief": f"brief:{ticker}"},
+        complete_llm=lambda _prompt: (_ for _ in ()).throw(TapeMismatchError("fixture")),
+        quote_fn=lambda symbol, _day: {"MSFT": "100", "NVDA": "200"}[symbol],
     )
     seen = []
 
     class Graph:
+        def __init__(self, **_kwargs):
+            pass
+
         def propagate(self, ticker, day, *, temporal):
             seen.append((ticker, day, temporal.source_run_id))
             return {"ticker": ticker}, "Hold"
 
+    monkeypatch.setattr("tradingagents.graph.trading_graph.TradingAgentsGraph", Graph)
     replay = replay_production_portfolio_day(
         store,
         "portfolio-2026-09-06",
-        worker_graph_factory=lambda tape: Graph(),
-        cio_entrypoint=lambda tape: {"weights": {}},
     )
 
     assert [item[:2] for item in seen] == [("MSFT", "2026-09-06"), ("NVDA", "2026-09-06")]
     assert [item["ticker"] for item in replay["workers"]] == ["MSFT", "NVDA"]
+    assert replay["execution"]["matches_seal"] is True
+    assert replay["execution"]["final_state"] == captured["final_state"]
 
 
 def test_production_portfolio_replay_scopes_cio_tools_to_parent_tape(tmp_path):
