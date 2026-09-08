@@ -149,7 +149,8 @@ def replay_production_portfolio_day(
             raise
         summary = None
 
-    if worker_graph_factory is None:
+    default_worker_graph = worker_graph_factory is None
+    if default_worker_graph:
         worker_graph_factory = _default_worker_graph_factory(
             store, scenario.metadata.get("replay_graph_config")
         )
@@ -159,10 +160,13 @@ def replay_production_portfolio_day(
 
         def cio_entrypoint(tape):
             return cio_allocate(
-                summary["ratings"], briefs=summary["briefs"],
+                replayed_ratings, briefs=replayed_briefs,
                 constraints=summary["constraints"],
                 complete_llm=lambda prompt: tape.invoke(prompt).content,
             )
+
+    replayed_ratings: dict[str, str] = {}
+    replayed_briefs: dict[str, str] = {}
 
     def worker(ticker: str, source_run_id: str) -> Mapping[str, Any]:
         stream = next(item for item in manifest["workers"] if item["run_id"] == source_run_id)
@@ -181,6 +185,15 @@ def replay_production_portfolio_day(
             result, _signal = worker_graph_factory(tape).propagate(
                 ticker, scenario.metadata["trade_date"], temporal=context
             )
+        if summary is not None and default_worker_graph:
+            brief = _brief_from_worker_state(result)
+            if brief != summary["briefs"].get(ticker):
+                raise ValueError("portfolio replay analyst brief differs from sealed CIO input")
+            # The capture policy's analyst sweep derives ratings uniformly;
+            # retain that versioned mapping and prove the regenerated briefs
+            # are the actual inputs to the replayed CIO call below.
+            replayed_ratings[ticker] = summary["ratings"][ticker]
+            replayed_briefs[ticker] = brief
         if tape._cursor != len(tape.calls):
             raise ValueError(
                 f"portfolio replay did not consume its complete LLM stream ({tape._cursor}/{len(tape.calls)})"
@@ -195,6 +208,11 @@ def replay_production_portfolio_day(
 
     def cio(source_run_id: str) -> Mapping[str, Any]:
         stream = manifest["cio"]
+        if summary is not None and default_worker_graph and (
+            canonical_json(replayed_ratings) != canonical_json(summary["ratings"])
+            or canonical_json(replayed_briefs) != canonical_json(summary["briefs"])
+        ):
+            raise ValueError("portfolio replay CIO inputs differ from sealed inputs")
         tape = TapeChatModel.from_store(store, source_run_id=source_run_id)
         context = TemporalContext.at(
             TemporalMode.REPLAY, scenario.as_of, scenario_id=scenario_id,
@@ -236,6 +254,21 @@ def _portfolio_summary(store: Any, run_id: str) -> Mapping[str, Any]:
     if not isinstance(summary, Mapping) or not required.issubset(summary):
         raise ValueError("portfolio replay lacks versioned execution inputs")
     return summary
+
+
+def _brief_from_worker_state(final_state: Any) -> str:
+    """Recreate the versioned capture brief from the real analyst result."""
+    if not isinstance(final_state, Mapping):
+        raise ValueError("portfolio replay worker returned no analyst state")
+    reports = {
+        key.removesuffix("_report"): final_state.get(key, "")
+        for key in ("market_report", "sentiment_report", "news_report", "fundamentals_report")
+        if final_state.get(key)
+    }
+    brief = json.dumps(reports, ensure_ascii=False, sort_keys=True)[:2000]
+    if not brief:
+        raise ValueError("portfolio replay worker produced an empty analyst brief")
+    return brief
 
 
 def _default_worker_graph_factory(store: Any, captured_config: Any):
