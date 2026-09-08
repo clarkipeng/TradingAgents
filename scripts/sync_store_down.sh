@@ -9,35 +9,50 @@ dest_dir=${TRADER_STORE_MIRROR:-"$HOME/.tradingagents/temporal-cloud-mirror"}
 
 mkdir -p "$dest_dir"
 
-# The trader publishes one atomically replaced database plus its manifest.
+# The trader publishes one atomically selected, versioned backup unit.
 newest=$(flyctl ssh console -a "$app" --process-group trader -C \
-    "test -s /data/backups/temporal-latest.sqlite3 && test -s /data/backups/temporal-latest.manifest.json && test -s /data/backups/temporal-latest.artifacts.tar && printf temporal-latest.sqlite3" 2>/dev/null || true)
-if [ "$newest" != "temporal-latest.sqlite3" ]; then
+    "test -s /data/backups/temporal-latest/temporal.sqlite3 && test -s /data/backups/temporal-latest/model-budget.sqlite && test -s /data/backups/temporal-latest/manifest.json && test -s /data/backups/temporal-latest/artifacts.tar && printf temporal-latest" 2>/dev/null || true)
+if [ "$newest" != "temporal-latest" ]; then
     echo "No backup found on the trader volume yet." >&2
     exit 1
 fi
 
-tmp="$dest_dir/.incoming.sqlite3"
-manifest_tmp="$dest_dir/.incoming.manifest.json"
-artifacts_tmp="$dest_dir/.incoming.artifacts.tar"
-rm -f "$tmp"
-rm -f "$manifest_tmp"
-rm -f "$artifacts_tmp"
-flyctl ssh sftp get -a "$app" --process-group trader "/data/backups/$newest" "$tmp"
-flyctl ssh sftp get -a "$app" --process-group trader "/data/backups/temporal-latest.manifest.json" "$manifest_tmp"
-flyctl ssh sftp get -a "$app" --process-group trader "/data/backups/temporal-latest.artifacts.tar" "$artifacts_tmp"
-actual_sha=$(shasum -a 256 "$tmp" | awk '{print $1}')
-expected_sha=$(sed -n 's/.*"database_sha256": "\([0-9a-f]*\)".*/\1/p' "$manifest_tmp")
-actual_artifacts_sha=$(shasum -a 256 "$artifacts_tmp" | awk '{print $1}')
-expected_artifacts_sha=$(sed -n 's/.*"artifacts_archive_sha256": "\([0-9a-f]*\)".*/\1/p' "$manifest_tmp")
-if [ -z "$expected_sha" ] || [ "$actual_sha" != "$expected_sha" ] || \
-   [ -z "$expected_artifacts_sha" ] || [ "$actual_artifacts_sha" != "$expected_artifacts_sha" ]; then
-    echo "Backup manifest does not match database." >&2
+incoming="$dest_dir.incoming-unit"
+incoming_store="$dest_dir.incoming-store"
+incoming_budget="$dest_dir.incoming-budget.sqlite"
+rm -rf "$incoming" "$incoming_store" "$incoming_budget"
+mkdir -p "$incoming"
+flyctl ssh sftp get -a "$app" --process-group trader "/data/backups/$newest/temporal.sqlite3" "$incoming/temporal.sqlite3"
+flyctl ssh sftp get -a "$app" --process-group trader "/data/backups/$newest/model-budget.sqlite" "$incoming/model-budget.sqlite"
+flyctl ssh sftp get -a "$app" --process-group trader "/data/backups/$newest/manifest.json" "$incoming/manifest.json"
+flyctl ssh sftp get -a "$app" --process-group trader "/data/backups/$newest/artifacts.tar" "$incoming/artifacts.tar"
+python3 -m store_backup verify-unit "$incoming"
+python3 -m store_backup restore "$incoming" "$incoming_store" --budget-destination "$incoming_budget"
+
+# Keep the current mirror untouched until the complete incoming unit has been
+# verified and restored.  The old directory remains recoverable if the final
+# local rename fails.
+old="$dest_dir.previous"
+budget_path="$dest_dir/../model-budget.sqlite"
+old_budget="$budget_path.previous"
+rm -rf "$old"
+rm -f "$old_budget"
+if [ -e "$dest_dir/temporal.sqlite3" ]; then
+    mv "$dest_dir" "$old"
+    mkdir -p "$dest_dir"
+fi
+if ! mv "$incoming_store" "$dest_dir"; then
+    [ -e "$old" ] && mv "$old" "$dest_dir"
     exit 1
 fi
-mv "$tmp" "$dest_dir/temporal.sqlite3"
-mv "$manifest_tmp" "$dest_dir/temporal-latest.manifest.json"
-mkdir -p "$dest_dir/artifacts"
-tar -xf "$artifacts_tmp" -C "$dest_dir"
-rm -f "$artifacts_tmp"
-echo "Mirrored $newest -> $dest_dir/temporal.sqlite3 with verified manifest"
+if [ -e "$budget_path" ]; then
+    mv "$budget_path" "$old_budget"
+fi
+if ! mv "$incoming_budget" "$budget_path"; then
+    [ -e "$old_budget" ] && mv "$old_budget" "$budget_path"
+    rm -rf "$dest_dir"
+    [ -e "$old" ] && mv "$old" "$dest_dir"
+    exit 1
+fi
+rm -rf "$old" "$old_budget" "$incoming"
+echo "Mirrored $newest -> $dest_dir with verified manifest and budget ledger"
