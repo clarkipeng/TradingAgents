@@ -494,6 +494,38 @@ class TemporalStore:
             raise KeyError(f"unknown artifact: {content_hash}")
         return (self.artifacts_dir / row["path"]).read_bytes()
 
+    def artifact_reachability_report(self) -> dict[str, Any]:
+        """Return a read-only retention plan rooted in durable records.
+
+        This deliberately does not delete anything. Callers must back up and
+        review this report before reclaiming only the unreferenced artifacts.
+        """
+        references = """
+            SELECT artifact_hash AS content_hash FROM evidence
+            UNION SELECT request_artifact_hash FROM llm_calls
+            UNION SELECT response_artifact_hash FROM llm_calls WHERE response_artifact_hash IS NOT NULL
+            UNION SELECT artifact_hash FROM scenarios
+            UNION SELECT artifact_hash FROM scenario_snapshots
+            UNION SELECT artifact_hash FROM scenario_rubrics
+            UNION SELECT report_artifact_hash FROM research_runs WHERE report_artifact_hash IS NOT NULL
+        """
+        with self._connect() as connection:
+            rows = connection.execute(
+                "SELECT content_hash, byte_length, path, content_hash IN (" + references + ") AS reachable "
+                "FROM artifacts ORDER BY content_hash"
+            ).fetchall()
+        reachable = [row for row in rows if row["reachable"]]
+        unreachable = [row for row in rows if not row["reachable"]]
+        missing = [row["content_hash"] for row in reachable if not (self.artifacts_dir / row["path"]).is_file()]
+        return {
+            "reachable_count": len(reachable),
+            "reachable_bytes": sum(row["byte_length"] for row in reachable),
+            "unreferenced_count": len(unreachable),
+            "unreferenced_bytes": sum(row["byte_length"] for row in unreachable),
+            "unreferenced_hashes": tuple(row["content_hash"] for row in unreachable),
+            "missing_reachable_hashes": tuple(missing),
+        }
+
     def record(
         self,
         tool: str,
