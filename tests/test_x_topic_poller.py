@@ -1596,6 +1596,9 @@ def test_global_only_mode_runs_news_and_bounded_x_without_ticker_sources(
 
     monkeypatch.setenv("X_BEARER_TOKEN", "secret-test-token")
     monkeypatch.setattr(poller, "run_cycle", fake_run_cycle)
+    # This fixture checks CLI source selection. The independently scheduled
+    # shadow sweep has its own tests and must never fetch real providers here.
+    monkeypatch.setattr(poller, "poll_source_shadow_once", lambda *_args: None)
 
     poller.main([
         "--global-only",
