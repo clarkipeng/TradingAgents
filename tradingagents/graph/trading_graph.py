@@ -445,7 +445,10 @@ class TradingAgentsGraph:
             )
             is_historical = (
                 self.config.get("backtest_mode")
-                or (active_temporal is not None and active_temporal.mode is TemporalMode.REPLAY)
+                or (
+                    active_temporal is not None
+                    and active_temporal.mode in (TemporalMode.REPLAY, TemporalMode.FROZEN_EVIDENCE)
+                )
                 or is_scenario_capture
             )
             if not is_historical:

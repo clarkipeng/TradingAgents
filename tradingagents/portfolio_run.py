@@ -551,6 +551,7 @@ def production_day_inputs(store: TemporalStore, *, deep_model: str = "gpt-5.4",
     from tradingagents.default_config import DEFAULT_CONFIG
     from tradingagents.graph.trading_graph import TradingAgentsGraph
     from tradingagents.llm_clients.factory import create_llm_client
+    from tradingagents.temporal import TemporalGateway, current_context
     from tradingagents.temporal_adapters.langchain import LangChainTapeRecorder
 
     config = copy.deepcopy(DEFAULT_CONFIG)
@@ -600,17 +601,25 @@ def production_day_inputs(store: TemporalStore, *, deep_model: str = "gpt-5.4",
             run_id=f"{context.run_id}:research:{ticker}",
         )
         worker_context.model_budget = context.model_budget
-        final_state, _signal = worker_graph().propagate(
-            ticker, context.clock.as_of.date().isoformat(), temporal=worker_context
-        )
-        # A worker tape failure latches only the worker's child context; the
-        # day's parent context must inherit it or a truncated tape could seal
-        # (round-two re-audit, finding 8 parallel escape).
         try:
-            worker_context.ensure_valid()
+            final_state, _signal = worker_graph().propagate(
+                ticker, context.clock.as_of.date().isoformat(), temporal=worker_context
+            )
         except Exception:
+            # A graph that aborts before its callback can mark the child
+            # invalid still cannot be allowed to degrade into a sealed day.
+            # The parent owns the claim and is the only context that can
+            # prevent that outcome.
             context.invalidate()
             raise
+        finally:
+            # ``propagate`` owns the child temporal context. Its callback can
+            # raise before returning, so latch the claim-owning parent in the
+            # finally path rather than only after a successful graph result.
+            try:
+                worker_context.ensure_valid()
+            except TemporalRunInvalidError:
+                context.invalidate()
         reports = {
             key.removesuffix("_report"): final_state.get(key, "")
             for key in ("market_report", "sentiment_report", "news_report", "fundamentals_report")
@@ -635,8 +644,25 @@ def production_day_inputs(store: TemporalStore, *, deep_model: str = "gpt-5.4",
         start = format_timestamp(
             parse_timestamp(f"{day}T00:00:00Z") - timedelta(days=7)
         )[:10]
-        payload = route_to_vendor("get_stock_data", symbol, start, day)
-        return _last_close(payload)
+        context = current_context()
+        if context is None or context.store is None:
+            raise RuntimeError("portfolio quote requires a temporal context")
+        request = {
+            "symbol": symbol,
+            "start": start,
+            "end": day,
+            "series": "close-v1",
+        }
+
+        def fetch_close() -> str | None:
+            payload = route_to_vendor("get_stock_data", symbol, start, day)
+            close = _last_close(payload)
+            return str(close) if close is not None else None
+
+        outcome = TemporalGateway(context.store).invoke(
+            "portfolio.quote.v1", request, context, fetch_close, source="portfolio_quote"
+        )
+        return Decimal(str(outcome.value)) if outcome.value is not None else None
 
     return {"research_fn": research, "complete_llm": complete, "quote_fn": quote}
 
