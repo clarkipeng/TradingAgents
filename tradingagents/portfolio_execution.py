@@ -8,7 +8,7 @@ quote on different, explicit timestamps.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Mapping
 
@@ -47,16 +47,23 @@ class ExecutionTiming:
 
 
 def next_open_timing(decision_ready_at: datetime) -> ExecutionTiming:
-    """Choose the first XNYS opening session strictly after a decision date."""
+    """Choose the first XNYS open strictly after the actual ready instant."""
     if decision_ready_at.tzinfo is None:
         raise ValueError("decision_ready_at must be timezone-aware")
     from tradingagents.research.timeline import _xnys_calendar
 
     ready = decision_ready_at.astimezone(timezone.utc)
     calendar = _xnys_calendar()
-    session = calendar.next_session(ready.date().isoformat())
-    opened = calendar.session_open(session).to_pydatetime().astimezone(timezone.utc)
-    return ExecutionTiming(ready, session.date().isoformat(), opened, opened)
+    # UTC calendar date is not an exchange session decision date: 00:01Z can
+    # still precede that day's New York open. Select by open timestamp, so a
+    # weekend, holiday, and just-after-midnight completion all follow one rule.
+    start = (ready.date() - timedelta(days=7)).isoformat()
+    end = (ready.date() + timedelta(days=14)).isoformat()
+    for session in calendar.sessions_in_range(start, end):
+        opened = calendar.session_open(session).to_pydatetime().astimezone(timezone.utc)
+        if opened > ready:
+            return ExecutionTiming(ready, session.date().isoformat(), opened, opened)
+    raise ValueError("no eligible XNYS opening session in bounded execution window")
 
 
 def execute_next_open_targets(
