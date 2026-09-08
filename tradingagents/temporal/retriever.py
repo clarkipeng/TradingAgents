@@ -41,14 +41,16 @@ class TemporalRetriever:
         """
         for _attempt in range(2):
             generation_before = self.store.active_generation_id() if generation_id is None else generation_id
+            tables_before = self.store.generation_tables(generation_before)
             response = self._search_once(
                 query, as_of=as_of, limit=limit, page=page, date_from=date_from,
                 date_to=date_to, source=source, corpus_hash_pin=corpus_hash_pin,
                 generation_id=generation_before,
             )
-            if self.store.active_generation_id() == generation_before:
+            if (self.store.generation_tables(generation_before) == tables_before
+                    and (generation_id is not None or self.store.active_generation_id() == generation_before)):
                 return response
-        return response
+        raise RuntimeError("retrieval generation changed during read")
 
     def _search_once(
         self, query: str, *, as_of: datetime, limit: int = 10, page: int = 1,

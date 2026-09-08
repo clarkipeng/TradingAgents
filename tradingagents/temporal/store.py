@@ -9,7 +9,7 @@ import re
 import sqlite3
 import threading
 from collections.abc import Iterable, Iterator, Mapping
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -25,14 +25,12 @@ from .models import (
     ScenarioSnapshot,
     SearchManifest,
     SearchTraceRecord,
-    TemporalDocument,
     TemporalSearchResponse,
-    TemporalSearchResult,
     ToolTraceRecord,
     canonical_json,
     request_key,
 )
-from .ranking import RANKER_VERSION, EligibleChunkIndex, build_eligible_index, rank
+from .ranking import EligibleChunkIndex, build_eligible_index
 
 # Long enough to outlast a mirror batch's cluster refresh on a grown corpus
 # (observed live at ~110k documents: >30s per batch cost concurrent graph
@@ -137,7 +135,7 @@ class TemporalStore:
         if hasattr(self._thread_connections, "connection"):
             del self._thread_connections.connection
 
-    def __enter__(self) -> "TemporalStore":
+    def __enter__(self) -> TemporalStore:
         return self
 
     def __exit__(self, exc_type, exc_value, traceback) -> None:
@@ -146,10 +144,8 @@ class TemporalStore:
     def __del__(self) -> None:
         # Tests and short-lived CLI commands often rely on object lifetime;
         # explicit close() remains the production lifecycle boundary.
-        try:
+        with suppress(AttributeError, sqlite3.Error):
             self.close()
-        except (AttributeError, sqlite3.Error):
-            pass
 
     @contextmanager
     def write_lock(self) -> Iterator[None]:
@@ -161,13 +157,12 @@ class TemporalStore:
         """
         self.root.mkdir(parents=True, exist_ok=True)
         lock_path = self.root / "mutator.lock"
-        handle = open(lock_path, "a+")
-        try:
+        with open(lock_path, "a+") as handle:
             fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
-            yield
-        finally:
-            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
-            handle.close()
+            try:
+                yield
+            finally:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
     def active_generation_id(self) -> int:
         """Return the complete document generation currently visible to readers."""
@@ -574,33 +569,40 @@ class TemporalStore:
         and evidence are never age-pruned by this API.
         """
         cutoff = format_timestamp(parse_timestamp(before))
-        protected = tuple(dict.fromkeys(protected_run_ids))
+        protected = set(protected_run_ids)
         with self._connect() as connection:
-            params: list[Any] = [cutoff, *protected]
-            exclusion = ""
-            if protected:
-                exclusion = " AND run_id NOT IN (" + ",".join("?" for _ in protected) + ")"
-            counts = {
-                "llm_calls": connection.execute(
-                    "SELECT COUNT(*) FROM llm_calls WHERE completed_at IS NOT NULL AND completed_at < ?" + exclusion,
-                    params,
-                ).fetchone()[0],
-                "tool_traces": connection.execute(
-                    "SELECT COUNT(*) FROM tool_traces WHERE invoked_at < ?" + exclusion,
-                    params,
-                ).fetchone()[0],
-                "search_traces": connection.execute(
-                    "SELECT COUNT(*) FROM search_traces WHERE invoked_at < ?" + exclusion,
-                    params,
-                ).fetchone()[0],
-            }
+            protected.update(row[0] for row in connection.execute(
+                "SELECT capture_run_id FROM scenarios WHERE capture_run_id IS NOT NULL "
+                "UNION SELECT run_id FROM research_runs"
+            ))
+            for row in connection.execute("SELECT metadata_json FROM scenarios"):
+                manifest = json.loads(row[0]).get("replay_manifest", {})
+                for stream in [*manifest.get("workers", []), manifest.get("cio", {})]:
+                    if stream.get("run_id"):
+                        protected.add(stream["run_id"])
+            # A TEMP table avoids parameter-count limits for retained portfolios
+            # with many child streams, without changing the source database.
+            connection.execute("CREATE TEMP TABLE IF NOT EXISTS retention_roots (run_id TEXT PRIMARY KEY)")
+            connection.execute("DELETE FROM retention_roots")
+            connection.executemany("INSERT INTO retention_roots VALUES (?)", ((key,) for key in sorted(protected)))
+            counts = {}
+            for table, clock, identity in (
+                ("llm_calls", "completed_at", "COALESCE(t.temporal_run_id, t.run_id)"),
+                ("tool_traces", "invoked_at", "t.run_id"),
+                ("search_traces", "invoked_at", "t.run_id"),
+            ):
+                counts[table] = connection.execute(
+                    f"SELECT COUNT(*) FROM {table} t WHERE t.{clock} < ? "
+                    f"AND NOT EXISTS (SELECT 1 FROM retention_roots r WHERE r.run_id = {identity})",
+                    (cutoff,),
+                ).fetchone()[0]
             duplicate_payloads = connection.execute(
                 "SELECT COUNT(*) FROM llm_calls WHERE response_json IS NOT NULL "
                 "AND response_artifact_hash IS NOT NULL"
             ).fetchone()[0]
         return {
             "before": cutoff,
-            "protected_run_ids": protected,
+            "protected_run_ids": tuple(sorted(protected)),
             "candidate_trace_rows": counts,
             "inline_payloads_with_artifacts": duplicate_payloads,
             "artifacts": self.artifact_reachability_report(),
@@ -777,7 +779,16 @@ class TemporalStore:
                 connection.execute(f"INSERT INTO {fts_table}(rowid, body) VALUES (?, ?)", (rowid, body))
 
     def reindex_documents(self) -> int:
-        """Rebuild documents and chunks in a private generation, then atomically publish it."""
+        """Serialize builders without holding the capture/mutation lock."""
+        with (self.root / "index-build.lock").open("a+") as handle:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+            try:
+                return self._reindex_documents()
+            finally:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+    def _reindex_documents(self) -> int:
+        """Build privately, then publish all table names and metadata together."""
         with self._connect() as connection:
             high_water = connection.execute("SELECT COALESCE(MAX(rowid), 0) FROM evidence").fetchone()[0]
             generation = connection.execute(
@@ -786,6 +797,10 @@ class TemporalStore:
         suffix = f"_g{generation}"
         documents_table, chunks_table, fts_table = f"documents{suffix}", f"document_chunks{suffix}", f"document_chunks_fts{suffix}"
         with self._connect() as connection:
+            # A failed private build may leave scratch tables. This builder
+            # owns the unpublished generation and can safely retry it.
+            for table in (fts_table, chunks_table, documents_table):
+                connection.execute(f"DROP TABLE IF EXISTS {table}")
             connection.executescript(f"""
                 CREATE TABLE {documents_table} (
                     doc_key TEXT PRIMARY KEY, parent_evidence_id TEXT NOT NULL, logical_position INTEGER NOT NULL,
@@ -859,18 +874,26 @@ class TemporalStore:
                 "UPDATE temporal_index_generations SET documents_table=?, chunks_table=?, fts_table=? WHERE generation_id=?",
                 (f"documents{old_suffix}", f"document_chunks{old_suffix}", f"document_chunks_fts{old_suffix}", previous_generation),
             )
-            connection.executescript(f"""
-                ALTER TABLE documents RENAME TO documents{old_suffix};
-                ALTER TABLE document_chunks RENAME TO document_chunks{old_suffix};
-                ALTER TABLE document_chunks_fts RENAME TO document_chunks_fts{old_suffix};
-                ALTER TABLE {documents_table} RENAME TO documents;
-                ALTER TABLE {chunks_table} RENAME TO document_chunks;
-                ALTER TABLE {fts_table} RENAME TO document_chunks_fts;
-                INSERT OR REPLACE INTO temporal_index_generations
-                    (generation_id, documents_table, chunks_table, fts_table)
-                    VALUES ({generation}, 'documents', 'document_chunks', 'document_chunks_fts');
-                UPDATE temporal_index_state SET active_generation={generation}, evidence_high_water=(SELECT COALESCE(MAX(rowid), 0) FROM evidence) WHERE singleton=1;
-            """)
+            # executescript() commits its caller's transaction before running
+            # DDL. Execute each statement inside this existing transaction.
+            for old, new in (
+                ("documents", f"documents{old_suffix}"),
+                ("document_chunks", f"document_chunks{old_suffix}"),
+                ("document_chunks_fts", f"document_chunks_fts{old_suffix}"),
+                (documents_table, "documents"),
+                (chunks_table, "document_chunks"),
+                (fts_table, "document_chunks_fts"),
+            ):
+                connection.execute(f"ALTER TABLE {old} RENAME TO {new}")
+            connection.execute(
+                "INSERT OR REPLACE INTO temporal_index_generations "
+                "(generation_id, documents_table, chunks_table, fts_table) "
+                "VALUES (?, 'documents', 'document_chunks', 'document_chunks_fts')", (generation,),
+            )
+            connection.execute(
+                "UPDATE temporal_index_state SET active_generation=?, "
+                "evidence_high_water=(SELECT COALESCE(MAX(rowid), 0) FROM evidence) WHERE singleton=1", (generation,),
+            )
             count = connection.execute("SELECT COUNT(*) FROM documents").fetchone()[0]
         self._eligible_index_cache.clear()
         # Reindex is an explicit maintenance boundary; publish its durable

@@ -42,3 +42,19 @@ def test_real_store_benchmark_does_not_mutate_database(tmp_path):
     result = run_benchmark(bench, tmp_path)
     assert result["queries"][0]["recall"] == 1
     assert database.read_bytes() == before
+
+
+def test_current_store_benchmark_uses_normalized_documents_without_legacy_fts(tmp_path):
+    from datetime import datetime, timezone
+
+    from tradingagents.temporal import TemporalStore
+
+    root = tmp_path / "store"
+    with TemporalStore(root) as store:
+        row = store.record("corpus.document", {"url": "fixture"}, {"text": "alpha signal"}, available_at=datetime(2025, 1, 2, 9, tzinfo=timezone.utc))
+        store.reindex_documents()
+    bench = tmp_path / "bench.json"
+    bench.write_text(json.dumps({"as_of": "2025-01-02T12:00:00Z", "queries": [{"query": "alpha", "expected_document_keys": [row.evidence_id]}]}))
+    before = (root / "temporal.sqlite3").read_bytes()
+    assert run_benchmark(bench, root)["metrics"]["recall@k"] == 1
+    assert (root / "temporal.sqlite3").read_bytes() == before

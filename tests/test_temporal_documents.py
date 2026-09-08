@@ -346,3 +346,23 @@ def test_rubric_still_requires_reindex_for_unmapped_documents(tmp_path):
             material_evidence_ids=(doc.evidence_id,),
             useful_evidence_ids=(doc.evidence_id,),
         )
+
+
+def test_generation_publication_failure_rolls_back_and_can_retry(tmp_path):
+    with TemporalStore(tmp_path) as store:
+        store.record("corpus.document", {"url": "fixture"}, {"text": "alpha"}, available_at=at(9))
+        with store._connect() as connection:
+            def reject_second_rename(action, _database, table, *_args):
+                if action == sqlite3.SQLITE_ALTER_TABLE and table == "document_chunks":
+                    return sqlite3.SQLITE_DENY
+                return sqlite3.SQLITE_OK
+            connection.set_authorizer(reject_second_rename)
+        try:
+            with pytest.raises(sqlite3.DatabaseError):
+                store.reindex_documents()
+        finally:
+            connection.set_authorizer(None)
+        assert store.active_generation_id() == 0
+        assert len(store.search("alpha", as_of=at(10)).results) == 1
+        assert store.reindex_documents() == 1
+        assert store.active_generation_id() == 1
