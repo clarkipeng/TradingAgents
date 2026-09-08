@@ -19,7 +19,6 @@ from pydantic import BaseModel, ConfigDict, PrivateAttr
 
 from tradingagents.temporal import LLMCallRecord, TemporalStore, canonical_json, current_context
 from tradingagents.temporal.retriever import search_payload
-from tradingagents.model_budget import ModelBudgetExceeded
 
 logger = logging.getLogger(__name__)
 
@@ -245,10 +244,14 @@ def _stable_message_dict(message: BaseMessage | dict[str, Any]) -> dict[str, Any
 class LangChainTapeRecorder(BaseCallbackHandler):
     """Record model calls via LangChain callbacks without coupling the temporal core to LangChain."""
 
-    raise_error = False
+    raise_error = True
+    run_inline = True
 
-    def __init__(self, store: TemporalStore):
+    def __init__(self, store: TemporalStore, *, budget_role: str = "research"):
+        if budget_role not in {"research", "cio"}:
+            raise ValueError("invalid model budget role")
         self.store = store
+        self.budget_role = budget_role
 
     def on_chat_model_start(
         self,
@@ -290,6 +293,26 @@ class LangChainTapeRecorder(BaseCallbackHandler):
 
     def on_llm_end(self, response: LLMResult, *, run_id: UUID, **_kwargs: Any) -> None:
         self._finish(run_id, response=_serialize_result(response))
+        context = current_context()
+        if context is None or context.model_budget is None:
+            return
+        usage = (response.llm_output or {}).get("token_usage", {})
+        total = usage.get("total_tokens") if isinstance(usage, dict) else None
+        if not isinstance(total, int) or isinstance(total, bool) or total < 0:
+            counts = [
+                getattr(getattr(generation, "message", None), "usage_metadata", None)
+                for batch in response.generations for generation in batch
+            ]
+            totals = [item.get("total_tokens") if isinstance(item, dict) else None for item in counts]
+            total = sum(totals) if totals and all(isinstance(n, int) and not isinstance(n, bool) and n >= 0 for n in totals) else None
+        # Missing/invalid usage is ambiguous: keep the full original reservation.
+        if total is not None:
+            try:
+                context.model_budget.reconcile(str(run_id), actual_tokens=total)
+            except Exception:
+                context.invalidate()
+                raise
+
 
     def on_llm_error(self, error: BaseException, *, run_id: UUID, **_kwargs: Any) -> None:
         self._finish(
@@ -299,16 +322,25 @@ class LangChainTapeRecorder(BaseCallbackHandler):
 
     def _begin(self, run_id: UUID, request: dict[str, Any]) -> None:
         context = current_context()
+        if context is not None:
+            context.ensure_valid()
         if context is not None and context.model_budget is not None:
-            # Conservative, deterministic preflight.  The reservation itself
-            # is durable and shared by all worker threads for this day.
             try:
+                params = request.get("invocation_params") or {}
+                output_limit = params.get("max_completion_tokens") or params.get("max_tokens")
+                copies = params.get("n", 1)
+                if any(isinstance(n, bool) or not isinstance(n, int) or n <= 0 for n in (output_limit, copies)):
+                    raise ValueError("budgeted models require an explicit positive output token limit")
+                batches = len(request.get("messages") or request.get("prompts") or [None])
+                # UTF-8 bytes plus framing is deliberately conservative; a
+                # chars/4 estimate and no completion allowance under-reserves.
+                estimated = len(canonical_json(request).encode("utf-8")) + batches * (256 + output_limit * copies)
                 context.model_budget.reserve(
-                    str(run_id), estimated_tokens=max(1, len(canonical_json(request)) // 4),
-                    estimated_cost=(max(1, len(canonical_json(request)) // 4)
-                                    * context.model_budget.cost_per_token),
+                    str(run_id), estimated_tokens=estimated,
+                    estimated_cost=context.model_budget.cost_for_tokens(estimated),
+                    role=self.budget_role,
                 )
-            except ModelBudgetExceeded:
+            except Exception:
                 context.invalidate()
                 raise
         try:
@@ -324,6 +356,9 @@ class LangChainTapeRecorder(BaseCallbackHandler):
             if context is not None:
                 context.invalidate()
             logger.warning("failed to persist temporal LLM request; run invalidated")
+            if context is not None and context.model_budget is not None:
+                from tradingagents.temporal import TemporalRunInvalidError
+                raise TemporalRunInvalidError("temporal run is invalid") from None
 
     def _finish(
         self,
