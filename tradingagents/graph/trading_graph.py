@@ -206,6 +206,12 @@ class TradingAgentsGraph:
         if max_retries is not None and max_retries != "":
             kwargs["max_retries"] = _coerce_max_retries(max_retries)
 
+        max_completion_tokens = self.config.get("llm_max_completion_tokens")
+        if max_completion_tokens is not None and max_completion_tokens != "":
+            if isinstance(max_completion_tokens, bool) or int(max_completion_tokens) <= 0:
+                raise ValueError("llm_max_completion_tokens must be a positive integer")
+            kwargs["max_completion_tokens"] = int(max_completion_tokens)
+
         return kwargs
 
     def _create_tool_nodes(self) -> dict[str, ToolNode]:

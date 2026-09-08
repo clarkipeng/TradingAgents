@@ -52,6 +52,8 @@ PORTFOLIO_DAY_POLICY = {
     # Returned usage reconciliation can only refine this reservation; it must
     # never turn a request into an uncharged one.
     "model_cost_per_token": "0.0001",
+    "research_max_completion_tokens": 1_200,
+    "cio_max_completion_tokens": 800,
 }
 MAX_RESEARCH_WORKERS = PORTFOLIO_DAY_POLICY["max_workers"]
 MIN_TICKER_COVERAGE = PORTFOLIO_DAY_POLICY["minimum_ticker_coverage"]
@@ -550,6 +552,10 @@ def production_day_inputs(store: TemporalStore, *, deep_model: str = "gpt-5.4",
         "max_risk_discuss_rounds": 0,
         "analysts_only": True,
         "checkpoint_enabled": False,
+        # Reservation is per provider attempt, so invisible SDK retries would
+        # spend outside it. Bounded completions give the budget a real ceiling.
+        "llm_max_retries": 0,
+        "llm_max_completion_tokens": PORTFOLIO_DAY_POLICY["research_max_completion_tokens"],
     })
     config["temporal"] = {
         **DEFAULT_CONFIG["temporal"],
@@ -567,7 +573,11 @@ def production_day_inputs(store: TemporalStore, *, deep_model: str = "gpt-5.4",
         return workers.graph
     cio_recorder = LangChainTapeRecorder(store)
     cio_model = create_llm_client(
-        "openai", deep_model, callbacks=[cio_recorder]
+        "openai",
+        deep_model,
+        callbacks=[cio_recorder],
+        max_retries=0,
+        max_completion_tokens=PORTFOLIO_DAY_POLICY["cio_max_completion_tokens"],
     ).get_llm()
 
     def research(ticker: str, context) -> dict:
