@@ -12,8 +12,9 @@ import json
 import logging
 import math
 import time
+from csv import DictReader
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal, ROUND_DOWN, localcontext
 from tradingagents.model_budget import DailyModelBudget
 
@@ -656,7 +657,7 @@ def production_day_inputs(store: TemporalStore, *, deep_model: str = "gpt-5.4",
 
         def fetch_close() -> str | None:
             payload = route_to_vendor("get_stock_data", symbol, start, day)
-            close = _last_close(payload)
+            close = _last_close(payload, through=day)
             return str(close) if close is not None else None
 
         outcome = TemporalGateway(context.store).invoke(
@@ -667,25 +668,23 @@ def production_day_inputs(store: TemporalStore, *, deep_model: str = "gpt-5.4",
     return {"research_fn": research, "complete_llm": complete, "quote_fn": quote}
 
 
-def _last_close(payload) -> Decimal | None:
-    """Pull the final Close from a get_stock_data CSV payload, or None."""
+def _last_close(payload, *, through: str | None = None) -> Decimal | None:
+    """Return the latest eligible finite positive Close from provider CSV."""
     if not isinstance(payload, str) or payload.startswith("NO_DATA_AVAILABLE"):
         return None
-    lines = [line for line in payload.strip().splitlines() if "," in line]
-    if len(lines) < 2:
-        return None
-    header = [column.strip().lower() for column in lines[0].split(",")]
-    if "close" not in header:
-        return None
-    index = header.index("close")
-    for line in reversed(lines[1:]):
-        fields = line.split(",")
-        if len(fields) > index:
-            try:
-                return Decimal(fields[index].strip())
-            except Exception:  # noqa: BLE001 - malformed rows are skipped
-                continue
-    return None
+    cutoff = date.fromisoformat(through) if through else None
+    latest: tuple[date, Decimal] | None = None
+    for row in DictReader(payload.strip().splitlines()):
+        try:
+            session = date.fromisoformat(str(row.get("Date", "")).strip()[:10])
+            close = Decimal(str(row.get("Close", "")).strip())
+        except (ArithmeticError, TypeError, ValueError):
+            continue
+        if not close.is_finite() or close <= 0 or (cutoff is not None and session > cutoff):
+            continue
+        if latest is None or session > latest[0]:
+            latest = (session, close)
+    return latest[1] if latest is not None else None
 
 
 def rebalance_orders(
