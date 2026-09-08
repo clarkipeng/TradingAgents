@@ -256,6 +256,7 @@ def _run_portfolio_day(
     fee_bps: float = 1,
     slippage_bps: float = 2,
     run_id: str | None = None,
+    replay_graph_config: dict | None = None,
     _claim_id: str,
 ) -> dict:
     """One sealed portfolio day: sweep, CIO sizing, simulated fills, sealed state.
@@ -513,6 +514,7 @@ def _run_portfolio_day(
         day, _claim_id, as_of=as_of, state=final_state,
         scenario_metadata={"kind": "portfolio-day", "trade_date": day, "tickers": tickers,
                            "retrieval_generation": context.retrieval_generation,
+                           "replay_graph_config": replay_graph_config,
                            "summary": {"coverage": summary["coverage"], "research_call_count": research_calls,
                                        "elapsed_seconds": summary["elapsed_seconds"]},
                            "replay_manifest": replay_manifest},
@@ -713,7 +715,24 @@ def production_day_inputs(store: TemporalStore, *, deep_model: str = "gpt-5.4",
         )
         return Decimal(str(outcome.value)) if outcome.value is not None else None
 
-    return {"research_fn": research, "complete_llm": complete, "quote_fn": quote}
+    replay_graph_config = {
+        key: config[key]
+        for key in (
+            "llm_provider", "deep_think_llm", "quick_think_llm", "max_debate_rounds",
+            "max_risk_discuss_rounds", "analysts_only", "checkpoint_enabled",
+            "llm_max_retries", "llm_max_completion_tokens",
+        )
+    }
+    replay_graph_config["temporal"] = {
+        key: config["temporal"][key]
+        for key in ("mode", "search_enabled", "evidence_brief", "evidence_brief_k", "hacker_news_enabled")
+    }
+    return {
+        "research_fn": research,
+        "complete_llm": complete,
+        "quote_fn": quote,
+        "replay_graph_config": replay_graph_config,
+    }
 
 
 def _last_close(payload, *, through: str | None = None) -> Decimal | None:

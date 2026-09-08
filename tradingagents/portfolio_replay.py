@@ -150,7 +150,9 @@ def replay_production_portfolio_day(
         summary = None
 
     if worker_graph_factory is None:
-        worker_graph_factory = _default_worker_graph_factory()
+        worker_graph_factory = _default_worker_graph_factory(
+            store, scenario.metadata.get("replay_graph_config")
+        )
     if cio_entrypoint is None:
         assert summary is not None
         from tradingagents.portfolio_run import cio_allocate
@@ -164,7 +166,11 @@ def replay_production_portfolio_day(
 
     def worker(ticker: str, source_run_id: str) -> Mapping[str, Any]:
         stream = next(item for item in manifest["workers"] if item["run_id"] == source_run_id)
-        tape = TapeChatModel.from_store(store, source_run_id=source_run_id)
+        # Sentiment first tries structured output then falls back to text;
+        # retain that recorded attempt rather than changing graph control flow.
+        tape = TapeChatModel.from_store(
+            store, source_run_id=source_run_id, structured_output_replay=True
+        )
         context = TemporalContext.at(
             TemporalMode.REPLAY, scenario.as_of, scenario_id=scenario_id,
             store=store, source_run_id=source_run_id,
@@ -176,7 +182,9 @@ def replay_production_portfolio_day(
                 ticker, scenario.metadata["trade_date"], temporal=context
             )
         if tape._cursor != len(tape.calls):
-            raise ValueError("portfolio replay did not consume its complete LLM stream")
+            raise ValueError(
+                f"portfolio replay did not consume its complete LLM stream ({tape._cursor}/{len(tape.calls)})"
+            )
         if len(store.list_tool_traces(context.run_id)) != stream["tool_call_count"]:
             raise ValueError("portfolio replay did not consume its complete tool stream")
         return {
@@ -198,6 +206,7 @@ def replay_production_portfolio_day(
         # parent's ordered tape under the same no-network replay boundary.
         with temporal_context(context):
             result = cio_entrypoint(tape)
+            execution = _replay_execution(store, context, summary, result) if summary is not None else None
         context.ensure_valid()
         if tape._cursor != len(tape.calls):
             raise ValueError("portfolio replay did not consume its complete LLM stream")
@@ -206,12 +215,12 @@ def replay_production_portfolio_day(
         return {
             "result": result, "llm_call_count": stream["llm_call_count"],
             "llm_digest": stream["llm_digest"], "tool_call_count": stream["tool_call_count"],
-            "tool_digest": stream["tool_digest"],
+            "tool_digest": stream["tool_digest"], "execution": execution,
         }
 
     replay = replay_portfolio_day(store, scenario_id, replay_worker=worker, replay_cio=cio)
     if summary is not None:
-        replay["execution"] = _replay_execution(summary, replay["cio"]["result"])
+        replay["execution"] = replay["cio"]["execution"]
     return replay
 
 
@@ -229,7 +238,7 @@ def _portfolio_summary(store: Any, run_id: str) -> Mapping[str, Any]:
     return summary
 
 
-def _default_worker_graph_factory():
+def _default_worker_graph_factory(store: Any, captured_config: Any):
     """Return the production graph shape with only a supplied tape model."""
     import copy
 
@@ -238,23 +247,47 @@ def _default_worker_graph_factory():
 
     config = copy.deepcopy(DEFAULT_CONFIG)
     config.update({
+        "llm_provider": "openai",
         "max_debate_rounds": 0,
         "max_risk_discuss_rounds": 0,
         "analysts_only": True,
         "checkpoint_enabled": False,
         "llm_max_retries": 0,
     })
+    # Tool registration is graph shape. Match capture's temporal surface
+    # exactly; the explicit replay context controls mode and tape selection.
+    config["temporal"] = {
+        **DEFAULT_CONFIG["temporal"],
+        "mode": "live_capture",
+        "store": str(store.root),
+        "search_enabled": True,
+    }
+    if isinstance(captured_config, Mapping):
+        allowed = {
+            "llm_provider", "deep_think_llm", "quick_think_llm", "max_debate_rounds",
+            "max_risk_discuss_rounds", "analysts_only", "checkpoint_enabled",
+            "llm_max_retries", "llm_max_completion_tokens",
+        }
+        config.update({key: value for key, value in captured_config.items() if key in allowed})
+        temporal = captured_config.get("temporal")
+        if isinstance(temporal, Mapping):
+            config["temporal"].update({
+                key: value for key, value in temporal.items()
+                if key in {"mode", "search_enabled", "evidence_brief", "evidence_brief_k", "hacker_news_enabled"}
+            })
+            config["temporal"]["store"] = str(store.root)
     return lambda tape: TradingAgentsGraph(
         config=copy.deepcopy(config), quick_thinking_llm=tape, deep_thinking_llm=tape
     )
 
 
-def _replay_execution(summary: Mapping[str, Any], replayed_plan: Any) -> dict[str, Any]:
+def _replay_execution(store: Any, context: Any, summary: Mapping[str, Any], replayed_plan: Any) -> dict[str, Any]:
     """Recompute the sealed simulator result and reject every divergence."""
     from datetime import datetime, timezone
     from decimal import Decimal
 
     from tradingagents.portfolio_run import rebalance_orders
+    from tradingagents.temporal import TemporalGateway
     from tradingagents.temporal.simulation import MarketQuote, PortfolioSimulator
 
     if canonical_json(replayed_plan) != canonical_json(summary["plan"]):
@@ -262,6 +295,35 @@ def _replay_execution(summary: Mapping[str, Any], replayed_plan: Any) -> dict[st
     execution = summary["execution"]
     submitted_at = datetime.fromisoformat(f"{summary['day']}T21:30:00+00:00").astimezone(timezone.utc)
     quotes = {symbol: Decimal(str(price)) for symbol, price in summary["quotes"].items()}
+    # A captured quote is two temporal operations: the dataflow adapter records
+    # its vendor-neutral stock lookup before the quote gateway records the
+    # derived close.  Preserve that order when replaying the parent stream;
+    # calling only the outer quote would skip an input and desynchronise the
+    # tape.  The inner result is selected strictly by its captured request, and
+    # the outer result is checked against the accounting inputs sealed below.
+    traces = store.list_tool_traces(context.source_run_id)
+    index = 0
+    while index < len(traces):
+        source = traces[index]
+        if source.tool != "dataflow.get_stock_data" or index + 1 >= len(traces):
+            raise ValueError("portfolio replay has an unsupported parent tool stream")
+        inner_evidence = store.get_evidence(source.evidence_id)
+        TemporalGateway(store).invoke(
+            source.tool, inner_evidence.request, context,
+            lambda: (_ for _ in ()).throw(AssertionError("replay contacted market-data provider")),
+        )
+        quote_trace = traces[index + 1]
+        if quote_trace.tool != "portfolio.quote.v1":
+            raise ValueError("portfolio replay quote stream lost its derived quote")
+        quote_evidence = store.get_evidence(quote_trace.evidence_id)
+        outcome = TemporalGateway(store).invoke(
+            quote_trace.tool, quote_evidence.request, context,
+            lambda: (_ for _ in ()).throw(AssertionError("replay contacted quote provider")),
+        )
+        symbol = quote_evidence.request.get("symbol")
+        if not isinstance(symbol, str) or str(outcome.value) != str(quotes.get(symbol)):
+            raise ValueError("portfolio replay quote differs from sealed input")
+        index += 2
     prior = summary["prior_state"]
     simulator = PortfolioSimulator(
         prior["cash"], fee_bps=execution["fee_bps"], slippage_bps=execution["slippage_bps"]

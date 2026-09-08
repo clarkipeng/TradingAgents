@@ -399,6 +399,7 @@ class TapeChatModel(BaseChatModel):
     structured_output_replay: bool = False
     verify_prompts: bool = True
     _cursor: int = PrivateAttr(default=0)
+    _consumed: set[int] = PrivateAttr(default_factory=set)
 
     @property
     def _llm_type(self) -> str:
@@ -458,15 +459,21 @@ class TapeChatModel(BaseChatModel):
         del stop, run_manager
         if self._cursor >= len(self.calls):
             raise TapeMismatchError("LLM tape exhausted")
-        call = self.calls[self._cursor]
+        # LangGraph can schedule independent analyst nodes differently across
+        # otherwise identical executions. Match only an *exact* remaining
+        # prompt, then consume its recorded occurrence; never accept a prefix,
+        # wildcard, or changed prompt merely to accommodate scheduling.
+        index = self._matching_call_index(messages)
+        if index is None:
+            raise TapeMismatchError("LLM prompt mismatch: no remaining tape call matches")
+        call = self.calls[index]
+        self._consumed.add(index)
         self._cursor += 1
         if call.error is not None:
             raise ReplayedLLMError(
                 f"replayed {call.error.get('error_type', 'LLM error')}: "
                 f"{call.error.get('message', '')}"
             )
-        if self.verify_prompts:
-            self._verify_messages(call, messages)
         if call.response is None:
             raise TapeMismatchError(f"LLM tape call {call.call_id} has no response")
         generation = call.response["generations"][0][0]
@@ -478,6 +485,14 @@ class TapeChatModel(BaseChatModel):
         if not isinstance(message, AIMessage):
             raise TapeMismatchError(f"LLM tape call {call.call_id} did not contain an AI response")
         return ChatResult(generations=[ChatGeneration(message=message)])
+
+    def _matching_call_index(self, messages: list[BaseMessage]) -> int | None:
+        for index, call in enumerate(self.calls):
+            if index in self._consumed:
+                continue
+            if not self.verify_prompts or self._messages_match(call, messages):
+                return index
+        return None
 
     def bind_tools(
         self,
@@ -509,8 +524,10 @@ class TapeChatModel(BaseChatModel):
             else:
                 try:
                     payload = json.loads(str(message.content))
-                except json.JSONDecodeError as error:
-                    raise ValueError("recorded structured output has no tool-call payload") from error
+                except json.JSONDecodeError:
+                    # Match the live structured adapter's parse-error contract
+                    # so the analyst performs its recorded free-text fallback.
+                    raise
             if isinstance(schema, type) and issubclass(schema, BaseModel):
                 return schema.model_validate(payload)
             return payload
@@ -519,13 +536,15 @@ class TapeChatModel(BaseChatModel):
 
     @staticmethod
     def _verify_messages(call: LLMCallRecord, messages: list[BaseMessage]) -> None:
+        if not TapeChatModel._messages_match(call, messages):
+            raise TapeMismatchError(f"LLM prompt mismatch at tape call {call.call_id}")
+
+    @staticmethod
+    def _messages_match(call: LLMCallRecord, messages: list[BaseMessage]) -> bool:
         request = call.request
         if request.get("kind") != "chat":
-            raise TapeMismatchError(
-                f"LLM tape call {call.call_id} is {request.get('kind', 'unknown')!r}, not chat"
-            )
+            return False
         expected_batches = request.get("messages") or []
         expected = [_stable_message_dict(message) for message in (expected_batches[0] if expected_batches else [])]
         actual = [_stable_message_dict(message) for message in messages]
-        if canonical_json(expected) != canonical_json(actual):
-            raise TapeMismatchError(f"LLM prompt mismatch at tape call {call.call_id}")
+        return canonical_json(expected) == canonical_json(actual)
