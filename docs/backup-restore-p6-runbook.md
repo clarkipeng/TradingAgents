@@ -4,20 +4,20 @@ The canonical backup is a versioned directory selected by the atomic
 `backups/temporal-latest` symlink. Each unit contains:
 
 - `temporal.sqlite3`, copied with SQLite's backup API;
-- `model-budget.sqlite`, copied with the same API;
+- `model-budget.sqlite` inside the store, copied with the same API;
 - `artifacts.tar`, containing every artifact referenced by the database;
 - `manifest.json`, with database, budget, archive, and per-artifact hashes.
 
-`store_backup.backup_store()` refuses an active mutator lock, missing or
+`tradingagents.store_backup.backup_store()` refuses an active mutator lock, missing or
 corrupt referenced artifact, missing budget ledger, SQLite integrity failure,
 or archive membership mismatch. It publishes only after full verification;
-the prior symlink remains selected on failure. `restore_unit()` verifies the
+the prior symlink remains selected on failure. `tradingagents.store_backup.restore_unit()` verifies the
 unit, rejects absolute/parent-traversal/symlink archive members, restores into
 an empty staging destination, and retains every model reservation—including
 ambiguous calls. Providers are disabled by contract during restore.
 
 The local reader is `scripts/sync_store_down.sh`. It downloads the four unit
-members, runs `python3 -m store_backup verify-unit`, restores to a sibling
+members, runs `python3 -m tradingagents.store_backup verify-unit`, restores to a sibling
 staging directory, and only then replaces the mirror. The previous mirror is
 kept as `<mirror>.previous` until successful completion. Pre-versioned
 `temporal-latest.sqlite3` files are not silently treated as complete units;

@@ -19,24 +19,20 @@ fi
 
 incoming="$dest_dir.incoming-unit"
 incoming_store="$dest_dir.incoming-store"
-incoming_budget="$dest_dir.incoming-budget.sqlite"
-rm -rf "$incoming" "$incoming_store" "$incoming_budget"
+rm -rf "$incoming" "$incoming_store"
 mkdir -p "$incoming"
 flyctl ssh sftp get -a "$app" --process-group trader "/data/backups/$newest/temporal.sqlite3" "$incoming/temporal.sqlite3"
 flyctl ssh sftp get -a "$app" --process-group trader "/data/backups/$newest/model-budget.sqlite" "$incoming/model-budget.sqlite"
 flyctl ssh sftp get -a "$app" --process-group trader "/data/backups/$newest/manifest.json" "$incoming/manifest.json"
 flyctl ssh sftp get -a "$app" --process-group trader "/data/backups/$newest/artifacts.tar" "$incoming/artifacts.tar"
-python3 -m store_backup verify-unit "$incoming"
-python3 -m store_backup restore "$incoming" "$incoming_store" --budget-destination "$incoming_budget"
+python3 -m tradingagents.store_backup verify-unit "$incoming"
+python3 -m tradingagents.store_backup restore "$incoming" "$incoming_store"
 
 # Keep the current mirror untouched until the complete incoming unit has been
 # verified and restored.  The old directory remains recoverable if the final
 # local rename fails.
 old="$dest_dir.previous"
-budget_path="$dest_dir/../model-budget.sqlite"
-old_budget="$budget_path.previous"
 rm -rf "$old"
-rm -f "$old_budget"
 if [ -e "$dest_dir/temporal.sqlite3" ]; then
     mv "$dest_dir" "$old"
     mkdir -p "$dest_dir"
@@ -45,14 +41,5 @@ if ! mv "$incoming_store" "$dest_dir"; then
     [ -e "$old" ] && mv "$old" "$dest_dir"
     exit 1
 fi
-if [ -e "$budget_path" ]; then
-    mv "$budget_path" "$old_budget"
-fi
-if ! mv "$incoming_budget" "$budget_path"; then
-    [ -e "$old_budget" ] && mv "$old_budget" "$budget_path"
-    rm -rf "$dest_dir"
-    [ -e "$old" ] && mv "$old" "$dest_dir"
-    exit 1
-fi
-rm -rf "$old" "$old_budget" "$incoming"
+rm -rf "$old" "$incoming"
 echo "Mirrored $newest -> $dest_dir with verified manifest and budget ledger"
