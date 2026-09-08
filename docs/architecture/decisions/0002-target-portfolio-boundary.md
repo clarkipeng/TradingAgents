@@ -8,6 +8,14 @@ paper-JSON compatibility path described in the original slice was removed with t
 workers. The offline decision runner currently persists validated target weights; it has not yet
 been wired through the canonical `TargetPortfolio` port.
 
+Implementation note (2026-09-07): the production temporal portfolio adapter now persists its
+validated target as an immutable pending decision with the actual evidence cutoff, actual
+decision-ready timestamp, and first eligible XNYS opening session. A separately claimed execution
+consumes raw opening quotes and held-position split/dividend facts, then atomically publishes the
+resulting state. `close-legacy-v1` remains a read/replay policy for existing seals; new CLI runs use
+`next-open-v1`. This is the exercised dictionary adapter for the existing allocator and does not
+introduce a second portfolio domain model.
+
 ## Context
 
 The optimizer returns nested dictionaries whose meaning is understood by research and backtest
