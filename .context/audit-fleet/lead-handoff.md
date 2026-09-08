@@ -53,7 +53,7 @@ Combined candidate proof: 206 passed (`cloud_supervisor`, `poller_window`, portf
 | 28 | Implemented: analysts-only excludes unused memory work. |
 | 29 | Implemented by store: unreachable retrieval removal. |
 | 30 | Implemented by store: duplicate trace indexes removed. |
-| 31 | Remaining P4: retention/reachability and artifact backfill. |
+| 31 | Partial P4: read-only seal-rooted artifact reachability report landed; artifact backfill and authorized cleanup remain. |
 | 32 | Implemented by ops: compatible timeout handling. |
 | 33 | Implemented by ops: durable schedule retention. |
 | C1 | Implemented: live capture timestamps use observation time. |
@@ -86,6 +86,7 @@ reconciled and archived after its corrective slice landed.
 | `69042fb` | Captured instrument context is recorded for portfolio workers and reused verbatim by graph replay, preventing mutable identity lookup from changing strict prompts. | `test_temporal_full_trace_replay.py test_portfolio_run.py test_portfolio_lifecycle.py test_portfolio_replay.py` — 28 passed. |
 | `d24fad5` | Legacy corpus-hash bytes are streamed from SQLite instead of materializing the full canonical ID payload. | `test_ranking_equivalence.py test_temporal_core.py test_temporal_evaluation.py` — 29 passed. |
 | `e59d984` | Reuses bounded immutable OHLCV disk vintages within a process without sharing mutable frames. | `test_ohlcv_cache_freshness.py test_no_data_handling.py test_date_boundaries.py test_stockstats_date_column.py` — 20 passed. |
+| `5390cf1` | Produces a non-destructive artifact reachability/missing-byte retention report rooted in evidence, tapes, seals, and research runs. | `test_temporal_retention.py test_temporal_core.py` — 12 passed. |
 
 The Sol reviewer was `c9836aea-6030-4b3b-86e1-75c8af909039`, session
 `28867288-0080-4d9d-903a-9cd04a2742a3`, branch `cdt/c983-ta-sol-review`.
