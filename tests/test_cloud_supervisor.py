@@ -9,6 +9,7 @@ space.
 from __future__ import annotations
 
 import sqlite3
+import json
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -23,6 +24,7 @@ from tradingagents.cloud_supervisor import (
     build_jobs,
     due_jobs,
     universe_tickers,
+    verify_local_p6_evidence,
 )
 
 
@@ -55,6 +57,23 @@ def test_empty_universe_refuses(tmp_path: Path) -> None:
     empty.write_text("# nothing\n")
     with pytest.raises(ValueError):
         universe_tickers(empty)
+
+
+def test_p6_gate_refuses_without_complete_local_observations(tmp_path: Path) -> None:
+    evidence = tmp_path / "p6.json"
+    evidence.write_text(json.dumps({"preflight": "passed"}))
+    result = verify_local_p6_evidence(evidence)
+    assert (result.status, result.code) == ("failed", "evidence_incomplete")
+
+
+def test_p6_gate_accepts_only_fixed_local_proof(tmp_path: Path) -> None:
+    evidence = tmp_path / "p6.json"
+    evidence.write_text(json.dumps({
+        "preflight": "passed", "cutover": "verified", "rollback": "verified",
+        "backup_restore": "verified", "providers": "disabled", "observed_at": "fixture",
+    }))
+    result = verify_local_p6_evidence(evidence)
+    assert (result.status, result.code) == ("completed", "p6_local_gate_verified")
 
 
 def test_slot_fires_once_within_grace(env: dict[str, str]) -> None:
@@ -105,20 +124,30 @@ def test_media_import_spans_slot_yesterday_to_slot_day(env: dict[str, str]) -> N
     assert argv[argv.index("--media-db-url") + 1] == env["MEDIA_DB_URL"]
 
 
-def test_backup_is_a_single_overwritten_slot(tmp_path: Path) -> None:
+def test_backup_is_one_atomic_unit_with_budget_and_artifact_membership(tmp_path: Path) -> None:
     """One slot only: rotating full multi-GB copies filled the volume."""
     store_dir = tmp_path / "temporal"
     store_dir.mkdir()
     db = store_dir / "temporal.sqlite3"
     conn = sqlite3.connect(db)
     conn.execute("CREATE TABLE t (v TEXT)")
+    conn.execute("CREATE TABLE artifacts (content_hash TEXT, path TEXT, byte_length INTEGER)")
     conn.execute("INSERT INTO t VALUES ('first')")
+    import hashlib
+    artifact = store_dir / "artifacts" / "aa" / "fixture"
+    artifact.parent.mkdir(parents=True)
+    artifact.write_bytes(b"fixture")
+    conn.execute("INSERT INTO artifacts VALUES (?, ?, ?)", (hashlib.sha256(b"fixture").hexdigest(), "artifacts/aa/fixture", 7))
     conn.commit()
     conn.close()
+    budget_conn = sqlite3.connect(store_dir.parent / "model-budget.sqlite")
+    budget_conn.execute("CREATE TABLE model_reservations (day TEXT, call_id TEXT, tokens INTEGER, cost TEXT, PRIMARY KEY(day, call_id))")
+    budget_conn.commit()
+    budget_conn.close()
 
     backups = tmp_path / "backups"
     target = backup_store(store_dir, backups)
-    assert target == backups / "temporal-latest.sqlite3"
+    assert target == backups / "temporal-latest" / "temporal.sqlite3"
     copy = sqlite3.connect(target)
     assert copy.execute("SELECT v FROM t").fetchall() == [("first",)]
     copy.close()
@@ -128,10 +157,11 @@ def test_backup_is_a_single_overwritten_slot(tmp_path: Path) -> None:
     conn.commit()
     conn.close()
     backup_store(store_dir, backups)
-    copy = sqlite3.connect(backups / "temporal-latest.sqlite3")
+    copy = sqlite3.connect(backups / "temporal-latest" / "temporal.sqlite3")
     assert copy.execute("SELECT v FROM t").fetchall() == [("second",)]
     copy.close()
-    assert sorted(p.name for p in backups.iterdir()) == ["temporal-latest.sqlite3"]
+    assert (backups / "temporal-latest" / "model-budget.sqlite").is_file()
+    assert (backups / "temporal-latest" / "manifest.json").is_file()
 
 
 def test_poller_child_pins_stores_to_the_local_volume(env: dict[str, str]) -> None:
