@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from decimal import Decimal
+from threading import Event, Thread
 from uuid import uuid4
 
 import pytest
@@ -306,6 +307,37 @@ def test_run_portfolio_day_skips_without_sealing_when_all_quotes_are_missing(tmp
     assert result["failures"] == ["NVDA: no quote"]
     assert "all quotes missing" in caplog.text
     assert store.get_scenario("portfolio-2026-08-31") is None
+
+
+@pytest.mark.unit
+def test_portfolio_chain_lock_rejects_concurrent_different_dates_before_research(tmp_path):
+    store = TemporalStore(tmp_path)
+    entered, release = Event(), Event()
+
+    def slow_research(_ticker, _context):
+        entered.set()
+        assert release.wait(5)
+        return {"rating": "Hold", "brief": "fixture"}
+
+    first = Thread(
+        target=lambda: portfolio_run.run_portfolio_day(
+            store, ["NVDA"], day="2026-08-31", research_fn=slow_research,
+            complete_llm=lambda _prompt: "{}", quote_fn=lambda *_args: Decimal("100"),
+        )
+    )
+    first.start()
+    assert entered.wait(5)
+    second = portfolio_run.run_portfolio_day(
+        store, ["MSFT"], day="2026-09-01",
+        research_fn=lambda *_args: pytest.fail("contended day began research"),
+        complete_llm=lambda _prompt: pytest.fail("contended day invoked CIO"),
+        quote_fn=lambda *_args: pytest.fail("contended day fetched quotes"),
+    )
+    assert second["reason"] == "ownership_contended"
+    assert store.portfolio_day("2026-09-01") is None
+    release.set()
+    first.join(timeout=5)
+    assert not first.is_alive()
 
 
 @pytest.mark.unit

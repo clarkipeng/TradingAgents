@@ -14,6 +14,7 @@ import math
 import time
 from csv import DictReader
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import contextmanager
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal, ROUND_DOWN, localcontext
 from tradingagents.model_budget import DailyModelBudget
@@ -193,25 +194,52 @@ def run_portfolio_day(store: TemporalStore, tickers: list[str], **kwargs) -> dic
     """Claim, execute, and atomically complete one portfolio day."""
     import uuid
     day = kwargs["day"]
-    if store.get_scenario(f"portfolio-{day}") is not None:
-        return {"skipped": "day already sealed", "scenario_id": f"portfolio-{day}", "day": day}
-    claim_id = kwargs.pop("claim_id", None) or str(uuid.uuid4())
-    claim = store.claim_portfolio_day(day, claim_id, claimed_at=datetime.now(timezone.utc))
-    if claim["status"] == "completed":
-        return {"skipped": "day already completed", "scenario_id": f"portfolio-{day}", "day": day}
-    if claim["claim_id"] != claim_id:
-        return {"skipped": "day already claimed", "scenario_id": f"portfolio-{day}", "day": day}
+    # Durable per-day claims prevent duplicate commits.  This separate lock
+    # prevents *different* dates from overlapping their predecessor reads,
+    # research spend, and state writes.
+    with _portfolio_chain_lock(store) as owns_chain:
+        if not owns_chain:
+            return {"status": "failed_unsealed", "reason": "ownership_contended", "scenario_id": f"portfolio-{day}", "day": day}
+        if store.get_scenario(f"portfolio-{day}") is not None:
+            return {"skipped": "day already sealed", "scenario_id": f"portfolio-{day}", "day": day}
+        claim_id = kwargs.pop("claim_id", None) or str(uuid.uuid4())
+        claim = store.claim_portfolio_day(day, claim_id, claimed_at=datetime.now(timezone.utc))
+        if claim["status"] == "completed":
+            return {"skipped": "day already completed", "scenario_id": f"portfolio-{day}", "day": day}
+        if claim["claim_id"] != claim_id:
+            return {"skipped": "day already claimed", "scenario_id": f"portfolio-{day}", "day": day}
+        try:
+            result = _run_portfolio_day(store, tickers, _claim_id=claim_id, **kwargs)
+            if result.get("status") == "failed_unsealed":
+                store.fail_portfolio_day(day, claim_id, result["reason"])
+            return result
+        except TemporalRunInvalidError:
+            store.fail_portfolio_day(day, claim_id, "temporal_run_invalid")
+            raise
+        except Exception:  # noqa: BLE001 - failure is the recovery boundary
+            store.fail_portfolio_day(day, claim_id, "execution_error")
+            return {"status": "failed_unsealed", "reason": "execution_error", "scenario_id": f"portfolio-{day}", "day": day}
+
+
+@contextmanager
+def _portfolio_chain_lock(store: TemporalStore):
+    """Acquire the process-wide portfolio owner lock without blocking work."""
+    import fcntl
+
+    lock_path = store.root / "portfolio-chain.lock"
+    handle = lock_path.open("a+")
     try:
-        result = _run_portfolio_day(store, tickers, _claim_id=claim_id, **kwargs)
-        if result.get("status") == "failed_unsealed":
-            store.fail_portfolio_day(day, claim_id, result["reason"])
-        return result
-    except TemporalRunInvalidError:
-        store.fail_portfolio_day(day, claim_id, "temporal_run_invalid")
-        raise
-    except Exception:  # noqa: BLE001 - failure is the recovery boundary
-        store.fail_portfolio_day(day, claim_id, "execution_error")
-        return {"status": "failed_unsealed", "reason": "execution_error", "scenario_id": f"portfolio-{day}", "day": day}
+        try:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            yield False
+        else:
+            yield True
+    finally:
+        try:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+        finally:
+            handle.close()
 
 
 def _run_portfolio_day(
