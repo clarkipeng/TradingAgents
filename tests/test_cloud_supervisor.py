@@ -9,7 +9,6 @@ space.
 from __future__ import annotations
 
 import sqlite3
-import json
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -24,7 +23,6 @@ from tradingagents.cloud_supervisor import (
     build_jobs,
     due_jobs,
     universe_tickers,
-    verify_local_p6_evidence,
 )
 
 
@@ -59,21 +57,8 @@ def test_empty_universe_refuses(tmp_path: Path) -> None:
         universe_tickers(empty)
 
 
-def test_p6_gate_refuses_without_complete_local_observations(tmp_path: Path) -> None:
-    evidence = tmp_path / "p6.json"
-    evidence.write_text(json.dumps({"preflight": "passed"}))
-    result = verify_local_p6_evidence(evidence)
-    assert (result.status, result.code) == ("failed", "evidence_incomplete")
 
 
-def test_p6_gate_accepts_only_fixed_local_proof(tmp_path: Path) -> None:
-    evidence = tmp_path / "p6.json"
-    evidence.write_text(json.dumps({
-        "preflight": "passed", "cutover": "verified", "rollback": "verified",
-        "backup_restore": "verified", "providers": "disabled", "observed_at": "fixture",
-    }))
-    result = verify_local_p6_evidence(evidence)
-    assert (result.status, result.code) == ("completed", "p6_local_gate_verified")
 
 
 def test_slot_fires_once_within_grace(env: dict[str, str]) -> None:

@@ -14,13 +14,14 @@ second claim, imports and discovery re-run for free, and backups overwrite.
 
 from __future__ import annotations
 
+import json
 import os
 import signal
-import json
 import subprocess
 import sys
 import time
 from collections.abc import Callable, Mapping
+from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -55,30 +56,6 @@ class JobResult:
         return self.status == "completed"
 
 
-def verify_local_p6_evidence(path: Path) -> JobResult:
-    """Fail closed unless local cutover, rollback, and restore proof exists.
-
-    This is deliberately an evidence reader, not a deployment driver.  It
-    cannot turn an absent observation into permission to mutate production.
-    """
-    try:
-        evidence = json.loads(Path(path).read_text())
-    except (OSError, json.JSONDecodeError):
-        return JobResult("failed", "evidence_unavailable")
-    if not isinstance(evidence, dict):
-        return JobResult("failed", "evidence_invalid")
-    required = {
-        "preflight": "passed",
-        "cutover": "verified",
-        "rollback": "verified",
-        "backup_restore": "verified",
-        "providers": "disabled",
-    }
-    if any(evidence.get(key) != value for key, value in required.items()):
-        return JobResult("failed", "evidence_incomplete")
-    if not isinstance(evidence.get("observed_at"), str) or not evidence["observed_at"]:
-        return JobResult("failed", "evidence_timestamp_missing")
-    return JobResult("completed", "p6_local_gate_verified")
 
 
 class ScheduleLedger:
@@ -136,17 +113,13 @@ def _stop_process_group(process: subprocess.Popen, *, grace: float = CHILD_STOP_
     if process.poll() is not None:
         process.wait()
         return
-    try:
+    with suppress(ProcessLookupError):
         os.killpg(process.pid, signal.SIGTERM)
-    except ProcessLookupError:
-        pass
     try:
         process.wait(timeout=grace)
     except subprocess.TimeoutExpired:
-        try:
+        with suppress(ProcessLookupError):
             os.killpg(process.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
         process.wait()
 
 

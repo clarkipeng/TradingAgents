@@ -8,18 +8,19 @@ containing SQLite snapshots, a referenced-artifact tar, and a manifest.  The
 from __future__ import annotations
 
 import argparse
+import fcntl
 import hashlib
 import json
 import os
+import re
 import shutil
 import sqlite3
 import tarfile
 import tempfile
 import uuid
 from collections.abc import Iterable
+from contextlib import ExitStack, contextmanager
 from pathlib import Path
-
-import fcntl
 
 UNIT_NAME = "temporal-latest"
 MANIFEST_NAME = "manifest.json"
@@ -31,6 +32,27 @@ SCHEMA_VERSION = 2
 
 class BackupError(RuntimeError):
     """A backup/restore gate refused an unsafe or incomplete operation."""
+
+
+@contextmanager
+def _exclusive_lock(path: Path):
+    with path.open("a+") as handle:
+        try:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise BackupError("active_writer") from exc
+        try:
+            yield
+        finally:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
+def _sync_path(path: Path) -> None:
+    descriptor = os.open(path, os.O_RDONLY)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
 
 
 def _sha256(path: Path) -> str:
@@ -55,6 +77,7 @@ def _sqlite_snapshot(source: Path, target: Path) -> None:
     target_db = sqlite3.connect(target)
     try:
         source_db.backup(target_db, pages=256, sleep=0.05)
+        target_db.execute("PRAGMA journal_mode=DELETE")
         result = target_db.execute("PRAGMA integrity_check").fetchone()
         if not result or result[0] != "ok":
             raise BackupError("sqlite integrity check failed")
@@ -120,23 +143,35 @@ def _manifest(unit: Path) -> dict[str, object]:
 
 def verify_unit(unit: Path) -> dict[str, object]:
     """Verify unit hashes, SQLite integrity, and artifact membership."""
+    unit = Path(unit).resolve(strict=True)
     payload = _manifest(unit)
     for name in (DATABASE_NAME, BUDGET_NAME):
         connection = sqlite3.connect(f"file:{unit / name}?mode=ro", uri=True)
         try:
             result = connection.execute("PRAGMA integrity_check").fetchone()
-            if not result or result[0] != "ok":
+            if not result or result[0] != "ok" or connection.execute("PRAGMA foreign_key_check").fetchone():
                 raise BackupError("backup sqlite integrity failed")
         finally:
             connection.close()
+    expected_members = _catalog_members(unit / DATABASE_NAME)
+    catalog = {str(item["path"]): item for item in expected_members}
     with tarfile.open(unit / ARTIFACTS_NAME, "r") as archive:
         names = []
         for item in archive.getmembers():
             relative = _safe_relative(item.name)
             if item.islnk() or item.issym() or not item.isfile():
                 raise BackupError("backup archive contains unsafe member")
-            names.append(relative.as_posix())
-    expected_members = _catalog_members(unit / DATABASE_NAME)
+            name = relative.as_posix()
+            expected_member = catalog.get(name)
+            if expected_member is None or item.size != expected_member["byte_length"]:
+                raise BackupError("backup artifact membership mismatch")
+            digest = hashlib.sha256()
+            with archive.extractfile(item) as source:
+                for block in iter(lambda: source.read(1024 * 1024), b""):
+                    digest.update(block)
+            if digest.hexdigest() != expected_member["sha256"]:
+                raise BackupError("backup artifact hash failed")
+            names.append(name)
     if expected_members != payload.get("artifacts", []):
         raise BackupError("backup catalog membership mismatch")
     expected = sorted(str(item["path"]) for item in expected_members)
@@ -155,20 +190,16 @@ def backup_store(store_dir: Path, backup_dir: Path, *, budget_path: Path | None 
     backup_dir = Path(backup_dir)
     database = store_dir / DATABASE_NAME
     budget = Path(budget_path) if budget_path else store_dir / BUDGET_NAME
-    lock_path = store_dir / "mutator.lock"
     backup_dir.mkdir(parents=True, exist_ok=True)
-    lock = lock_path.open("a+")
-    try:
-        try:
-            fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError as exc:
-            raise BackupError("active_writer") from exc
-        members = _artifact_members(store_dir, database)
+    with ExitStack() as locks:
+        for name in ("mutator.lock", "portfolio-chain.lock"):
+            locks.enter_context(_exclusive_lock(store_dir / name))
         incoming = backup_dir / f".{UNIT_NAME}.{uuid.uuid4().hex}.partial"
         incoming.mkdir()
         try:
             _sqlite_snapshot(database, incoming / DATABASE_NAME)
             _sqlite_snapshot(budget, incoming / BUDGET_NAME)
+            members = _artifact_members(store_dir, incoming / DATABASE_NAME)
             _write_artifact_archive(store_dir, incoming / ARTIFACTS_NAME, members)
             manifest = {
                 "schema_version": SCHEMA_VERSION,
@@ -182,28 +213,30 @@ def backup_store(store_dir: Path, backup_dir: Path, *, budget_path: Path | None 
             }
             (incoming / MANIFEST_NAME).write_text(json.dumps(manifest, sort_keys=True) + "\n")
             verify_unit(incoming)
+            for item in incoming.iterdir():
+                _sync_path(item)
+            _sync_path(incoming)
             published = backup_dir / f"unit-{uuid.uuid4().hex}"
             incoming.replace(published)
             latest_tmp = backup_dir / f".{UNIT_NAME}.{uuid.uuid4().hex}.link"
             latest_tmp.symlink_to(published.name)
             os.replace(latest_tmp, backup_dir / UNIT_NAME)
+            _sync_path(backup_dir)
             for prior in backup_dir.glob("unit-*"):
-                if prior != published:
+                if prior != published and re.fullmatch(r"unit-[0-9a-f]{32}", prior.name):
                     shutil.rmtree(prior, ignore_errors=True)
             return backup_dir / UNIT_NAME / DATABASE_NAME
         except BaseException:
             shutil.rmtree(incoming, ignore_errors=True)
             raise
-    finally:
-        fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
-        lock.close()
 
 
 def restore_unit(unit: Path, destination: Path, *, providers_disabled: bool = True) -> Path:
     """Restore a verified unit into an empty destination via a staging dir."""
     if not providers_disabled:
         raise BackupError("providers_disabled_required")
-    payload = verify_unit(Path(unit))
+    unit = Path(unit).resolve(strict=True)
+    payload = verify_unit(unit)
     destination = Path(destination)
     if destination.exists() and any(destination.iterdir()):
         raise BackupError("restore_destination_not_empty")
@@ -224,6 +257,15 @@ def restore_unit(unit: Path, destination: Path, *, providers_disabled: bool = Tr
             path = staging / _safe_relative(str(item["path"]))
             if _sha256(path) != item["sha256"]:
                 raise BackupError("restored artifact hash failed")
+        # Flush the complete restored tree before replacing its directory.
+        directories = [staging]
+        for item in staging.rglob("*"):
+            if item.is_file():
+                _sync_path(item)
+            elif item.is_dir():
+                directories.append(item)
+        for directory in sorted(directories, key=lambda item: len(item.parts), reverse=True):
+            _sync_path(directory)
         if destination.exists():
             destination.rmdir()
         staging.rename(destination)
@@ -231,6 +273,34 @@ def restore_unit(unit: Path, destination: Path, *, providers_disabled: bool = Tr
     except BaseException:
         shutil.rmtree(staging, ignore_errors=True)
         raise
+
+
+def install_mirror(unit: Path, destination: Path) -> Path:
+    """Replace a mirror under one owner, preserving recovery across a rename."""
+    destination = Path(destination)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    previous = destination.with_name(destination.name + ".previous")
+    with _exclusive_lock(destination.with_name("." + destination.name + ".sync.lock")):
+        # Recover the only gap between the two directory renames if a prior
+        # process stopped there. Never discard that last complete mirror.
+        if previous.exists() and not destination.exists():
+            previous.rename(destination)
+        with tempfile.TemporaryDirectory(prefix=".mirror-", dir=destination.parent) as scratch:
+            restored = restore_unit(unit, Path(scratch) / "store")
+            if previous.exists():
+                shutil.rmtree(previous)
+            if destination.exists():
+                destination.rename(previous)
+            try:
+                restored.rename(destination)
+                _sync_path(destination.parent)
+            except OSError:
+                if previous.exists() and not destination.exists():
+                    previous.rename(destination)
+                raise
+            if previous.exists():
+                shutil.rmtree(previous)
+    return destination
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -241,11 +311,20 @@ def main(argv: list[str] | None = None) -> int:
     restore = sub.add_parser("restore")
     restore.add_argument("unit", type=Path)
     restore.add_argument("destination", type=Path)
+    mirror = sub.add_parser("mirror")
+    mirror.add_argument("unit", type=Path)
+    mirror.add_argument("destination", type=Path)
     args = parser.parse_args(argv)
-    if args.command == "verify-unit":
-        verify_unit(args.unit)
-    else:
-        restore_unit(args.unit, args.destination)
+    try:
+        if args.command == "verify-unit":
+            verify_unit(args.unit)
+        elif args.command == "mirror":
+            install_mirror(args.unit, args.destination)
+        else:
+            restore_unit(args.unit, args.destination)
+    except (BackupError, OSError, ValueError, sqlite3.Error, tarfile.TarError):
+        print("backup_operation_failed")
+        return 1
     print("ok")
     return 0
 
