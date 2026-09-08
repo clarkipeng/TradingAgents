@@ -9,7 +9,14 @@ from tradingagents.portfolio_replay import (
     stream_digest,
     validate_portfolio_replay_manifest,
 )
-from tradingagents.temporal import TemporalStore
+from tradingagents.temporal import (
+    TemporalContext,
+    TemporalGateway,
+    TemporalMode,
+    TemporalStore,
+    current_context,
+    temporal_context,
+)
 
 
 def test_portfolio_manifest_names_independent_worker_streams(tmp_path):
@@ -102,3 +109,31 @@ def test_production_portfolio_replay_calls_each_named_worker_graph_offline(tmp_p
 
     assert [item[:2] for item in seen] == [("MSFT", "2026-09-06"), ("NVDA", "2026-09-06")]
     assert [item["ticker"] for item in replay["workers"]] == ["MSFT", "NVDA"]
+
+
+def test_production_portfolio_replay_scopes_cio_tools_to_parent_tape(tmp_path):
+    store = TemporalStore(tmp_path)
+    observed = datetime(2026, 9, 6, tzinfo=timezone.utc)
+    capture = TemporalContext.at(TemporalMode.LIVE_CAPTURE, observed, store=store, run_id="day-1")
+    with temporal_context(capture):
+        TemporalGateway(store).invoke(
+            "cio.fixture", {"kind": "coverage"}, capture, lambda: {"captured": True}
+        )
+    manifest = build_portfolio_replay_manifest(store, parent_run_id="day-1", tickers=[])
+    store.seal_scenario(
+        "portfolio-2026-09-06", as_of=observed, basis="forward-captured",
+        metadata={"trade_date": "2026-09-06", "replay_manifest": manifest},
+    )
+
+    def cio(_tape):
+        context = current_context()
+        assert context is not None
+        return TemporalGateway(store).invoke(
+            "cio.fixture", {"kind": "coverage"}, context,
+            lambda: (_ for _ in ()).throw(AssertionError("replay contacted provider")),
+        ).value
+
+    replay = replay_production_portfolio_day(
+        store, "portfolio-2026-09-06", worker_graph_factory=lambda _tape: None, cio_entrypoint=cio
+    )
+    assert replay["cio"]["result"] == {"captured": True}
