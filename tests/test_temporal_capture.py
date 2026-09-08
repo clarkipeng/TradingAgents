@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from tradingagents.dataflows import hacker_news, interface, reddit, stocktwits
 from tradingagents.dataflows.config import set_config
@@ -39,33 +39,36 @@ def test_daily_capture_uses_existing_router_and_continues_after_a_failure(tmp_pa
         ],
     )
     store = TemporalStore(tmp_path)
+    captured_at = datetime.now(UTC)
 
     result = capture_daily_market_research(
         store,
         ["NVDA"],
-        now=datetime(2025, 1, 2, 16, tzinfo=UTC),
+        now=captured_at,
     )
 
     assert result.attempted == 5
     assert result.completed == 4
     assert result.failures == ("NVDA:get_news:ValueError",)
-    assert result.start_date == "2024-12-26"
-    assert result.end_date == "2025-01-02"
+    assert result.start_date == (captured_at - timedelta(days=7)).date().isoformat()
+    assert result.end_date == captured_at.date().isoformat()
     assert result.run_id
     prices = store.latest_eligible(
         "dataflow.get_stock_data",
-        {"args": ["NVDA", "2024-12-26", "2025-01-02"], "kwargs": {}},
+        {"args": ["NVDA", result.start_date, result.end_date], "kwargs": {}},
         as_of=datetime.now(UTC),
     )
     news = store.latest_eligible(
         "dataflow.get_news",
-        {"args": ["NVDA", "2024-12-26", "2025-01-02"], "kwargs": {}},
+        {"args": ["NVDA", result.start_date, result.end_date], "kwargs": {}},
         as_of=datetime.now(UTC),
     )
     assert prices is not None and prices.response == "prices"
-    assert prices.available_at == datetime(2025, 1, 2, 16, tzinfo=UTC)
+    # A virtual backtest clock selects evidence; it must not rewrite the
+    # wall-clock observation time of this forward capture.
+    assert prices.available_at >= captured_at
     assert news is not None and news.is_error is True
-    assert news.available_at == datetime(2025, 1, 2, 16, tzinfo=UTC)
+    assert news.available_at >= captured_at
     assert store.latest_eligible(
         "social.stocktwits", {"ticker": "NVDA", "limit": 30}, as_of=datetime.now(UTC)
     ).response == "stocktwits"
@@ -77,7 +80,7 @@ def test_daily_capture_uses_existing_router_and_continues_after_a_failure(tmp_pa
     assert store.latest_eligible(
         "social.hackernews", {"feed": "top", "limit": 8}, as_of=datetime.now(UTC)
     ).response[0]["external_id"] == "hn_123"
-    document = store.search("NVIDIA", as_of=datetime(2025, 1, 2, 16, tzinfo=UTC)).results[0]
+    document = store.search("NVIDIA", as_of=result.captured_at).results[0]
     assert document.evidence.tool == "corpus.document"
     assert document.evidence.response["metadata"]["parent_artifact_hash"]
 

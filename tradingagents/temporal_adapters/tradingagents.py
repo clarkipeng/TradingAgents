@@ -135,7 +135,9 @@ def capture_daily_market_research(
         else:
             completed += 1
 
-    with temporal_context(context), store.write_lock():
+    # Each temporal write owns a short transaction. Provider calls must never
+    # hold the store-wide mutation lock or block the generation publisher.
+    with temporal_context(context):
         for ticker in tickers:
             captures = (
                 (
@@ -188,11 +190,12 @@ def capture_daily_market_research(
                     "top", captured_at.timestamp(), limit=8
                 ),
             )
+            observed_at = datetime.now(timezone.utc)
             _record_hacker_news_documents(
                 store,
                 rows=hacker_news_rows,
                 request=hacker_news_request,
-                captured_at=captured_at,
+                captured_at=observed_at,
             )
         record_capture("global", "hacker_news", capture_hacker_news)
         if full_surface:
@@ -204,12 +207,19 @@ def capture_daily_market_research(
                 ("get_prediction_markets", lambda: route_to_vendor("get_prediction_markets", "US equities", 6)),
             ):
                 record_capture("global", name, call)
+    # Evidence ingested after the first published generation is deliberately
+    # not spliced into that immutable reader view. Publish a new generation at
+    # the capture boundary so subsequent research sees this complete capture.
+    store.reindex_documents()
+    # Research must be cut off after the captures it is allowed to consume;
+    # the caller-provided start time is not an observation timestamp.
+    decision_ready_at = datetime.now(timezone.utc)
     return DailyCaptureResult(
         attempted=attempted,
         completed=completed,
         failures=tuple(failures),
         run_id=context.run_id or "",
-        captured_at=context.clock.as_of,
+        captured_at=decision_ready_at,
         start_date=start_date,
         end_date=end_date,
     )
