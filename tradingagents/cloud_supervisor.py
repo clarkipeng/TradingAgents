@@ -179,6 +179,7 @@ class ScheduledJob:
     # Receives the slot's local date so date-parameterized jobs label
     # themselves with the slot they fire for, not the wall clock at exec time.
     build: Callable[[datetime], list[str] | Callable[[], None]]
+    exchange_sessions_only: bool = False
 
     def slot_for(self, now: datetime) -> datetime | None:
         """The slot datetime this job should fire for at `now`, if any."""
@@ -187,6 +188,10 @@ class ScheduledJob:
             return None
         if self.weekdays_only and slot.weekday() >= 5:
             return None
+        if self.exchange_sessions_only:
+            from tradingagents.research.timeline import _xnys_calendar
+            if not _xnys_calendar().is_session(slot.date().isoformat()):
+                return None
         return slot
 
 
@@ -261,6 +266,9 @@ def build_jobs(env: Mapping[str, str]) -> list[ScheduledJob]:
             store,
         ]
 
+    def portfolio_execution(slot: datetime) -> list[str]:
+        return ["tradingagents", "temporal-portfolio-execute", "--store", store]
+
     def discovery(slot: datetime) -> list[str]:
         return [
             "tradingagents",
@@ -304,8 +312,9 @@ def build_jobs(env: Mapping[str, str]) -> list[ScheduledJob]:
         return run
 
     jobs = [
+        ScheduledJob("portfolio-execution", 9, 31, True, 600.0, portfolio_execution, exchange_sessions_only=True),
         ScheduledJob("temporal-capture", 17, 15, True, 3000.0, capture),
-        ScheduledJob("portfolio-day", 17, 45, True, 9000.0, portfolio_day),
+        ScheduledJob("portfolio-day", 17, 45, True, 9000.0, portfolio_day, exchange_sessions_only=True),
         ScheduledJob("daily-discovery", 18, 30, False, 3600.0, discovery),
         ScheduledJob("cloud-media-import", 19, 15, False, 3600.0, media_import),
         ScheduledJob("store-backup", 20, 30, False, 3600.0, backup),
@@ -315,7 +324,7 @@ def build_jobs(env: Mapping[str, str]) -> list[ScheduledJob]:
     # scheduled day can never trade from a mid-chain position.
     if env.get("TRADER_PORTFOLIO_DAY_ENABLED", "true").lower() == "false":
         print("[supervisor] portfolio-day is paused via TRADER_PORTFOLIO_DAY_ENABLED", flush=True)
-        jobs = [job for job in jobs if job.name != "portfolio-day"]
+        jobs = [job for job in jobs if job.name not in {"portfolio-day", "portfolio-execution"}]
     return jobs
 
 

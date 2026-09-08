@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from cli.main import app
@@ -49,3 +50,41 @@ def test_portfolio_execute_cli_uses_production_pending_entrypoint(monkeypatch, t
     ])
     assert result.exit_code == 0
     assert '"status": "completed"' in result.output
+
+
+def test_scheduled_execute_cli_drains_queue_and_propagates_failure(monkeypatch, tmp_path):
+    import tradingagents.portfolio_run as portfolio
+
+    monkeypatch.setattr(portfolio, "production_execution_inputs", lambda _store: {})
+    monkeypatch.setattr(portfolio, "execute_due_portfolio_days", lambda _store, **kwargs: {
+        "status": "failed_unsealed", "reason": "execution_session_expired",
+    })
+    result = CliRunner().invoke(app, ["temporal-portfolio-execute", "--store", str(tmp_path)])
+    assert result.exit_code == 1
+    assert "execution_session_expired" in result.output
+
+
+@pytest.mark.parametrize(("day", "expected"), [
+    ("2026-09-08", "2026-09-09T00:30:00+00:00"),
+    ("2026-09-04", "2026-09-04T21:30:00+00:00"),
+])
+def test_default_cutoff_uses_the_exchange_date_across_utc_midnight(monkeypatch, tmp_path, day, expected):
+    import datetime
+
+    import tradingagents.portfolio_run as portfolio
+
+    class Clock(datetime.datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return cls(2026, 9, 9, 0, 30, tzinfo=datetime.timezone.utc)
+
+    monkeypatch.setattr(datetime, "datetime", Clock)
+    monkeypatch.setattr(portfolio, "production_day_inputs", lambda *args, **kwargs: {})
+    def run(*args, **kwargs):
+        assert kwargs["capture_cutoff"].isoformat() == expected
+        return {"status": "pending_execution"}
+    monkeypatch.setattr(portfolio, "run_portfolio_day", run)
+    result = CliRunner().invoke(app, [
+        "temporal-portfolio-run", "--tickers", "AAPL", "--date", day, "--store", str(tmp_path),
+    ])
+    assert result.exit_code == 0, result.output

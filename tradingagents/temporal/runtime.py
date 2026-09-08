@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from concurrent.futures import Future
 from contextlib import contextmanager
 from contextvars import ContextVar
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
+from threading import Lock
 from uuid import uuid4
 
 from .clock import VirtualClock
@@ -30,7 +32,10 @@ class TemporalContext:
     retrieval_generation: int | None = None
     model_budget: object | None = None
     instrument_context: str | None = None
+    trade_date: str | None = None
     _invalid: bool = False
+    _vendor_cache: dict[tuple, Future] = field(default_factory=dict, init=False, repr=False)
+    _vendor_cache_lock: object = field(default_factory=Lock, init=False, repr=False)
 
     def invalidate(self) -> None:
         """Latch this run invalid; the latch is intentionally irreversible."""

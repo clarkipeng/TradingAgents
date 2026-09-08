@@ -88,6 +88,7 @@ def test_weekday_jobs_skip_weekends(env: dict[str, str]) -> None:
     names = {job.name for job, _ in due_jobs(jobs, saturday_evening, set())}
     assert "cloud-media-import" in names
     assert "portfolio-day" not in names
+    assert "portfolio-execution" not in names
     assert "temporal-capture" not in names
 
 
@@ -191,6 +192,19 @@ def test_portfolio_day_pause_switch_only_pauses_the_trading_day(
     assert "portfolio-day" not in names
     assert {"temporal-capture", "daily-discovery", "cloud-media-import", "store-backup"} <= names
     assert "portfolio-day" in {job.name for job in build_jobs(env)}
+
+
+def test_execution_job_drains_pending_days_only_on_exchange_sessions(env):
+    jobs = build_jobs(env)
+    execution = next(job for job in jobs if job.name == "portfolio-execution")
+    slot = local(2026, 9, 8, 9, 31)
+    assert execution.slot_for(slot) == slot
+    assert execution.build(slot) == [
+        "tradingagents", "temporal-portfolio-execute", "--store", env["TRADINGAGENTS_TEMPORAL_STORE"],
+    ]
+    for name, hour, minute in (("portfolio-day", 17, 45), ("portfolio-execution", 9, 31)):
+        job = next(job for job in jobs if job.name == name)
+        assert job.slot_for(local(2026, 9, 7, hour, minute)) is None  # Labor Day
 
 
 def test_unseeded_volume_is_not_a_store(env: dict[str, str]) -> None:

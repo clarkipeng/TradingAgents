@@ -208,6 +208,7 @@ class ToolTraceRecord:
     request_key: str
     evidence_id: str | None
     invoked_at: datetime
+    outcome: str = "evidence"
 
 
 @dataclass(frozen=True)

@@ -41,6 +41,7 @@ class TemporalGateway:
         if context.mode in (TemporalMode.REPLAY, TemporalMode.FROZEN_EVIDENCE):
             evidence = self._replay_evidence(tool, request, context)
             if evidence is None:
+                self._record_trace(tool, request, context, None, outcome="missing-v1")
                 raise ReplayMissError(
                     f"no eligible evidence for {tool!r} at {context.clock.as_of.isoformat()}"
                 )
@@ -57,10 +58,10 @@ class TemporalGateway:
         # A virtual clock selects evidence.  It never changes when a live
         # response was observed: otherwise a backfill can label today's
         # mutable provider response as historical evidence.
-        observed_at = datetime.now(timezone.utc)
         try:
             value = live_call()
         except Exception as error:
+            observed_at = datetime.now(timezone.utc)
             if context.mode is TemporalMode.LIVE_CAPTURE:
                 evidence = self.store.record_error(
                     tool,
@@ -75,6 +76,7 @@ class TemporalGateway:
         if context.mode is TemporalMode.LIVE:
             return TemporalOutcome(value=value, evidence=None)
 
+        observed_at = datetime.now(timezone.utc)
         captured_at = observed_at
         evidence = self.store.record(
             tool,
@@ -108,16 +110,23 @@ class TemporalGateway:
             raise ReplayTapeMismatchError(
                 f"tool tape mismatch at sequence {sequence}: expected {captured.tool!r}"
             )
-        if captured.evidence_id is None:
+        if captured.outcome == "missing-v1" and captured.evidence_id is None:
+            return None
+        if captured.outcome != "evidence" or captured.evidence_id is None:
             raise ReplayTapeMismatchError(f"tool tape has no evidence at sequence {sequence}")
-        return self.store.get_evidence(captured.evidence_id)
+        evidence = self.store.get_evidence(captured.evidence_id)
+        if evidence is None:
+            raise ReplayTapeMismatchError(f"tool tape evidence is missing at sequence {sequence}")
+        return evidence
 
     def _record_trace(
         self,
         tool: str,
         request: Mapping[str, Any],
         context: TemporalContext,
-        evidence_id: str,
+        evidence_id: str | None,
+        *,
+        outcome: str = "evidence",
     ) -> None:
         if context.run_id is None:
             return
@@ -128,4 +137,5 @@ class TemporalGateway:
             tool=tool,
             request=request,
             evidence_id=evidence_id,
+            outcome=outcome,
         )

@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from threading import Barrier, Thread
 
+import pandas as pd
 import pytest
 
 from tradingagents.portfolio_execution import (
@@ -60,13 +61,28 @@ def test_production_pending_target_uses_actual_ready_time_and_holiday_open(tmp_p
 
 
 def test_production_execution_applies_opening_gap_and_replays_its_quote_tape(tmp_path, monkeypatch):
-    import tradingagents.dataflows.interface as interface
+    import tradingagents.dataflows.execution_prices as prices
+    import tradingagents.temporal.gateway as gateway
 
-    def provider(_method, symbol, *_args):
-        opening = "110" if symbol == "AAPL" else "90"
-        return f"Date,Open,Split Coefficient,Dividend Amount\n2026-09-08,{opening},1,0\n"
+    class ObservedClock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return _utc(2026, 9, 8, 14)
 
-    monkeypatch.setattr(interface, "route_to_vendor", provider)
+    monkeypatch.setattr(gateway, "datetime", ObservedClock)
+
+    class Ticker:
+        def __init__(self, symbol):
+            self.symbol = symbol
+
+        def history(self, **options):
+            assert options["auto_adjust"] is False and options["actions"] is True
+            return pd.DataFrame({
+                "Open": [110 if self.symbol == "AAPL" else 90],
+                "Stock Splits": [0], "Dividends": [0],
+            }, index=pd.to_datetime(["2026-09-08"]))
+
+    monkeypatch.setattr(prices.yf, "Ticker", Ticker)
     with TemporalStore(tmp_path) as store:
         _publish_pending(store)
         result = execute_pending_portfolio_day(
@@ -76,6 +92,7 @@ def test_production_execution_applies_opening_gap_and_replays_its_quote_tape(tmp
         assert result["status"] == "completed"
         assert {fill["price"] for fill in result["fills"]} == {"110.0220", "90.0180"}
         assert Decimal(result["final_state"]["cash"]) >= 0
+        monkeypatch.setattr(prices.yf, "Ticker", lambda *_args: pytest.fail("replay contacted Yahoo"))
         class FixtureGraph:
             def propagate(self, symbol, *_args, **_kwargs):
                 return ({"market_report": f"market-{symbol}", "sentiment_report": f"sentiment-{symbol}",
@@ -147,3 +164,50 @@ def test_duplicate_execution_has_one_durable_winner(tmp_path):
             thread.join()
         assert sum(outcome.get("status") == "completed" for outcome in outcomes) == 1
         assert len(store.portfolio_states()) == 1
+
+
+def test_pending_predecessor_blocks_new_research_and_is_retained(tmp_path):
+    with TemporalStore(tmp_path) as store:
+        _publish_pending(store)
+        result = _publish_pending(store, day="2026-09-08", ready=_utc(2026, 9, 8, 22))
+        assert result["reason"] == "pending_predecessor"
+        decision = store.portfolio_decision("2026-09-04")
+        retention = store.retention_plan(before=_utc(2027, 1, 1, 0))
+        assert decision["payload_artifact_hash"] not in retention["artifacts"]["unreferenced_hashes"]
+        assert decision["capture_run_id"] in retention["protected_run_ids"]
+        assert f"{decision['capture_run_id']}:research:AAPL" in retention["protected_run_ids"]
+
+
+def test_interrupted_execution_recovers_under_the_chain_lock(tmp_path):
+    with TemporalStore(tmp_path) as store:
+        _publish_pending(store)
+        store.claim_portfolio_execution("2026-09-04", "dead-owner", claimed_at=_utc(2026, 9, 8, 13, 30))
+        result = execute_pending_portfolio_day(store, "2026-09-04", execution_quote_fn=_quote,
+                                             execution_clock=lambda: _utc(2026, 9, 8, 14))
+        assert result["status"] == "completed"
+        assert store.portfolio_execution("2026-09-04")["claim_id"] != "dead-owner"
+
+
+def test_returns_do_not_silently_bridge_legacy_and_next_open_policies(tmp_path):
+    from tradingagents.portfolio_run import portfolio_report
+
+    with TemporalStore(tmp_path) as store:
+        claim = store.claim_portfolio_day("2026-09-03", "legacy", claimed_at=_utc(2026, 9, 3, 22))
+        store.complete_portfolio_day(
+            "2026-09-03", claim["claim_id"], as_of=_utc(2026, 9, 3, 22),
+            state={"cash": "100000", "positions": {}, "equity": "100000"},
+            scenario_metadata={}, capture_run_id="legacy", decision="{}",
+            report="{}",
+        )
+        _publish_pending(store)
+        result = execute_pending_portfolio_day(
+            store, "2026-09-04", execution_quote_fn=_quote,
+            execution_clock=lambda: _utc(2026, 9, 8, 14),
+        )
+        assert result["status"] == "completed"
+        report = portfolio_report(store)
+        assert report["return_status"] == "mixed_execution_policies"
+        assert report["total_return_pct"] is None
+        assert report["days"][-1]["daily_return_pct"] is None
+        assert report["days"][-1]["valuation_date"] == "2026-09-08"
+        assert [row["execution_policy"] for row in report["days"]] == ["close-legacy-v1", "next-open-v1"]

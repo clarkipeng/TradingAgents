@@ -1553,30 +1553,36 @@ def temporal_portfolio_run(
     deep_model: str = typer.Option("gpt-5.4", help="CIO model."),  # noqa: B008
     sweep_model: str = typer.Option("gpt-5.4-mini", help="Per-ticker research model."),  # noqa: B008
     capture_cutoff: str | None = typer.Option(
-        None, "--capture-cutoff", help="Actual evidence cutoff (aware ISO-8601; defaults to invocation time)."
+        None, "--capture-cutoff", help="Evidence cutoff with timezone; defaults to now, or 21:30Z for a past date."
     ),
 ):
     """Publish one immutable portfolio target for its next eligible opening."""
+    from zoneinfo import ZoneInfo
+
     from tradingagents.portfolio_run import production_day_inputs, run_portfolio_day
     from tradingagents.temporal import TemporalStore
 
     symbols = [symbol.strip().upper() for symbol in tickers.split(",") if symbol.strip()]
     if not symbols:
         raise typer.BadParameter("at least one ticker is required")
-    temporal_store = TemporalStore(store)
-    inputs = production_day_inputs(
-        temporal_store, deep_model=deep_model, sweep_model=sweep_model
-    )
-    cutoff = (
-        datetime.datetime.fromisoformat(capture_cutoff.replace("Z", "+00:00"))
-        if capture_cutoff else datetime.datetime.now(datetime.timezone.utc)
-    )
+    try:
+        date = datetime.date.fromisoformat(date).isoformat()
+        cutoff = (
+            datetime.datetime.fromisoformat(capture_cutoff.replace("Z", "+00:00"))
+            if capture_cutoff else datetime.datetime.now(datetime.timezone.utc)
+        )
+    except ValueError:
+        raise typer.BadParameter("date or capture cutoff is not a valid ISO timestamp") from None
+    if not capture_cutoff and date < cutoff.astimezone(ZoneInfo("America/New_York")).date().isoformat():
+        cutoff = datetime.datetime.fromisoformat(f"{date}T21:30:00+00:00")
     if cutoff.tzinfo is None:
         raise typer.BadParameter("capture cutoff must include a timezone")
-    summary = run_portfolio_day(
-        temporal_store, symbols, day=date, capture_cutoff=cutoff,
-        execution_policy="next-open-v1", **inputs,
-    )
+    with TemporalStore(store) as temporal_store:
+        inputs = production_day_inputs(temporal_store, deep_model=deep_model, sweep_model=sweep_model)
+        summary = run_portfolio_day(
+            temporal_store, symbols, day=date, capture_cutoff=cutoff,
+            execution_policy="next-open-v1", **inputs,
+        )
     typer.echo(json.dumps(summary, indent=2, sort_keys=True))
     # A non-sealed execution can have no per-ticker failures (for example a
     # budget or ownership outcome). The durable day outcome is the CLI success
@@ -1590,22 +1596,23 @@ def temporal_portfolio_run(
 
 @app.command("temporal-portfolio-execute")
 def temporal_portfolio_execute(
-    date: str = typer.Option(..., "--date", help="Pending decision day YYYY-MM-DD."),  # noqa: B008
+    date: str | None = typer.Option(None, "--date", help="Pending decision day; omitted executes the pending queue."),  # noqa: B008
     store: Path = typer.Option(  # noqa: B008
         Path(".tradingagents/temporal"), "--store", help="Temporal evidence-store directory."
     ),
 ):
     """Claim and execute a pending target using its eligible raw opening tape."""
     from tradingagents.portfolio_run import (
+        execute_due_portfolio_days,
         execute_pending_portfolio_day,
         production_execution_inputs,
     )
     from tradingagents.temporal import TemporalStore
 
-    temporal_store = TemporalStore(store)
-    summary = execute_pending_portfolio_day(
-        temporal_store, date, **production_execution_inputs(temporal_store)
-    )
+    with TemporalStore(store) as temporal_store:
+        inputs = production_execution_inputs(temporal_store)
+        summary = (execute_pending_portfolio_day(temporal_store, date, **inputs)
+                   if date else execute_due_portfolio_days(temporal_store, **inputs))
     typer.echo(json.dumps(summary, indent=2, sort_keys=True))
     if summary.get("status") == "failed_unsealed":
         typer.echo(f"portfolio execution failed: {summary.get('reason', 'unknown')}", err=True)

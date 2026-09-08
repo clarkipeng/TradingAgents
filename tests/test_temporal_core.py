@@ -91,6 +91,32 @@ def test_replay_miss_is_explicit(tmp_path):
         gateway.invoke("news", {"ticker": "NVDA"}, context, lambda: "unexpected")
 
 
+def test_recorded_missing_input_stays_missing_after_later_ingestion(tmp_path):
+    from tradingagents.temporal.gateway import ReplayTapeMismatchError
+
+    with TemporalStore(tmp_path) as store:
+        gateway = TemporalGateway(store)
+        captured = TemporalContext.at(TemporalMode.FROZEN_EVIDENCE, at(10), store=store)
+        request = {"ticker": "NVDA"}
+        def forbidden():
+            pytest.fail("must not fetch a replacement")
+        with pytest.raises(ReplayMissError):
+            gateway.invoke("news", request, captured, forbidden)
+        trace = store.list_tool_traces(captured.run_id)[0]
+        assert trace.outcome == "missing-v1"
+        store.record("news", request, "late import", available_at=at(9))
+        replay = TemporalContext.at(TemporalMode.REPLAY, at(10), store=store, source_run_id=captured.run_id)
+        with pytest.raises(ReplayMissError):
+            gateway.invoke("news", request, replay, forbidden)
+        # A legacy null reference still means corrupt tape; it cannot silently
+        # adopt the explicit missing-input contract.
+        with store._connect() as connection:
+            connection.execute("UPDATE tool_traces SET outcome='evidence' WHERE trace_id=?", (trace.trace_id,))
+        replay = TemporalContext.at(TemporalMode.REPLAY, at(10), store=store, source_run_id=captured.run_id)
+        with pytest.raises(ReplayTapeMismatchError, match="no evidence"):
+            gateway.invoke("news", request, replay, forbidden)
+
+
 def test_live_capture_seals_failures_for_replay(tmp_path):
     store = TemporalStore(tmp_path)
     gateway = TemporalGateway(store)

@@ -1,9 +1,13 @@
 from datetime import datetime, timezone
-from decimal import Decimal
+from decimal import Decimal, localcontext
 
 import pytest
 
-from tradingagents.portfolio_execution import ExecutionQuote, execute_next_open_targets, next_open_timing
+from tradingagents.portfolio_execution import (
+    ExecutionQuote,
+    execute_next_open_targets,
+    next_open_timing,
+)
 
 
 def test_next_open_execution_keeps_decision_and_fill_sessions_distinct():
@@ -35,3 +39,19 @@ def test_next_open_execution_rejects_wrong_session_or_missing_evidence():
                            "raw-ohlcv-v1", "fixture-open")
     with pytest.raises(ValueError, match="different sessions"):
         execute_next_open_targets({"cash": "1000", "positions": {}}, {"weights": {"AAPL": .1}}, {"AAPL": quote}, timing=timing)
+
+
+def test_corporate_actions_and_fills_ignore_ambient_decimal_precision():
+    timing = next_open_timing(datetime(2026, 9, 4, 22, tzinfo=timezone.utc))
+    quote = ExecutionQuote("AAPL", timing.execution_session, Decimal("123.456"), timing.filled_at,
+                           "raw-ohlcv-v1", "fixture-open", split_ratio=Decimal("1.5"),
+                           cash_dividend=Decimal("1.23456"))
+    def execute():
+        return execute_next_open_targets(
+            {"cash": "6543.2109", "positions": {"AAPL": "111"}},
+            {"weights": {"AAPL": 0.2}}, {"AAPL": quote}, timing=timing,
+        )
+    expected = execute()
+    with localcontext() as ambient:
+        ambient.prec = 4
+        assert execute() == expected

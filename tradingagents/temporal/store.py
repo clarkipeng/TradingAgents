@@ -419,6 +419,9 @@ class TemporalStore:
                 connection.execute("ALTER TABLE search_traces ADD COLUMN tie_break TEXT NOT NULL DEFAULT 'evidence_id/doc_key'")
             if "generation_id" not in search_columns:
                 connection.execute("ALTER TABLE search_traces ADD COLUMN generation_id INTEGER NOT NULL DEFAULT 0")
+            tool_columns = {row["name"] for row in connection.execute("PRAGMA table_info(tool_traces)")}
+            if "outcome" not in tool_columns:
+                connection.execute("ALTER TABLE tool_traces ADD COLUMN outcome TEXT NOT NULL DEFAULT 'evidence'")
             connection.execute(
                 "CREATE TABLE IF NOT EXISTS temporal_index_state "
                 "(singleton INTEGER PRIMARY KEY CHECK (singleton=1), active_generation INTEGER NOT NULL, evidence_high_water INTEGER NOT NULL)"
@@ -572,6 +575,19 @@ class TemporalStore:
             )
             return {"day": day, "claim_id": claim_id, "status": "claimed"}
 
+    def pending_portfolio_days(self) -> list[str]:
+        with self._connect() as connection:
+            return [row[0] for row in connection.execute(
+                "SELECT d.day FROM portfolio_decisions d LEFT JOIN portfolio_executions e "
+                "ON e.day=d.day WHERE e.status IS NULL OR e.status != 'completed' "
+                "ORDER BY d.decision_ready_at, d.day"
+            )]
+
+    def portfolio_execution(self, day: str) -> dict | None:
+        with self._connect() as connection:
+            row = connection.execute("SELECT * FROM portfolio_executions WHERE day=?", (day,)).fetchone()
+        return dict(row) if row else None
+
     def fail_portfolio_execution(self, day: str, claim_id: str, failure_code: str) -> None:
         with self.write_lock(), self._connect() as connection:
             connection.execute(
@@ -655,6 +671,7 @@ class TemporalStore:
             UNION SELECT artifact_hash FROM scenario_snapshots
             UNION SELECT artifact_hash FROM scenario_rubrics
             UNION SELECT report_artifact_hash FROM research_runs WHERE report_artifact_hash IS NOT NULL
+            UNION SELECT payload_artifact_hash FROM portfolio_decisions
         """
         with self._connect() as connection:
             rows = connection.execute(
@@ -687,13 +704,21 @@ class TemporalStore:
         with self._connect() as connection:
             protected.update(row[0] for row in connection.execute(
                 "SELECT capture_run_id FROM scenarios WHERE capture_run_id IS NOT NULL "
-                "UNION SELECT run_id FROM research_runs"
+                "UNION SELECT run_id FROM research_runs "
+                "UNION SELECT capture_run_id FROM portfolio_decisions"
             ))
             for row in connection.execute("SELECT metadata_json FROM scenarios"):
-                manifest = json.loads(row[0]).get("replay_manifest", {})
+                metadata = json.loads(row[0])
+                if metadata.get("execution_run_id"):
+                    protected.add(metadata["execution_run_id"])
+                manifest = metadata.get("replay_manifest", {})
                 for stream in [*manifest.get("workers", []), manifest.get("cio", {})]:
                     if stream.get("run_id"):
                         protected.add(stream["run_id"])
+            for row in connection.execute("SELECT day FROM portfolio_decisions"):
+                payload = self.portfolio_decision(row[0])["payload"]
+                for stream in payload["replay_manifest"]["workers"]:
+                    protected.add(stream["run_id"])
             # A TEMP table avoids parameter-count limits for retained portfolios
             # with many child streams, without changing the source database.
             connection.execute("CREATE TEMP TABLE IF NOT EXISTS retention_roots (run_id TEXT PRIMARY KEY)")
@@ -1759,8 +1784,11 @@ class TemporalStore:
         request: Mapping[str, Any],
         evidence_id: str | None,
         invoked_at: datetime | None = None,
+        outcome: str = "evidence",
     ) -> ToolTraceRecord:
         """Append one selected tool result to a temporal run trace."""
+        if outcome not in {"evidence", "missing-v1"} or (outcome == "missing-v1" and evidence_id is not None):
+            raise ValueError("invalid tool trace outcome")
         invoked = parse_timestamp(invoked_at or datetime.now(timezone.utc))
         key = request_key(tool, request)
         with self._connect() as connection:
@@ -1775,12 +1803,14 @@ class TemporalStore:
                 "request_key": key,
                 "evidence_id": evidence_id,
             }
+            if outcome != "evidence":
+                identity["outcome"] = outcome
             trace_id = hashlib.sha256(canonical_json(identity).encode("utf-8")).hexdigest()
             connection.execute(
                 """
                 INSERT INTO tool_traces(
-                    trace_id, run_id, sequence, scenario_id, mode, tool, request_key, evidence_id, invoked_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    trace_id, run_id, sequence, scenario_id, mode, tool, request_key, evidence_id, invoked_at, outcome
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     trace_id,
@@ -1792,6 +1822,7 @@ class TemporalStore:
                     key,
                     evidence_id,
                     format_timestamp(invoked),
+                    outcome,
                 ),
             )
         return ToolTraceRecord(
@@ -1804,6 +1835,7 @@ class TemporalStore:
             request_key=key,
             evidence_id=evidence_id,
             invoked_at=invoked,
+            outcome=outcome,
         )
 
     def record_search_trace(
@@ -2103,6 +2135,7 @@ class TemporalStore:
             request_key=row["request_key"],
             evidence_id=row["evidence_id"],
             invoked_at=parse_timestamp(row["invoked_at"]),
+            outcome=row["outcome"],
         )
 
     @staticmethod

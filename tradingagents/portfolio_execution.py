@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal
+from decimal import Context, Decimal, localcontext
 
 from tradingagents.temporal.simulation import MarketQuote, PortfolioSimulator
 
@@ -54,6 +54,18 @@ class ExecutionTiming:
     filled_at: datetime
 
 
+def execution_quote_payload(quote: ExecutionQuote) -> dict[str, str]:
+    """The sealed inputs that production replay must derive again."""
+    from tradingagents.temporal.clock import format_timestamp
+
+    return {
+        "session": quote.session, "price": str(quote.price),
+        "available_at": format_timestamp(quote.available_at),
+        "adjustment_basis": quote.adjustment_basis, "evidence_id": quote.evidence_id,
+        "split_ratio": str(quote.split_ratio), "cash_dividend": str(quote.cash_dividend),
+    }
+
+
 def next_open_timing(decision_ready_at: datetime) -> ExecutionTiming:
     """Choose the first XNYS open strictly after the actual ready instant."""
     if decision_ready_at.tzinfo is None:
@@ -86,6 +98,11 @@ def execute_next_open_targets(
     """Apply a target only with its next-session, evidence-backed raw opens."""
     from tradingagents.portfolio_run import rebalance_orders
 
+    expected = next_open_timing(timing.decision_ready_at)
+    if (timing.execution_session != expected.execution_session
+            or timing.submitted_at != expected.submitted_at
+            or timing.filled_at < timing.submitted_at):
+        raise ValueError("execution timing differs from the eligible opening")
     weights = plan.get("weights", {})
     if not isinstance(weights, Mapping):
         raise ValueError("execution target lacks weights")
@@ -94,14 +111,13 @@ def execute_next_open_targets(
         raise ValueError("execution quote coverage is incomplete")
     if any(quote.session != timing.execution_session for quote in quotes.values()):
         raise ValueError("execution quotes belong to different sessions")
+    if any(symbol != quote.symbol for symbol, quote in quotes.items()):
+        raise ValueError("execution quote instrument differs from its key")
     if any(quote.available_at > timing.filled_at for quote in quotes.values()):
         raise ValueError("execution quote was unavailable at the eligible opening")
     for quote in quotes.values():
         quote.market_quote()
-    if plan.get("hold_book"):
-        orders = []
-    else:
-        prices = {symbol: quote.price for symbol, quote in quotes.items()}
+    with localcontext(Context(prec=50)):
         adjusted_positions = {}
         adjusted_cash = Decimal(str(prior_state["cash"]))
         for symbol, quantity_value in prior_state.get("positions", {}).items():
@@ -110,45 +126,37 @@ def execute_next_open_targets(
             adjusted_cash += quantity * quote.cash_dividend
             adjusted_positions[symbol] = quantity * quote.split_ratio
         executable_state = {"cash": adjusted_cash, "positions": adjusted_positions}
-        orders = rebalance_orders(
+        prices = {symbol: quote.price for symbol, quote in quotes.items()}
+        orders = [] if plan.get("hold_book") else rebalance_orders(
             executable_state, weights, prices, submitted_at=timing.submitted_at,
             fee_bps=fee_bps, slippage_bps=slippage_bps,
         )
-    if plan.get("hold_book"):
-        adjusted_cash = Decimal(str(prior_state["cash"]))
-        adjusted_positions = {}
-        for symbol, quantity_value in prior_state.get("positions", {}).items():
-            quantity = Decimal(str(quantity_value))
-            quote = quotes[symbol]
-            adjusted_cash += quantity * quote.cash_dividend
-            adjusted_positions[symbol] = quantity * quote.split_ratio
-    simulator = PortfolioSimulator(prior_state["cash"], fee_bps=fee_bps, slippage_bps=slippage_bps)
-    simulator.state.cash = adjusted_cash
-    simulator.state.positions.update(adjusted_positions)
-    fills = []
-    for order in orders:
-        quote = quotes[order.symbol]
-        fill = simulator.fill_from_quote(order, quote.market_quote(), filled_at=timing.filled_at)
-        fills.append({
-            "symbol": fill.symbol, "side": fill.side.value,
-            "quantity": str(fill.quantity), "price": str(fill.price),
-            "evidence_id": quote.evidence_id,
-        })
-    return {
-        "policy": NEXT_OPEN_EXECUTION_POLICY,
-        "decision_ready_at": timing.decision_ready_at.isoformat(),
-        "execution_session": timing.execution_session,
-        "submitted_at": timing.submitted_at.isoformat(),
-        "filled_at": timing.filled_at.isoformat(),
-        "fills": fills,
-        "corporate_actions": {
-            symbol: {"split_ratio": str(quote.split_ratio), "cash_dividend": str(quote.cash_dividend)}
-            for symbol, quote in sorted(quotes.items())
-            if symbol in prior_state.get("positions", {})
-        },
-        "final_state": {
-            "cash": str(simulator.state.cash),
-            "positions": {symbol: str(quantity) for symbol, quantity in simulator.state.positions.items() if quantity},
-            "equity": str(simulator.marked_value({symbol: quotes[symbol].price for symbol in simulator.state.positions})),
-        },
-    }
+        simulator = PortfolioSimulator(adjusted_cash, fee_bps=fee_bps, slippage_bps=slippage_bps)
+        simulator.state.positions.update(adjusted_positions)
+        fills = []
+        for order in orders:
+            quote = quotes[order.symbol]
+            fill = simulator.fill_from_quote(order, quote.market_quote(), filled_at=timing.filled_at)
+            fills.append({
+                "symbol": fill.symbol, "side": fill.side.value,
+                "quantity": str(fill.quantity), "price": str(fill.price),
+                "evidence_id": quote.evidence_id,
+            })
+        return {
+            "policy": NEXT_OPEN_EXECUTION_POLICY,
+            "decision_ready_at": timing.decision_ready_at.isoformat(),
+            "execution_session": timing.execution_session,
+            "submitted_at": timing.submitted_at.isoformat(),
+            "filled_at": timing.filled_at.isoformat(),
+            "fills": fills,
+            "corporate_actions": {
+                symbol: {"split_ratio": str(quote.split_ratio), "cash_dividend": str(quote.cash_dividend)}
+                for symbol, quote in sorted(quotes.items())
+                if symbol in prior_state.get("positions", {})
+            },
+            "final_state": {
+                "cash": str(simulator.state.cash),
+                "positions": {symbol: str(quantity) for symbol, quantity in simulator.state.positions.items() if quantity},
+                "equity": str(simulator.marked_value({symbol: quotes[symbol].price for symbol in simulator.state.positions})),
+            },
+        }

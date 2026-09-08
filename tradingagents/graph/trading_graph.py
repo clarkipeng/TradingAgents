@@ -627,8 +627,8 @@ class TradingAgentsGraph:
             )
         else:
             instrument_context = self.resolve_instrument_context(company_name, asset_type)
-            if temporal is not None:
-                temporal.instrument_context = instrument_context
+        if temporal is not None:
+            temporal.instrument_context = instrument_context
         init_agent_state = self.propagator.create_initial_state(
             company_name,
             trade_date,

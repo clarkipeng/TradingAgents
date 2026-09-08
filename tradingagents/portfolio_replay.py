@@ -174,6 +174,7 @@ def replay_production_portfolio_day(
             if canonical_json(ratings) != canonical_json(summary["ratings"]) or canonical_json(briefs) != canonical_json(summary["briefs"]):
                 raise ValueError("portfolio replay research differs from sealed CIO inputs")
             return cio_allocate(
+                ratings if summary["execution"]["policy"] == "next-open-v1" else
                 {ticker: rating for ticker, rating in ratings.items() if ticker in summary["quotes"]},
                 briefs=briefs,
                 constraints=summary["constraints"],
@@ -191,7 +192,7 @@ def replay_production_portfolio_day(
         source_facts = _source_stream_facts(store, source_run_id, tape.calls)
         _assert_consumed(stream, source_facts)
         context = TemporalContext.at(
-            TemporalMode.REPLAY, scenario.as_of, scenario_id=scenario_id,
+            TemporalMode.REPLAY, scenario.metadata.get("capture_cutoff", scenario.as_of), scenario_id=scenario_id,
             store=store, source_run_id=source_run_id,
             retrieval_generation=scenario.metadata.get("retrieval_generation"),
         )
@@ -219,7 +220,7 @@ def replay_production_portfolio_day(
         source_facts = _source_stream_facts(store, source_run_id, tape.calls)
         _assert_consumed(stream, source_facts)
         context = TemporalContext.at(
-            TemporalMode.REPLAY, scenario.as_of, scenario_id=scenario_id,
+            TemporalMode.REPLAY, scenario.metadata.get("capture_cutoff", scenario.as_of), scenario_id=scenario_id,
             store=store, source_run_id=source_run_id,
             retrieval_generation=scenario.metadata.get("retrieval_generation"),
         )
@@ -315,7 +316,11 @@ def _replay_execution(store: Any, context: Any, summary: Mapping[str, Any], repl
         raise ValueError("portfolio replay CIO plan differs from sealed plan")
     execution = summary["execution"]
     if execution.get("policy") == "next-open-v1":
-        from tradingagents.portfolio_execution import ExecutionTiming, execute_next_open_targets
+        from tradingagents.portfolio_execution import (
+            ExecutionTiming,
+            execute_next_open_targets,
+            execution_quote_payload,
+        )
         from tradingagents.portfolio_run import production_execution_inputs
         from tradingagents.temporal import TemporalContext, TemporalMode, temporal_context
         from tradingagents.temporal.clock import parse_timestamp
@@ -336,6 +341,8 @@ def _replay_execution(store: Any, context: Any, summary: Mapping[str, Any], repl
                 symbol: quote_fn(symbol, summary["execution_session"], submitted_at)
                 for symbol in sorted(summary["quotes"])
             }
+            if canonical_json({symbol: execution_quote_payload(quote) for symbol, quote in quotes.items()}) != canonical_json(summary["quotes"]):
+                raise ValueError("portfolio replay quote differs from sealed input")
             result = execute_next_open_targets(
                 summary["prior_state"], replayed_plan, quotes,
                 timing=ExecutionTiming(
