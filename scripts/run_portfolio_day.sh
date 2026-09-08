@@ -1,6 +1,8 @@
 #!/bin/sh
-# Run one sealed paper-trading portfolio day. Intended for launchd after the
-# daily tool-tape capture. Weekends exit quietly: no session, no day.
+# Capture one pending paper-trading decision after the daily tool capture.
+# Execution is a separate temporal-portfolio-execute invocation; the cloud
+# supervisor schedules it the next eligible morning. This script only captures.
+# Weekends exit quietly: no session, no day.
 set -eu
 
 project_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)

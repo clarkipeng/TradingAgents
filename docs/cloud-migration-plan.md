@@ -1,6 +1,6 @@
 # Cloud migration plan: everything on Fly
 
-Status: proposed 2026-09-02, not started.
+Status: historical proposal from 2026-09-02. Current requirements are in [the audit fix plan](audit-fix-plan-2026-09-06.md), with implementation and rollout state in [doing.md](../doing.md). Estimates and observations below are from the original proposal.
 Goal: the laptop leaves the critical path entirely.
 One Fly machine owns the canonical evidence store and runs capture, discovery, and the daily trading run.
 
@@ -21,7 +21,8 @@ All writers run on that machine as supervised processes under one scheduler:
 - market-hours ticker poller (stocktwits, news, macro) - continuous
 - X roster + trends + global news - continuous (unchanged, but now writes straight into the temporal store; the Postgres intermediate becomes unnecessary)
 - daily discovery (GDELT + Wayback) - nightly
-- portfolio trading day - weekdays 17:45 ET
+- portfolio decision capture - exchange sessions at 17:45 ET
+- pending portfolio execution - the next eligible exchange session, dispatched at 09:31 ET
 - generational index rebuild - only when re-armed deliberately, with a lock-holder liveness alarm
 
 The laptop becomes a read-only consumer: a `sync_store_down.sh` pulls a store snapshot for dev, replay, and reports.

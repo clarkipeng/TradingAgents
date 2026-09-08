@@ -1,6 +1,7 @@
 # Audit fix plan
 
 Status: implementation in progress; current verified outcomes and remaining work are in [doing.md](../doing.md).
+For a plain-English account of the integrated changes and why they were needed, see [what changed, and why](audit-repairs-explained.md).
 Baseline: `afbd64f` on `agent-trading-simulation-backtest`.
 Sources: [the 33-finding audit](audit-2026-09-06.md), the attached review transcript, current code, and the existing engineering taste canon.
 The packages below define the required completion gates; they are not claims of deployment or operational verification.
