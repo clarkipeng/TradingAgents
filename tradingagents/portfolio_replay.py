@@ -253,6 +253,10 @@ def _portfolio_summary(store: Any, run_id: str) -> Mapping[str, Any]:
     required = {"ratings", "briefs", "constraints", "quotes", "prior_state", "execution", "plan", "fills", "final_state"}
     if not isinstance(summary, Mapping) or not required.issubset(summary):
         raise ValueError("portfolio replay lacks versioned execution inputs")
+    policy = summary.get("brief_policy")
+    if policy is not None:
+        if not isinstance(policy, Mapping) or policy.get("compaction_enabled") is not False:
+            raise ValueError("portfolio replay has an unsupported analyst brief policy")
     return summary
 
 
