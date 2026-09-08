@@ -477,10 +477,25 @@ def _run_portfolio_day(
         "scenario_id": scenario_id,
         "run_id": context.run_id,
         "ratings": ratings,
+        # These are the exact CIO inputs, retained with the sealed output so
+        # production replay can recompute rather than merely echo a plan.
+        "briefs": briefs,
+        "constraints": constraints,
+        "quotes": {symbol: str(price) for symbol, price in quotes.items()},
+        "prior_state": {
+            "cash": str(prior["cash"]),
+            "positions": {symbol: str(quantity) for symbol, quantity in prior["positions"].items()},
+        },
+        "execution": {"fee_bps": fee_bps, "slippage_bps": slippage_bps, "policy": "close-legacy-v1"},
         "plan": plan,
         "fills": fills,
         "equity": str(equity),
         "cash": str(simulator.state.cash),
+        "final_state": {
+            "cash": str(final_state["cash"]),
+            "positions": {symbol: str(quantity) for symbol, quantity in final_state["positions"].items()},
+            "equity": str(final_state["equity"]),
+        },
         "failures": failures,
         "coverage": len(ratings) / len(tickers) if tickers else 0.0,
         "research_call_count": research_calls,
