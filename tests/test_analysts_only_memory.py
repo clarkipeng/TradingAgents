@@ -6,7 +6,7 @@ from tradingagents.default_config import DEFAULT_CONFIG
 from tradingagents.graph.trading_graph import TradingAgentsGraph
 
 
-def test_analysts_only_graph_never_reads_decision_memory(tmp_path):
+def test_analysts_only_graph_never_reads_decision_memory(tmp_path, monkeypatch):
     config = copy.deepcopy(DEFAULT_CONFIG)
     config.update({
         "analysts_only": True,
@@ -17,12 +17,12 @@ def test_analysts_only_graph_never_reads_decision_memory(tmp_path):
         "memory_log_path": str(tmp_path / "memory.md"),
     })
     graph = TradingAgentsGraph(selected_analysts=("market",), config=config)
+    monkeypatch.setattr(graph, "resolve_instrument_context", lambda *_args: "Fixture instrument")
     graph.memory_log.get_past_context = lambda *_args: (_ for _ in ()).throw(
         AssertionError("analysts-only run must not read unused memory")
     )
     # Initial-state construction is the boundary that formerly performed the
     # unused read; no provider/model execution is needed to prove it.
-    graph._run_graph = graph._run_graph
     from datetime import datetime, timezone
 
     from tradingagents.temporal import TemporalContext, TemporalMode, temporal_context

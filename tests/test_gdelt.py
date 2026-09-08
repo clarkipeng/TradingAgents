@@ -33,6 +33,14 @@ _ARTICLE = {
 }
 
 
+@pytest.fixture(autouse=True)
+def _isolate_transport_pacing(monkeypatch):
+    # These fixtures replace HTTP and sometimes its clock. Real pacing state
+    # would mix clock epochs and sleep for the host's uptime; the shared gate
+    # has its own fake-clock tests in test_temporal_gdelt.py.
+    monkeypatch.setattr(gdelt, "pace_gdelt_request", lambda: None)
+
+
 @pytest.mark.unit
 def test_emits_manifest_and_exact_content_vintage_media_row() -> None:
     with mock.patch.object(gdelt, "get_json", return_value={"articles": [_ARTICLE]}):
