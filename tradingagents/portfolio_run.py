@@ -54,6 +54,10 @@ PORTFOLIO_DAY_POLICY = {
     "model_cost_per_token": "0.0001",
     "research_max_completion_tokens": 1_200,
     "cio_max_completion_tokens": 800,
+    # Headroom reserved for the final allocator before concurrent research
+    # begins. These are policy ceilings, not claims about provider invoices.
+    "cio_token_headroom": 20_000,
+    "cio_cost_headroom": "2",
 }
 MAX_RESEARCH_WORKERS = PORTFOLIO_DAY_POLICY["max_workers"]
 MIN_TICKER_COVERAGE = PORTFOLIO_DAY_POLICY["minimum_ticker_coverage"]
@@ -275,6 +279,8 @@ def _run_portfolio_day(
         store.root, day, max_tokens=PORTFOLIO_DAY_POLICY["model_token_budget"],
         max_cost=PORTFOLIO_DAY_POLICY["model_cost_budget"],
         cost_per_token=PORTFOLIO_DAY_POLICY["model_cost_per_token"],
+        cio_tokens=PORTFOLIO_DAY_POLICY["cio_token_headroom"],
+        cio_cost=PORTFOLIO_DAY_POLICY["cio_cost_headroom"],
     )
     with temporal_context(context):
         research_calls = 0
@@ -331,6 +337,10 @@ def _run_portfolio_day(
             failures.append("research pool: deadline_exceeded")
         finally:
             pool.shutdown(wait=False, cancel_futures=True)
+
+        # A callback can fail before a child reaches its normal return path.
+        # Do not turn that fatal tape/budget condition into degraded coverage.
+        context.ensure_valid()
 
         coverage = len(ratings) / len(tickers) if tickers else 0.0
         if deadline_breached:
@@ -568,10 +578,10 @@ def production_day_inputs(store: TemporalStore, *, deep_model: str = "gpt-5.4",
 
     def worker_graph():
         if not hasattr(workers, "graph"):
-            recorder = LangChainTapeRecorder(store)
+            recorder = LangChainTapeRecorder(store, budget_role="research")
             workers.graph = TradingAgentsGraph(config=copy.deepcopy(config), callbacks=[recorder])
         return workers.graph
-    cio_recorder = LangChainTapeRecorder(store)
+    cio_recorder = LangChainTapeRecorder(store, budget_role="cio")
     cio_model = create_llm_client(
         "openai",
         deep_model,

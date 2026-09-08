@@ -227,7 +227,12 @@ def test_run_portfolio_day_does_not_seal_when_tape_persistence_latches_run(tmp_p
     monkeypatch.setattr(store, "begin_llm_call", fail)
 
     def research(ticker, context):
-        recorder.on_llm_start({"name": "test-model"}, [ticker], run_id=uuid4())
+        recorder.on_llm_start(
+            {"name": "test-model"},
+            [ticker],
+            run_id=uuid4(),
+            invocation_params={"max_tokens": 32},
+        )
         return {"rating": "Buy", "brief": "brief"}
 
     with pytest.raises(TemporalRunInvalidError, match="^temporal run is invalid$"):
