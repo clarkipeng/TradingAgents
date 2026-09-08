@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime
+from threading import Lock
 from typing import Annotated
 
 import pandas as pd
@@ -22,7 +23,7 @@ from .symbol_utils import NoMarketDataError, normalize_symbol
 logger = logging.getLogger(__name__)
 
 
-def _run_history_cache() -> dict[tuple[str, str, str, str], pd.DataFrame] | None:
+def _run_history_cache() -> tuple[dict, Lock] | None:
     """Return one temporal run's private vendor-result cache, if any.
 
     This is deliberately not a disk cache: existing yfinance calls retain
@@ -37,7 +38,8 @@ def _run_history_cache() -> dict[tuple[str, str, str, str], pd.DataFrame] | None
     if cache is None:
         cache = {}
         setattr(context, "_yfinance_history_cache", cache)
-    return cache
+        setattr(context, "_yfinance_history_cache_lock", Lock())
+    return cache, context._yfinance_history_cache_lock
 
 
 def _request_error(operation: str, exc: BaseException) -> VendorError:
@@ -63,15 +65,24 @@ def get_YFin_data_online(
     # past end_date so the requested range is actually inclusive (#986/#987).
     end_inclusive = (end_dt + relativedelta(days=1)).strftime("%Y-%m-%d")
     identity = ("history-default-adjusted", canonical, start_date, end_inclusive)
-    cache = _run_history_cache()
-    cached = cache.get(identity) if cache is not None else None
+    run_cache = _run_history_cache()
+    cached = None
+    if run_cache is not None:
+        cache, cache_lock = run_cache
+        with cache_lock:
+            cached = cache.get(identity)
     if cached is None:
         ticker = yf.Ticker(canonical)
         data = yf_retry(lambda: ticker.history(start=start_date, end=end_inclusive))
-        if cache is not None:
-            cache[identity] = data.copy(deep=True)
+        observed_at = datetime.now()
+        if run_cache is not None:
+            with cache_lock:
+                # A frame and the observation that vouches for it are one
+                # in-run publication unit; callers receive independent copies.
+                cached = cache.setdefault(identity, (data.copy(deep=True), observed_at))
+            data, observed_at = cached[0].copy(deep=True), cached[1]
     else:
-        data = cached.copy(deep=True)
+        data, observed_at = cached[0].copy(deep=True), cached[1]
 
     # Empty result means the symbol is unknown/delisted. Raise a typed error
     # instead of returning prose: the routing layer turns it into a single
@@ -104,7 +115,7 @@ def get_YFin_data_online(
     label = canonical if canonical == symbol.upper() else f"{canonical} (from {symbol})"
     header = f"# Stock data for {label} from {start_date} to {end_date}\n"
     header += f"# Total records: {len(data)}\n"
-    header += f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+    header += f"# Data retrieved on: {observed_at.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
 
     return header + csv_string
 
