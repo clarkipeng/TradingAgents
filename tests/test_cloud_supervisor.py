@@ -137,10 +137,10 @@ def test_backup_is_one_atomic_unit_with_budget_and_artifact_membership(tmp_path:
     artifact = store_dir / "artifacts" / "aa" / "fixture"
     artifact.parent.mkdir(parents=True)
     artifact.write_bytes(b"fixture")
-    conn.execute("INSERT INTO artifacts VALUES (?, ?, ?)", (hashlib.sha256(b"fixture").hexdigest(), "artifacts/aa/fixture", 7))
+    conn.execute("INSERT INTO artifacts VALUES (?, ?, ?)", (hashlib.sha256(b"fixture").hexdigest(), "aa/fixture", 7))
     conn.commit()
     conn.close()
-    budget_conn = sqlite3.connect(store_dir.parent / "model-budget.sqlite")
+    budget_conn = sqlite3.connect(store_dir / "model-budget.sqlite")
     budget_conn.execute("CREATE TABLE model_reservations (day TEXT, call_id TEXT, tokens INTEGER, cost TEXT, PRIMARY KEY(day, call_id))")
     budget_conn.commit()
     budget_conn.close()

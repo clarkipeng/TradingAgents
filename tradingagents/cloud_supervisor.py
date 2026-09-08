@@ -245,7 +245,7 @@ def backup_store(
     artifact_paths: list[Path] | None = None,
 ) -> Path:
     """Publish one verified backup unit; retained for supervisor callers."""
-    from store_backup import backup_store as publish_backup
+    from tradingagents.store_backup import backup_store as publish_backup
 
     if artifact_paths not in (None, [store_dir / "artifacts"]):
         raise ValueError("custom artifact roots are no longer supported")
