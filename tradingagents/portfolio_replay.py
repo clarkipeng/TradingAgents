@@ -130,6 +130,7 @@ def replay_production_portfolio_day(
     models, never a provider client. Optional factories remain a narrow test
     seam; they do not bypass CIO, accounting, or final-state verification.
     """
+    from tradingagents.portfolio_run import portfolio_research_result
     from tradingagents.temporal import TemporalContext, TemporalMode, temporal_context
     from tradingagents.temporal_adapters.langchain import TapeChatModel
 
@@ -154,27 +155,34 @@ def replay_production_portfolio_day(
         worker_graph_factory = _default_worker_graph_factory(
             store, scenario.metadata.get("replay_graph_config")
         )
-    if cio_entrypoint is None:
+    production_cio = cio_entrypoint is None
+    regenerated = {}
+    if production_cio:
         assert summary is not None
         from tradingagents.portfolio_run import cio_allocate
 
         def cio_entrypoint(tape):
+            ratings = {ticker: value["rating"] for ticker, value in regenerated.items()}
+            briefs = {ticker: value["brief"] for ticker, value in regenerated.items()}
+            if canonical_json(ratings) != canonical_json(summary["ratings"]) or canonical_json(briefs) != canonical_json(summary["briefs"]):
+                raise ValueError("portfolio replay research differs from sealed CIO inputs")
             return cio_allocate(
-                replayed_ratings, briefs=replayed_briefs,
+                {ticker: rating for ticker, rating in ratings.items() if ticker in summary["quotes"]},
+                briefs=briefs,
                 constraints=summary["constraints"],
                 complete_llm=lambda prompt: tape.invoke(prompt).content,
             )
-
-    replayed_ratings: dict[str, str] = {}
-    replayed_briefs: dict[str, str] = {}
 
     def worker(ticker: str, source_run_id: str) -> Mapping[str, Any]:
         stream = next(item for item in manifest["workers"] if item["run_id"] == source_run_id)
         # Sentiment first tries structured output then falls back to text;
         # retain that recorded attempt rather than changing graph control flow.
         tape = TapeChatModel.from_store(
-            store, source_run_id=source_run_id, structured_output_replay=True
+            store, source_run_id=source_run_id, structured_output_replay=True,
+            match_parallel_prompts=True,
         )
+        source_facts = _source_stream_facts(store, source_run_id, tape.calls)
+        _assert_consumed(stream, source_facts)
         context = TemporalContext.at(
             TemporalMode.REPLAY, scenario.as_of, scenario_id=scenario_id,
             store=store, source_run_id=source_run_id,
@@ -185,35 +193,24 @@ def replay_production_portfolio_day(
             result, _signal = worker_graph_factory(tape).propagate(
                 ticker, scenario.metadata["trade_date"], temporal=context
             )
-        if summary is not None and default_worker_graph:
-            brief = _brief_from_worker_state(result)
-            if brief != summary["briefs"].get(ticker):
-                raise ValueError("portfolio replay analyst brief differs from sealed CIO input")
-            # The capture policy's analyst sweep derives ratings uniformly;
-            # retain that versioned mapping and prove the regenerated briefs
-            # are the actual inputs to the replayed CIO call below.
-            replayed_ratings[ticker] = summary["ratings"][ticker]
-            replayed_briefs[ticker] = brief
         if tape._cursor != len(tape.calls):
             raise ValueError(
                 f"portfolio replay did not consume its complete LLM stream ({tape._cursor}/{len(tape.calls)})"
             )
         if len(store.list_tool_traces(context.run_id)) != stream["tool_call_count"]:
             raise ValueError("portfolio replay did not consume its complete tool stream")
+        context.ensure_valid()
+        regenerated[ticker] = portfolio_research_result(result, context.instrument_context)
         return {
             "ticker": ticker, "result": result,
-            "llm_call_count": stream["llm_call_count"], "llm_digest": stream["llm_digest"],
-            "tool_call_count": stream["tool_call_count"], "tool_digest": stream["tool_digest"],
+            **source_facts,
         }
 
     def cio(source_run_id: str) -> Mapping[str, Any]:
         stream = manifest["cio"]
-        if summary is not None and default_worker_graph and (
-            canonical_json(replayed_ratings) != canonical_json(summary["ratings"])
-            or canonical_json(replayed_briefs) != canonical_json(summary["briefs"])
-        ):
-            raise ValueError("portfolio replay CIO inputs differ from sealed inputs")
         tape = TapeChatModel.from_store(store, source_run_id=source_run_id)
+        source_facts = _source_stream_facts(store, source_run_id, tape.calls)
+        _assert_consumed(stream, source_facts)
         context = TemporalContext.at(
             TemporalMode.REPLAY, scenario.as_of, scenario_id=scenario_id,
             store=store, source_run_id=source_run_id,
@@ -224,16 +221,14 @@ def replay_production_portfolio_day(
         # parent's ordered tape under the same no-network replay boundary.
         with temporal_context(context):
             result = cio_entrypoint(tape)
-            execution = _replay_execution(store, context, summary, result) if summary is not None else None
+            execution = _replay_execution(store, context, summary, result, require_quotes=production_cio) if summary is not None else None
         context.ensure_valid()
         if tape._cursor != len(tape.calls):
             raise ValueError("portfolio replay did not consume its complete LLM stream")
         if len(store.list_tool_traces(context.run_id)) != stream["tool_call_count"]:
             raise ValueError("portfolio replay did not consume its complete tool stream")
         return {
-            "result": result, "llm_call_count": stream["llm_call_count"],
-            "llm_digest": stream["llm_digest"], "tool_call_count": stream["tool_call_count"],
-            "tool_digest": stream["tool_digest"], "execution": execution,
+            "result": result, **source_facts, "execution": execution,
         }
 
     replay = replay_portfolio_day(store, scenario_id, replay_worker=worker, replay_cio=cio)
@@ -258,21 +253,6 @@ def _portfolio_summary(store: Any, run_id: str) -> Mapping[str, Any]:
         if not isinstance(policy, Mapping) or policy.get("compaction_enabled") is not False:
             raise ValueError("portfolio replay has an unsupported analyst brief policy")
     return summary
-
-
-def _brief_from_worker_state(final_state: Any) -> str:
-    """Recreate the versioned capture brief from the real analyst result."""
-    if not isinstance(final_state, Mapping):
-        raise ValueError("portfolio replay worker returned no analyst state")
-    reports = {
-        key.removesuffix("_report"): final_state.get(key, "")
-        for key in ("market_report", "sentiment_report", "news_report", "fundamentals_report")
-        if final_state.get(key)
-    }
-    brief = json.dumps(reports, ensure_ascii=False, sort_keys=True)[:2000]
-    if not brief:
-        raise ValueError("portfolio replay worker produced an empty analyst brief")
-    return brief
 
 
 def _default_worker_graph_factory(store: Any, captured_config: Any):
@@ -318,12 +298,13 @@ def _default_worker_graph_factory(store: Any, captured_config: Any):
     )
 
 
-def _replay_execution(store: Any, context: Any, summary: Mapping[str, Any], replayed_plan: Any) -> dict[str, Any]:
+def _replay_execution(store: Any, context: Any, summary: Mapping[str, Any], replayed_plan: Any, *, require_quotes: bool) -> dict[str, Any]:
     """Recompute the sealed simulator result and reject every divergence."""
     from datetime import datetime, timezone
     from decimal import Decimal
 
-    from tradingagents.portfolio_run import rebalance_orders
+    from tradingagents.dataflows.interface import route_to_vendor
+    from tradingagents.portfolio_run import _last_close, portfolio_close_request, rebalance_orders
     from tradingagents.temporal import TemporalGateway
     from tradingagents.temporal.simulation import MarketQuote, PortfolioSimulator
 
@@ -332,35 +313,21 @@ def _replay_execution(store: Any, context: Any, summary: Mapping[str, Any], repl
     execution = summary["execution"]
     submitted_at = datetime.fromisoformat(f"{summary['day']}T21:30:00+00:00").astimezone(timezone.utc)
     quotes = {symbol: Decimal(str(price)) for symbol, price in summary["quotes"].items()}
-    # A captured quote is two temporal operations: the dataflow adapter records
-    # its vendor-neutral stock lookup before the quote gateway records the
-    # derived close.  Preserve that order when replaying the parent stream;
-    # calling only the outer quote would skip an input and desynchronise the
-    # tape.  The inner result is selected strictly by its captured request, and
-    # the outer result is checked against the accounting inputs sealed below.
-    traces = store.list_tool_traces(context.source_run_id)
-    index = 0
-    while index < len(traces):
-        source = traces[index]
-        if source.tool != "dataflow.get_stock_data" or index + 1 >= len(traces):
-            raise ValueError("portfolio replay has an unsupported parent tool stream")
-        inner_evidence = store.get_evidence(source.evidence_id)
-        TemporalGateway(store).invoke(
-            source.tool, inner_evidence.request, context,
-            lambda: (_ for _ in ()).throw(AssertionError("replay contacted market-data provider")),
-        )
-        quote_trace = traces[index + 1]
-        if quote_trace.tool != "portfolio.quote.v1":
-            raise ValueError("portfolio replay quote stream lost its derived quote")
-        quote_evidence = store.get_evidence(quote_trace.evidence_id)
-        outcome = TemporalGateway(store).invoke(
-            quote_trace.tool, quote_evidence.request, context,
-            lambda: (_ for _ in ()).throw(AssertionError("replay contacted quote provider")),
-        )
-        symbol = quote_evidence.request.get("symbol")
-        if not isinstance(symbol, str) or str(outcome.value) != str(quotes.get(symbol)):
-            raise ValueError("portfolio replay quote differs from sealed input")
-        index += 2
+    # Recompute the lookup identity and CSV-to-close transformation from the
+    # real input adapter. A stored derived quote alone cannot verify either.
+    # The callback seam can assess legacy fixtures without a source tool tape.
+    if require_quotes or store.list_tool_traces(context.source_run_id):
+        for symbol in sorted(set(summary["ratings"]) | set(summary["prior_state"]["positions"])):
+            request = portfolio_close_request(symbol, summary["day"])
+            payload = route_to_vendor("get_stock_data", symbol, request["start"], request["end"])
+            close = _last_close(payload, through=summary["day"])
+            outcome = TemporalGateway(store).invoke(
+                "portfolio.quote.v1", request, context,
+                lambda: (_ for _ in ()).throw(AssertionError("replay contacted quote provider")),
+            )
+            derived = str(close) if close is not None else None
+            if derived != outcome.value or close != quotes.get(symbol):
+                raise ValueError("portfolio replay quote differs from sealed input")
     prior = summary["prior_state"]
     simulator = PortfolioSimulator(
         prior["cash"], fee_bps=execution["fee_bps"], slippage_bps=execution["slippage_bps"]
@@ -389,6 +356,15 @@ def _replay_execution(store: Any, context: Any, summary: Mapping[str, Any], repl
     if canonical_json(final_state) != canonical_json(summary["final_state"]):
         raise ValueError("portfolio replay state differs from sealed result")
     return {"orders": len(orders), "fills": fills, "final_state": final_state, "matches_seal": True}
+
+
+def _source_stream_facts(store: Any, run_id: str, calls: Iterable[Any]) -> dict[str, Any]:
+    calls = tuple(calls)
+    traces = store.list_tool_traces(run_id)
+    return {
+        "llm_call_count": len(calls), "llm_digest": stream_digest(calls),
+        "tool_call_count": len(traces), "tool_digest": stream_digest(traces),
+    }
 
 
 def _assert_consumed(stream: Mapping[str, Any], result: Mapping[str, Any]) -> None:

@@ -1,15 +1,18 @@
 """Capture and replay the actual multi-ticker, four-analyst portfolio path."""
-import socket
 import json
-from datetime import datetime, timezone
+import socket
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from types import SimpleNamespace
 
+import pytest
 from langchain_core.language_models.fake_chat_models import FakeListChatModel
 
 import tradingagents.agents.analysts.sentiment_analyst as sentiment
 import tradingagents.dataflows.interface as interface
 import tradingagents.graph.trading_graph as graph_module
 import tradingagents.llm_clients.factory as factory
+import tradingagents.portfolio_run as portfolio_run
 from tradingagents.portfolio_replay import replay_production_portfolio_day
 from tradingagents.portfolio_run import production_day_inputs, run_portfolio_day
 from tradingagents.temporal import TemporalStore
@@ -23,8 +26,11 @@ class FixtureModel(FakeListChatModel):
         return {**super()._get_invocation_params(stop=stop, **kwargs), "max_tokens": 1200}
 
 
-def test_actual_portfolio_capture_replays_without_providers(tmp_path, monkeypatch):
-    day = datetime.now(timezone.utc).date().isoformat()
+@pytest.mark.parametrize("mutation", [None, "report", "quote", "missing_tape"])
+def test_actual_portfolio_capture_replays_without_providers(tmp_path, monkeypatch, mutation):
+    # Keep this synthetic forward capture ahead of its actual observations,
+    # independent of when the offline fixture runs.
+    day = (datetime.now(timezone.utc) + timedelta(days=1)).date().isoformat()
     network_attempts = []
 
     def forbidden_network(*args, **kwargs):
@@ -69,7 +75,29 @@ def test_actual_portfolio_capture_replays_without_providers(tmp_path, monkeypatc
         monkeypatch.setattr(sentiment, "fetch_stocktwits_messages", forbidden_network)
         monkeypatch.setattr(sentiment, "fetch_reddit_posts", forbidden_network)
         for method, vendors in interface.VENDOR_METHODS.items():
-            monkeypatch.setitem(interface.VENDOR_METHODS, method, {vendor: forbidden_network for vendor in vendors})
+            monkeypatch.setitem(interface.VENDOR_METHODS, method, dict.fromkeys(vendors, forbidden_network))
+        if mutation == "report":
+            propagate = graph_module.TradingAgentsGraph.propagate
+
+            def changed_report(*args, **kwargs):
+                state, signal = propagate(*args, **kwargs)
+                state["news_report"] = "A changed graph output must reach the CIO boundary."
+                return state, signal
+
+            monkeypatch.setattr(graph_module.TradingAgentsGraph, "propagate", changed_report)
+        elif mutation == "quote":
+            monkeypatch.setattr(portfolio_run, "_last_close", lambda *args, **kwargs: Decimal("999"))
+        elif mutation == "missing_tape":
+            worker_id = scenario.metadata["replay_manifest"]["workers"][0]["run_id"]
+            call_id = store.list_llm_calls(None, temporal_run_id=worker_id)[0].call_id
+            with store._connect() as connection:
+                connection.execute("DELETE FROM llm_calls WHERE call_id = ?", (call_id,))
+        if mutation:
+            message = {"report": "research differs", "quote": "quote differs", "missing_tape": "complete LLM"}[mutation]
+            with pytest.raises(ValueError, match=message):
+                replay_production_portfolio_day(store, scenario_id)
+            assert network_attempts == []
+            return
         replayed = replay_production_portfolio_day(store, scenario_id)
         assert replayed["execution"]["matches_seal"] is True
         assert replayed["execution"]["fills"]

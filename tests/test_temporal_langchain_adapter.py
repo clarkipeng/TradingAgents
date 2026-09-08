@@ -146,6 +146,22 @@ def test_tape_chat_model_loads_the_capture_run_named_by_a_scenario(tmp_path):
     assert model.invoke([HumanMessage(content="hello")]).content == "world"
 
 
+def test_only_parallel_worker_tapes_allow_exact_prompt_reordering(tmp_path):
+    store = TemporalStore(tmp_path)
+    _taped_chat_call(store, "first analyst", AIMessage(content="first report"), uuid4())
+    _taped_chat_call(store, "second analyst", AIMessage(content="second report"), uuid4())
+    sequential = TapeChatModel.from_store(store)
+    with pytest.raises(TapeMismatchError, match="prompt mismatch"):
+        sequential.invoke("second analyst")
+    parallel = TapeChatModel.from_store(store, match_parallel_prompts=True)
+    assert parallel.invoke("second analyst").content == "second report"
+    with pytest.raises(TapeMismatchError, match="prompt mismatch"):
+        parallel.invoke("second analyst")
+    assert parallel.invoke("first analyst").content == "first report"
+    with pytest.raises(TapeMismatchError, match="exhausted"):
+        parallel.invoke("first analyst")
+
+
 def test_tape_chat_model_replays_structured_tool_output(tmp_path):
     class Answer(BaseModel):
         action: str
