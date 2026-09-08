@@ -46,3 +46,18 @@ def test_retention_plan_is_non_destructive_and_protects_runs(tmp_path):
     assert plan["candidate_trace_rows"]["llm_calls"] == 0
     assert plan["inline_payloads_with_artifacts"] == 1
     assert (tmp_path / "temporal.sqlite3").read_bytes() == before
+
+
+def test_retention_automatically_protects_sealed_child_streams(tmp_path):
+    with TemporalStore(tmp_path) as store:
+        at = datetime(2026, 9, 1, tzinfo=timezone.utc)
+        for call_id, temporal_run_id in [("model-call", "parent:research:A"), ("debug-call", "debug")]:
+            store.begin_llm_call(call_id, {"prompt": "fixture"}, temporal_run_id=temporal_run_id, started_at=at)
+            store.finish_llm_call(call_id, response={"answer": "fixture"}, completed_at=at)
+        store.seal_scenario("day", as_of=at, basis="forward-captured", capture_run_id="parent", metadata={
+            "replay_manifest": {"workers": [{"run_id": "parent:research:A"}], "cio": {"run_id": "parent"}},
+        })
+        plan = store.retention_plan(before=datetime(2026, 9, 2, tzinfo=timezone.utc))
+        assert plan["candidate_trace_rows"]["llm_calls"] == 1
+        assert plan["protected_run_ids"] == ("parent", "parent:research:A")
+        assert store.get_llm_call("model-call") is not None
