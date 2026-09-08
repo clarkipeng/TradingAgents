@@ -79,7 +79,9 @@ class TestTool:
         assert "Verified market data snapshot for COF" in out
 
     def test_tool_capture_and_replay_use_the_temporal_boundary(self, tmp_path, monkeypatch):
-        from tradingagents.agents.utils.market_data_validation_tools import get_verified_market_snapshot
+        from tradingagents.agents.utils.market_data_validation_tools import (
+            get_verified_market_snapshot,
+        )
         monkeypatch.setattr(validator, "load_ohlcv", lambda s, d: _sample_ohlcv())
         store = TemporalStore(tmp_path)
         captured = TemporalContext.at(TemporalMode.LIVE_CAPTURE, datetime.now(timezone.utc), store=store)

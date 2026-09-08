@@ -4,8 +4,8 @@ import pytest
 
 from tradingagents.portfolio_replay import (
     build_portfolio_replay_manifest,
-    replay_production_portfolio_day,
     replay_portfolio_day,
+    replay_production_portfolio_day,
     stream_digest,
     validate_portfolio_replay_manifest,
 )

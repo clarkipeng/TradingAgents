@@ -19,16 +19,15 @@ from datetime import datetime, timedelta, timezone
 
 from tradingagents.temporal.models import canonical_json
 from tradingagents.temporal.ranking import (
+    BODY_WEIGHT,
     INDEX_VERSION,
     RECENCY_HALF_LIFE_DAYS,
     STATIC_STORE_ALIASES,
     TITLE_WEIGHT,
-    BODY_WEIGHT,
     _terms,
     build_eligible_index,
     rank,
 )
-
 
 # --- Reference: the previous implementation, verbatim behavior. ---
 

@@ -85,9 +85,10 @@ def test_x_posts_refuses_subjects_outside_the_roster(tmp_path):
 
 @pytest.mark.unit
 def test_graph_registers_x_posts_with_the_temporal_tools(monkeypatch):
+    import copy
+
     from tradingagents.default_config import DEFAULT_CONFIG
     from tradingagents.graph.trading_graph import TradingAgentsGraph
-    import copy
 
     config = copy.deepcopy(DEFAULT_CONFIG)
     config["temporal"] = {

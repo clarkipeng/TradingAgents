@@ -77,13 +77,6 @@ from tradingagents.dataflows.media_sources import (
     looks_company_authored,
 )
 from tradingagents.dataflows.media_store import open_store
-from tradingagents.dataflows.x_roster import (
-    X_ROSTER_STATIC_SLOTS,
-    X_ROSTER_V1_COLLECTOR_SEMANTICS_ID,
-    X_ROSTER_V1_POLICY,
-    X_ROSTER_V1_PROTOCOL_ID,
-    x_roster_cycle_resolution,
-)
 from tradingagents.dataflows.shadow_sources import (
     SOURCE_SHADOW_STATIC_SLOTS,
     SOURCE_SHADOW_V1_COLLECTOR_SEMANTICS_ID,
@@ -94,6 +87,13 @@ from tradingagents.dataflows.shadow_sources import (
     source_shadow_cycle_spec,
 )
 from tradingagents.dataflows.trading_clock import TradingClock
+from tradingagents.dataflows.x_roster import (
+    X_ROSTER_STATIC_SLOTS,
+    X_ROSTER_V1_COLLECTOR_SEMANTICS_ID,
+    X_ROSTER_V1_POLICY,
+    X_ROSTER_V1_PROTOCOL_ID,
+    x_roster_cycle_resolution,
+)
 from tradingagents.dataflows.x_shadow import (
     X_SHADOW_COLLECTOR_SEMANTICS_ID,
     X_SHADOW_POLICY,
@@ -107,8 +107,10 @@ from tradingagents.global_research import (
     _raw_content_id,
     is_formally_eligible_evidence,
 )
-from tradingagents.logging_utils import safe_exception_site as _exception_site
-from tradingagents.logging_utils import safe_exception_type as _exception_kind
+from tradingagents.logging_utils import (
+    safe_exception_site as _exception_site,
+    safe_exception_type as _exception_kind,
+)
 from tradingagents.operations import emit_alert, probe_alert_webhook
 from tradingagents.research_protocol import (
     GLOBAL_EVENT_V2_COLLECTION_PROTOCOL_ID,
@@ -3702,7 +3704,7 @@ def poll_forever(
                 # Shadow telemetry runs only after formal coverage and health
                 # are terminal. It cannot change either result.
                 _run_post_cycle_hook(
-                    lambda: poll_x_shadow_once(store, shadow_period_utc, max_topics=x_topic_limit),
+                    lambda period=shadow_period_utc: poll_x_shadow_once(store, period, max_topics=x_topic_limit),
                     stop,
                     lease_guard=lease_guard,
                 )
@@ -3712,7 +3714,7 @@ def poll_forever(
                 if lease_guard is not None:
                     lease_guard.assert_held()
                 _run_post_cycle_hook(
-                    lambda: poll_source_shadow_once(store, shadow_period_utc),
+                    lambda period=shadow_period_utc: poll_source_shadow_once(store, period),
                     stop,
                     lease_guard=lease_guard,
                 )
@@ -3723,7 +3725,7 @@ def poll_forever(
                 if lease_guard is not None:
                     lease_guard.assert_held()
                 _run_post_cycle_hook(
-                    lambda: poll_x_roster_once(store, shadow_period_utc),
+                    lambda period=shadow_period_utc: poll_x_roster_once(store, period),
                     stop,
                     lease_guard=lease_guard,
                 )

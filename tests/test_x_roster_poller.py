@@ -38,9 +38,9 @@ def test_roster_is_fifty_unique_frozen_tickers():
     assert len(X_ROSTER_TICKERS) == 50
     assert len(set(X_ROSTER_TICKERS)) == 50
     assert all(ticker == ticker.upper() for ticker in X_ROSTER_TICKERS)
-    assert X_ROSTER_STATIC_SLOTS == tuple(
+    assert tuple(
         ("x", f"cashtag:{ticker}") for ticker in X_ROSTER_TICKERS
-    )
+    ) == X_ROSTER_STATIC_SLOTS
     assert X_ROSTER_V1_PROTOCOL_ID.startswith("protocol_")
     assert X_ROSTER_V1_COLLECTOR_SEMANTICS_ID.startswith("collector_")
 

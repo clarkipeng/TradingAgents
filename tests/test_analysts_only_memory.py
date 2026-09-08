@@ -23,8 +23,9 @@ def test_analysts_only_graph_never_reads_decision_memory(tmp_path):
     # Initial-state construction is the boundary that formerly performed the
     # unused read; no provider/model execution is needed to prove it.
     graph._run_graph = graph._run_graph
-    from tradingagents.temporal import TemporalContext, TemporalMode, temporal_context
     from datetime import datetime, timezone
+
+    from tradingagents.temporal import TemporalContext, TemporalMode, temporal_context
     with temporal_context(TemporalContext.at(TemporalMode.LIVE, datetime.now(timezone.utc))):
         # Force only setup by replacing compiled graph invocation.
         graph.graph.invoke = lambda state, **_kwargs: state

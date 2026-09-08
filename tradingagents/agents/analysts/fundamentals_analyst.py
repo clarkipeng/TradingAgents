@@ -3,11 +3,11 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from tradingagents.agents.utils.agent_utils import (
     get_balance_sheet,
     get_cashflow,
+    get_evidence_brief_guidance,
     get_fundamentals,
     get_income_statement,
     get_instrument_context_from_state,
     get_language_instruction,
-    get_evidence_brief_guidance,
     get_temporal_search_guidance,
 )
 

@@ -26,18 +26,19 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_DIR))
 
-from dotenv import load_dotenv
-
 load_dotenv(PROJECT_DIR / ".env", override=False)
 
-from tradingagents.default_config import DEFAULT_CONFIG
-from tradingagents.graph.trading_graph import TradingAgentsGraph
-from tradingagents.temporal import TemporalStore
-from tradingagents.temporal_adapters.langchain import LangChainTapeRecorder
-from tradingagents.temporal_adapters.tradingagents import replay_scenario
+# This executable bootstraps its repository path and import-time configuration.
+from tradingagents.default_config import DEFAULT_CONFIG  # noqa: E402
+from tradingagents.graph.trading_graph import TradingAgentsGraph  # noqa: E402
+from tradingagents.temporal import TemporalStore  # noqa: E402
+from tradingagents.temporal_adapters.langchain import LangChainTapeRecorder  # noqa: E402
+from tradingagents.temporal_adapters.tradingagents import replay_scenario  # noqa: E402
 
 STORE_PATH = os.environ.get(
     "TRADINGAGENTS_TEMPORAL_STORE", str(Path.home() / ".tradingagents" / "temporal")

@@ -97,7 +97,7 @@ def test_cio_gross_overage_is_normalized_not_rejected():
     """Full-book proposals routinely sum a hair over the limit (30 float
     weights); scaling down is deterministic and can only reduce exposure.
     Rejecting them liquidated the book over rounding epsilon."""
-    ratings = {t: "Hold" for t in ("NVDA", "MSFT", "AAPL", "AMZN")}
+    ratings = dict.fromkeys(("NVDA", "MSFT", "AAPL", "AMZN"), "Hold")
 
     def eager_llm(prompt: str) -> str:
         return '{"weights": {"NVDA": 0.10, "MSFT": 0.10, "AAPL": 0.10, "AMZN": 0.10}}'

@@ -95,9 +95,8 @@ class PolymarketFilterTests(unittest.TestCase):
         wrong_typed["events"][0]["markets"].append(
             _market("Broken?", 0.5, volume="lots", end_date="2030-12-31T00:00:00Z")
         )
-        with mock.patch.object(polymarket, "_request", return_value=wrong_typed):
-            with self.assertRaises(ProviderResponseError):
-                polymarket.iter_forward_markets("anything", limit=10)
+        with mock.patch.object(polymarket, "_request", return_value=wrong_typed), self.assertRaises(ProviderResponseError):
+            polymarket.iter_forward_markets("anything", limit=10)
 
 
 @pytest.mark.unit

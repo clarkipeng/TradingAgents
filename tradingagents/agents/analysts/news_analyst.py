@@ -1,6 +1,7 @@
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 from tradingagents.agents.utils.agent_utils import (
+    get_evidence_brief_guidance,
     get_global_news,
     get_hacker_news,
     get_insider_transactions,
@@ -9,7 +10,6 @@ from tradingagents.agents.utils.agent_utils import (
     get_macro_indicators,
     get_news,
     get_prediction_markets,
-    get_evidence_brief_guidance,
     get_temporal_search_guidance,
 )
 from tradingagents.dataflows.config import get_config

@@ -185,14 +185,10 @@ def test_write_lock_serializes_mutators(tmp_path):
     import fcntl
 
     store = TemporalStore(tmp_path)
-    with store.write_lock():
-        probe = open(tmp_path / "mutator.lock", "a+")
+    with store.write_lock(), open(tmp_path / "mutator.lock", "a+") as probe:
         try:
-            try:
-                fcntl.flock(probe.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-            except BlockingIOError:
-                pass
-            else:
-                raise AssertionError("write_lock did not exclude a second mutator")
-        finally:
-            probe.close()
+            fcntl.flock(probe.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            pass
+        else:
+            raise AssertionError("write_lock did not exclude a second mutator")
