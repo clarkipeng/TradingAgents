@@ -38,7 +38,7 @@ class TemporalGateway:
         *,
         source: str | None = None,
     ) -> TemporalOutcome:
-        if context.mode is TemporalMode.REPLAY:
+        if context.mode in (TemporalMode.REPLAY, TemporalMode.FROZEN_EVIDENCE):
             evidence = self._replay_evidence(tool, request, context)
             if evidence is None:
                 raise ReplayMissError(

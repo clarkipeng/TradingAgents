@@ -178,7 +178,7 @@ def test_run_portfolio_day_seals_state_and_next_day_reads_it(tmp_path):
     quotes = {ticker: Decimal("500") for ticker in tickers}
 
     def research(ticker, context):
-        assert context.mode.value == "live_capture"
+        assert context.mode.value == "frozen_evidence"
         if ticker == "MSFT":
             raise RuntimeError("sweep hiccup")  # one failure must not kill the day
         return {"rating": "Overweight", "brief": f"{ticker} looks strong"}
