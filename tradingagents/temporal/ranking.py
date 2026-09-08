@@ -71,9 +71,20 @@ class EligibleChunkIndex:
     sum_body_lens: int
 
 
-def build_eligible_index(connection: sqlite3.Connection, *, as_of: str) -> EligibleChunkIndex:
-    document_columns = {row[1] for row in connection.execute("PRAGMA table_info(documents)")}
-    chunk_columns = {row[1] for row in connection.execute("PRAGMA table_info(document_chunks)")}
+def build_eligible_index(
+    connection: sqlite3.Connection, *, as_of: str,
+    documents_table: str = "documents", chunks_table: str = "document_chunks",
+) -> EligibleChunkIndex:
+    """Build an index from one immutable generation.
+
+    Table names are store-owned identifiers.  Keeping them as explicit
+    parameters makes a pinned read impossible to accidentally hydrate from
+    the newly published generation.
+    """
+    if not re.fullmatch(r"[A-Za-z0-9_]+", documents_table) or not re.fullmatch(r"[A-Za-z0-9_]+", chunks_table):
+        raise ValueError("unsafe index table name")
+    document_columns = {row[1] for row in connection.execute(f"PRAGMA table_info({documents_table})")}
+    chunk_columns = {row[1] for row in connection.execute(f"PRAGMA table_info({chunks_table})")}
     cluster = "d.cluster_key" if "cluster_key" in document_columns else "d.doc_key"
     title = "d.title" if "title" in document_columns else "''"
     published = "d.published_at" if "published_at" in document_columns else "NULL"
@@ -81,7 +92,7 @@ def build_eligible_index(connection: sqlite3.Connection, *, as_of: str) -> Eligi
     cursor = connection.execute(
         f"""SELECT c.doc_key, d.parent_evidence_id, {cluster} AS cluster_key, {title} AS title, c.body,
                   d.available_at, {published} AS published_at
-           FROM document_chunks AS c JOIN documents AS d ON d.doc_key = c.doc_key
+           FROM {chunks_table} AS c JOIN {documents_table} AS d ON d.doc_key = c.doc_key
            WHERE d.available_at <= ? ORDER BY c.doc_key, {chunk_order}""",
         (as_of,),
     )

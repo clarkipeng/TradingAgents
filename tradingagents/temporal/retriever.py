@@ -30,6 +30,7 @@ class TemporalRetriever:
         self, query: str, *, as_of: datetime, limit: int = 10, page: int = 1,
         date_from: str | None = None, date_to: str | None = None,
         source: str | None = None, corpus_hash_pin: str | None = None,
+        generation_id: int | None = None,
     ) -> TemporalSearchResponse:
         """One search, pinned to a single document generation.
 
@@ -39,7 +40,7 @@ class TemporalRetriever:
         retry re-runs the whole search against the settled generation.
         """
         for _attempt in range(2):
-            generation_before = self.store.active_generation_id()
+            generation_before = self.store.active_generation_id() if generation_id is None else generation_id
             response = self._search_once(
                 query, as_of=as_of, limit=limit, page=page, date_from=date_from,
                 date_to=date_to, source=source, corpus_hash_pin=corpus_hash_pin,
@@ -65,6 +66,7 @@ class TemporalRetriever:
         cutoff = format_timestamp(parsed_as_of)
         if generation_id is None:
             generation_id = self.store.active_generation_id()
+        documents_table, _chunks_table, _fts_table = self.store.generation_tables(generation_id)
         corpus_hash = self.store.corpus_hash(as_of=parsed_as_of)
         if page > 1 and corpus_hash_pin != corpus_hash:
             raise ValueError("page > 1 requires a matching page-1 corpus_hash pin")
@@ -85,7 +87,7 @@ class TemporalRetriever:
                 parameters.extend((source, source, f"%{source}%"))
             with self.store._connect() as connection:
                 filtered = {row["doc_key"] for row in connection.execute(
-                    "SELECT d.doc_key FROM documents d JOIN evidence e ON e.evidence_id = d.parent_evidence_id "
+                    f"SELECT d.doc_key FROM {documents_table} d JOIN evidence e ON e.evidence_id = d.parent_evidence_id "
                     f"WHERE {' AND '.join(predicates)}", parameters,
                 ).fetchall()}
 
@@ -93,7 +95,7 @@ class TemporalRetriever:
         if not query.strip():
             with self.store._connect() as connection:
                 rows = connection.execute(
-                    "SELECT doc_key, cluster_key FROM documents WHERE available_at <= ? "
+                    f"SELECT doc_key, cluster_key FROM {documents_table} WHERE available_at <= ? "
                     "ORDER BY available_at DESC, doc_key ASC", (cutoff,),
                 ).fetchall()
             best: dict[str, dict[str, Any]] = {}
@@ -122,11 +124,11 @@ class TemporalRetriever:
             with self.store._connect() as connection:
                 hydrated_rows = connection.execute(
                     "SELECT d.*, e.*, json_extract(e.response_json, '$.metadata') AS metadata_json "
-                    f"FROM documents d JOIN evidence e ON e.evidence_id = d.parent_evidence_id WHERE d.doc_key IN ({placeholders})", keys,
+                    f"FROM {documents_table} d JOIN evidence e ON e.evidence_id = d.parent_evidence_id WHERE d.doc_key IN ({placeholders})", keys,
                 ).fetchall()
                 hydrated = {row["doc_key"]: row for row in hydrated_rows}
                 siblings = {row["cluster_key"]: tuple(item["doc_key"] for item in connection.execute(
-                    "SELECT doc_key FROM documents WHERE cluster_key=? AND doc_key<>? ORDER BY doc_key",
+                    f"SELECT doc_key FROM {documents_table} WHERE cluster_key=? AND doc_key<>? ORDER BY doc_key",
                     (row["cluster_key"], row["doc_key"]),
                 ).fetchall()) for row in selected}
 
