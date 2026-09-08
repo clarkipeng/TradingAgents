@@ -27,6 +27,14 @@ def stream_digest(records: Iterable[Any]) -> str:
     return hashlib.sha256(canonical_json(facts).encode("utf-8")).hexdigest()
 
 
+def tool_stream_digest(records: Iterable[Any]) -> str:
+    """Hash replay-stable request/evidence membership in sequence order."""
+    facts = [{"sequence": record.sequence, "tool": record.tool,
+              "request_key": record.request_key, "evidence_id": record.evidence_id}
+             for record in records]
+    return hashlib.sha256(canonical_json(facts).encode("utf-8")).hexdigest()
+
+
 def build_portfolio_replay_manifest(
     store: Any,
     *,
@@ -306,6 +314,46 @@ def _replay_execution(store: Any, context: Any, summary: Mapping[str, Any], repl
     if canonical_json(replayed_plan) != canonical_json(summary["plan"]):
         raise ValueError("portfolio replay CIO plan differs from sealed plan")
     execution = summary["execution"]
+    if execution.get("policy") == "next-open-v1":
+        from tradingagents.portfolio_execution import ExecutionTiming, execute_next_open_targets
+        from tradingagents.portfolio_run import production_execution_inputs
+        from tradingagents.temporal import TemporalContext, TemporalMode, temporal_context
+        from tradingagents.temporal.clock import parse_timestamp
+
+        source_run_id = summary.get("execution_run_id")
+        if not source_run_id:
+            raise ValueError("portfolio replay lacks execution tape identity")
+        replay_context = TemporalContext.at(
+            TemporalMode.REPLAY, context.clock.as_of, store=store,
+            scenario_id=context.scenario_id, source_run_id=source_run_id,
+            retrieval_generation=context.retrieval_generation,
+        )
+        submitted_at = parse_timestamp(summary["submitted_at"])
+        filled_at = parse_timestamp(summary["filled_at"])
+        quote_fn = production_execution_inputs(store)["execution_quote_fn"]
+        with temporal_context(replay_context):
+            quotes = {
+                symbol: quote_fn(symbol, summary["execution_session"], submitted_at)
+                for symbol in sorted(summary["quotes"])
+            }
+            result = execute_next_open_targets(
+                summary["prior_state"], replayed_plan, quotes,
+                timing=ExecutionTiming(
+                    parse_timestamp(summary["decision_ready_at"]),
+                    summary["execution_session"], submitted_at, filled_at,
+                ), fee_bps=execution["fee_bps"], slippage_bps=execution["slippage_bps"],
+            )
+        replay_traces = store.list_tool_traces(replay_context.run_id)
+        tape = summary.get("execution_tape", {})
+        if (len(replay_traces) != tape.get("tool_call_count")
+                or tool_stream_digest(replay_traces) != tape.get("tool_digest")):
+            raise ValueError("portfolio replay consumed a different execution tool stream")
+        if canonical_json(result["fills"]) != canonical_json(summary["fills"]):
+            raise ValueError("portfolio replay fills differ from sealed result")
+        if canonical_json(result["final_state"]) != canonical_json(summary["final_state"]):
+            raise ValueError("portfolio replay state differs from sealed result")
+        return {"orders": len(result["fills"]), "fills": result["fills"],
+                "final_state": result["final_state"], "matches_seal": True}
     submitted_at = datetime.fromisoformat(f"{summary['day']}T21:30:00+00:00").astimezone(timezone.utc)
     quotes = {symbol: Decimal(str(price)) for symbol, price in summary["quotes"].items()}
     # Recompute the lookup identity and CSV-to-close transformation from the

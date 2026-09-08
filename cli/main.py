@@ -1552,8 +1552,11 @@ def temporal_portfolio_run(
     ),
     deep_model: str = typer.Option("gpt-5.4", help="CIO model."),  # noqa: B008
     sweep_model: str = typer.Option("gpt-5.4-mini", help="Per-ticker research model."),  # noqa: B008
+    capture_cutoff: str | None = typer.Option(
+        None, "--capture-cutoff", help="Actual evidence cutoff (aware ISO-8601; defaults to invocation time)."
+    ),
 ):
-    """Run one sealed portfolio day: sweep, CIO sizing, simulated fills."""
+    """Publish one immutable portfolio target for its next eligible opening."""
     from tradingagents.portfolio_run import production_day_inputs, run_portfolio_day
     from tradingagents.temporal import TemporalStore
 
@@ -1564,7 +1567,16 @@ def temporal_portfolio_run(
     inputs = production_day_inputs(
         temporal_store, deep_model=deep_model, sweep_model=sweep_model
     )
-    summary = run_portfolio_day(temporal_store, symbols, day=date, **inputs)
+    cutoff = (
+        datetime.datetime.fromisoformat(capture_cutoff.replace("Z", "+00:00"))
+        if capture_cutoff else datetime.datetime.now(datetime.timezone.utc)
+    )
+    if cutoff.tzinfo is None:
+        raise typer.BadParameter("capture cutoff must include a timezone")
+    summary = run_portfolio_day(
+        temporal_store, symbols, day=date, capture_cutoff=cutoff,
+        execution_policy="next-open-v1", **inputs,
+    )
     typer.echo(json.dumps(summary, indent=2, sort_keys=True))
     # A non-sealed execution can have no per-ticker failures (for example a
     # budget or ownership outcome). The durable day outcome is the CLI success
@@ -1574,6 +1586,30 @@ def temporal_portfolio_run(
         raise typer.Exit(code=1)
     if summary.get("failures"):
         typer.echo(f"failures: {', '.join(summary['failures'])}", err=True)
+
+
+@app.command("temporal-portfolio-execute")
+def temporal_portfolio_execute(
+    date: str = typer.Option(..., "--date", help="Pending decision day YYYY-MM-DD."),  # noqa: B008
+    store: Path = typer.Option(  # noqa: B008
+        Path(".tradingagents/temporal"), "--store", help="Temporal evidence-store directory."
+    ),
+):
+    """Claim and execute a pending target using its eligible raw opening tape."""
+    from tradingagents.portfolio_run import (
+        execute_pending_portfolio_day,
+        production_execution_inputs,
+    )
+    from tradingagents.temporal import TemporalStore
+
+    temporal_store = TemporalStore(store)
+    summary = execute_pending_portfolio_day(
+        temporal_store, date, **production_execution_inputs(temporal_store)
+    )
+    typer.echo(json.dumps(summary, indent=2, sort_keys=True))
+    if summary.get("status") == "failed_unsealed":
+        typer.echo(f"portfolio execution failed: {summary.get('reason', 'unknown')}", err=True)
+        raise typer.Exit(code=1)
 
 
 @app.command("temporal-portfolio-report")
