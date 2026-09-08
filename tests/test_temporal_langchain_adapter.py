@@ -193,6 +193,23 @@ def test_temporal_search_tool_uses_context_time_and_returns_citations(tmp_path):
     )
 
 
+def test_temporal_search_tool_forwards_the_context_generation_pin(tmp_path):
+    store = TemporalStore(tmp_path)
+    store.record("corpus.document", {"url": "alpha"}, {"text": "alpha signal"}, available_at=datetime(2025, 1, 2, 9, tzinfo=UTC))
+    store.reindex_documents()
+    pinned = store.active_generation_id()
+    store.record("corpus.document", {"url": "beta"}, {"text": "beta signal"}, available_at=datetime(2025, 1, 2, 9, tzinfo=UTC))
+    store.reindex_documents()
+    context = TemporalContext.at(
+        TemporalMode.REPLAY, datetime(2025, 1, 2, 10, tzinfo=UTC), store=store,
+        retrieval_generation=pinned,
+    )
+    with temporal_context(context):
+        result = json.loads(create_temporal_search_tool(store).invoke({"query": "beta"}))
+    assert result["results"] == []
+    assert result["manifest"]["generation_id"] == pinned
+
+
 def test_fetch_tool_reports_bad_model_arguments_instead_of_crashing_the_run(tmp_path):
     """Observed live 2026-08-23: an agent passed a hallucinated doc_key and
     the raw KeyError killed the whole replay run mid-experiment. A tool error
