@@ -22,6 +22,11 @@ from tradingagents.model_budget import DailyModelBudget
 from tradingagents.temporal import TemporalRunInvalidError, TemporalStore
 from tradingagents.temporal.clock import format_timestamp, parse_timestamp
 from tradingagents.temporal.simulation import Order, OrderSide
+from tradingagents.temporal.store import (
+    PORTFOLIO_CLAIM_STALE_SECONDS as _PORTFOLIO_CLAIM_STALE_SECONDS,
+)
+
+PORTFOLIO_CLAIM_STALE_SECONDS = _PORTFOLIO_CLAIM_STALE_SECONDS
 
 DEFAULT_CONSTRAINTS = {
     "mode": "long-only",
@@ -257,6 +262,9 @@ def _run_portfolio_day(
     slippage_bps: float = 2,
     run_id: str | None = None,
     replay_graph_config: dict | None = None,
+    capture_cutoff: datetime | None = None,
+    decision_ready_clock=lambda: datetime.now(timezone.utc),
+    execution_policy: str = "close-legacy-v1",
     _claim_id: str,
 ) -> dict:
     """One sealed portfolio day: sweep, CIO sizing, simulated fills, sealed state.
@@ -294,7 +302,7 @@ def _run_portfolio_day(
             "planned_research_calls": planned_research_calls,
         }
 
-    as_of = parse_timestamp(f"{day}T21:30:00Z")
+    as_of = parse_timestamp(capture_cutoff or f"{day}T21:30:00Z")
     # A backfill may compute new model output, but it must not call mutable
     # data providers and label their response historical. Its tool boundary
     # therefore reads only the evidence world eligible at the requested day.
@@ -384,6 +392,51 @@ def _run_portfolio_day(
         prior = portfolio_state_asof(
             store, as_of, initial_cash=constraints["initial_cash"]
         )
+        if execution_policy == "next-open-v1":
+            plan = cio_allocate(
+                ratings, briefs=briefs, constraints=constraints,
+                complete_llm=lambda prompt: budgeted_call(complete_llm, prompt),
+            )
+            if deadline_breached:
+                return {"status": "failed_unsealed", "reason": "deadline_exceeded", "scenario_id": scenario_id, "day": day}
+            context.ensure_valid()
+            decision_ready_at = parse_timestamp(decision_ready_clock())
+            if decision_ready_at < as_of:
+                return {"status": "failed_unsealed", "reason": "decision_ready_before_capture_cutoff", "scenario_id": scenario_id, "day": day}
+            from tradingagents.portfolio_execution import next_open_timing
+            from tradingagents.portfolio_replay import build_portfolio_replay_manifest
+            timing = next_open_timing(decision_ready_at)
+            replay_manifest = build_portfolio_replay_manifest(
+                store, parent_run_id=context.run_id or "", tickers=tickers,
+                instrument_contexts=instrument_contexts,
+                execution_policy=execution_policy,
+            )
+            pending = {
+                "version": "portfolio-pending-decision-v1", "day": day,
+                "scenario_id": scenario_id, "run_id": context.run_id,
+                "capture_cutoff": format_timestamp(as_of),
+                "decision_ready_at": format_timestamp(decision_ready_at),
+                "execution_session": timing.execution_session,
+                "ratings": ratings, "briefs": briefs, "constraints": constraints,
+                "prior_state": {"cash": str(prior["cash"]), "positions": {
+                    symbol: str(quantity) for symbol, quantity in prior["positions"].items()}},
+                "execution": {"fee_bps": fee_bps, "slippage_bps": slippage_bps,
+                              "policy": execution_policy},
+                "plan": plan, "failures": failures, "coverage": coverage,
+                "research_call_count": research_calls,
+                "elapsed_seconds": round(time.monotonic() - started, 3),
+                "instrument_contexts": instrument_contexts,
+                "replay_graph_config": replay_graph_config,
+                "replay_manifest": replay_manifest,
+            }
+            store.create_portfolio_decision(
+                day, _claim_id, capture_cutoff=as_of,
+                decision_ready_at=decision_ready_at,
+                execution_session=timing.execution_session,
+                capture_run_id=context.run_id or "", payload=pending,
+            )
+            return {**pending, "status": "pending_execution"}
+
         symbols = sorted(set(ratings) | set(prior["positions"]))
         quotes: dict[str, Decimal] = {}
         for symbol in symbols:
@@ -586,6 +639,111 @@ def portfolio_report(
     }
 
 
+def execute_pending_portfolio_day(
+    store: TemporalStore, day: str, *, execution_quote_fn,
+    execution_clock=lambda: datetime.now(timezone.utc), claim_id: str | None = None,
+) -> dict:
+    """Claim and execute one immutable target at its eligible XNYS opening."""
+    import uuid
+
+    from tradingagents.portfolio_execution import (
+        ExecutionTiming,
+        execute_next_open_targets,
+    )
+    from tradingagents.research.timeline import _xnys_calendar
+    from tradingagents.temporal import TemporalContext, TemporalMode, temporal_context
+
+    with _portfolio_chain_lock(store) as owns_chain:
+        if not owns_chain:
+            return {"status": "failed_unsealed", "reason": "ownership_contended", "day": day}
+        decision = store.portfolio_decision(day)
+        if decision is None:
+            return {"status": "failed_unsealed", "reason": "missing_pending_decision", "day": day}
+        execution_claim_id = claim_id or str(uuid.uuid4())
+        claim = store.claim_portfolio_execution(
+            day, execution_claim_id, claimed_at=parse_timestamp(execution_clock())
+        )
+        if claim["status"] == "completed":
+            return {"skipped": "execution already completed", "day": day}
+        if claim["claim_id"] != execution_claim_id:
+            return {"skipped": "execution already claimed", "day": day}
+        payload = decision["payload"]
+        calendar = _xnys_calendar()
+        session = payload["execution_session"]
+        opened = calendar.session_open(session).to_pydatetime().astimezone(timezone.utc)
+        observed_at = parse_timestamp(execution_clock())
+        if observed_at < opened:
+            store.fail_portfolio_execution(day, execution_claim_id, "execution_session_not_open")
+            return {"status": "failed_unsealed", "reason": "execution_session_not_open", "day": day}
+        execution_run_id = f"{payload['run_id']}:execution:{session}:{execution_claim_id}"
+        context = TemporalContext.at(
+            TemporalMode.LIVE_CAPTURE, observed_at, store=store,
+            run_id=execution_run_id, retrieval_generation=store.active_generation_id(),
+        )
+        # The executable book is the same eligible universe the CIO saw,
+        # plus every held position required for actions and marking.
+        symbols = sorted(set(payload["ratings"]) | set(payload["prior_state"]["positions"]))
+        try:
+            with temporal_context(context):
+                quotes = {symbol: execution_quote_fn(symbol, session, opened) for symbol in symbols}
+                result = execute_next_open_targets(
+                    payload["prior_state"], payload["plan"], quotes,
+                    timing=ExecutionTiming(
+                        parse_timestamp(payload["decision_ready_at"]), session, opened, observed_at
+                    ),
+                    fee_bps=payload["execution"]["fee_bps"],
+                    slippage_bps=payload["execution"]["slippage_bps"],
+                )
+                context.ensure_valid()
+        except Exception as error:  # noqa: BLE001 - fixed outcome at the lifecycle boundary
+            code = "quote_coverage" if isinstance(error, (KeyError, ValueError)) else "execution_policy_error"
+            store.fail_portfolio_execution(day, execution_claim_id, code)
+            return {"status": "failed_unsealed", "reason": code, "day": day,
+                    "failure_type": type(error).__name__}
+        summary = {
+            **payload, "status": "completed", "execution_run_id": execution_run_id,
+            "submitted_at": result["submitted_at"], "filled_at": result["filled_at"],
+            "quotes": {symbol: {
+                "session": quote.session, "price": str(quote.price),
+                "available_at": format_timestamp(quote.available_at),
+                "adjustment_basis": quote.adjustment_basis,
+                "evidence_id": quote.evidence_id,
+                "split_ratio": str(quote.split_ratio),
+                "cash_dividend": str(quote.cash_dividend),
+            } for symbol, quote in quotes.items()},
+            "fills": result["fills"], "final_state": result["final_state"],
+            "corporate_actions": result["corporate_actions"],
+        }
+        from tradingagents.portfolio_replay import tool_stream_digest
+        execution_traces = store.list_tool_traces(execution_run_id)
+        summary["execution_tape"] = {
+            "tool_call_count": len(execution_traces),
+            "tool_digest": tool_stream_digest(execution_traces),
+        }
+        try:
+            summary["state_evidence_id"] = store.complete_portfolio_day(
+                day, decision["claim_id"], as_of=observed_at, state=result["final_state"],
+                scenario_metadata={
+                    "kind": "portfolio-day", "trade_date": day,
+                    "tickers": sorted(payload["ratings"]),
+                    "capture_cutoff": payload["capture_cutoff"],
+                    "decision_ready_at": payload["decision_ready_at"],
+                    "execution_session": session, "execution_run_id": execution_run_id,
+                    "retrieval_generation": payload.get("retrieval_generation"),
+                    "replay_graph_config": payload.get("replay_graph_config"),
+                    "replay_manifest": payload["replay_manifest"],
+                },
+                capture_run_id=payload["run_id"],
+                decision=json.dumps(payload["plan"], sort_keys=True),
+                report=json.dumps(summary, sort_keys=True),
+                execution_claim_id=execution_claim_id,
+            )
+        except Exception:  # noqa: BLE001 - seal and execution share one fixed outcome
+            store.fail_portfolio_execution(day, execution_claim_id, "execution_commit_failed")
+            return {"status": "failed_unsealed", "reason": "execution_commit_failed", "day": day}
+        return summary
+
+
 def production_day_inputs(store: TemporalStore, *, deep_model: str = "gpt-5.4",
                           sweep_model: str = "gpt-5.4-mini") -> dict:
     """Real research, CIO, and quote callables for one captured portfolio day.
@@ -713,6 +871,44 @@ def production_day_inputs(store: TemporalStore, *, deep_model: str = "gpt-5.4",
     }
 
 
+def production_execution_inputs(store: TemporalStore) -> dict:
+    """Real opening-quote adapter; the lifecycle supplies its capture context."""
+    from tradingagents.dataflows.interface import route_to_vendor
+    from tradingagents.portfolio_execution import ExecutionQuote
+    from tradingagents.temporal import TemporalGateway, current_context
+
+    def quote(symbol: str, session: str, opened_at: datetime) -> ExecutionQuote:
+        context = current_context()
+        if context is None or context.store is None:
+            raise RuntimeError("portfolio opening quote requires a temporal context")
+        request = portfolio_open_request(symbol, session)
+
+        def fetch_open():
+            payload = route_to_vendor("get_stock_data", symbol, session, session)
+            parsed = _opening_quote(payload, session=session)
+            if parsed is None:
+                raise ValueError("opening quote is missing or invalid")
+            return {key: str(value) for key, value in parsed.items()}
+
+        outcome = TemporalGateway(store).invoke(
+            "portfolio.open-quote.v1", request, context, fetch_open,
+            source="portfolio_open_quote",
+        )
+        value = outcome.value
+        return ExecutionQuote(
+            symbol=symbol, session=session, price=Decimal(value["price"]),
+            # Eligibility is the actual observation boundary, never the date
+            # printed on a provider row or the earlier scheduled open.
+            available_at=outcome.evidence.observed_at if outcome.evidence else context.clock.as_of,
+            adjustment_basis=value["adjustment_basis"],
+            evidence_id=outcome.evidence.evidence_id if outcome.evidence else "live-unsealed",
+            split_ratio=Decimal(value["split_ratio"]),
+            cash_dividend=Decimal(value["cash_dividend"]),
+        )
+
+    return {"execution_quote_fn": quote}
+
+
 def portfolio_research_result(final_state: dict, instrument_context: str | None = None) -> dict:
     """The retained v1 analyst-to-CIO contract, shared by capture and replay."""
     reports = {
@@ -728,6 +924,31 @@ def portfolio_close_request(symbol: str, day: str) -> dict:
     """The retained v1 close lookup identity, shared by capture and replay."""
     start = format_timestamp(parse_timestamp(f"{day}T00:00:00Z") - timedelta(days=7))[:10]
     return {"symbol": symbol, "start": start, "end": day, "series": "close-v1"}
+
+
+def portfolio_open_request(symbol: str, session: str) -> dict:
+    return {"symbol": symbol, "session": session, "series": "raw-open-actions-v1"}
+
+
+def _opening_quote(payload, *, session: str) -> dict[str, Decimal | str] | None:
+    """Read one exact raw opening row and its held-position actions."""
+    if not isinstance(payload, str) or payload.startswith("NO_DATA_AVAILABLE"):
+        return None
+    for row in DictReader(payload.strip().splitlines()):
+        if str(row.get("Date", "")).strip()[:10] != session:
+            continue
+        try:
+            price = Decimal(str(row.get("Open", "")).strip())
+            split = Decimal(str(row.get("Split Coefficient", "1") or "1").strip())
+            dividend = Decimal(str(row.get("Dividend Amount", "0") or "0").strip())
+        except (ArithmeticError, TypeError, ValueError):
+            return None
+        if (not price.is_finite() or price <= 0 or not split.is_finite()
+                or split <= 0 or not dividend.is_finite() or dividend < 0):
+            return None
+        return {"price": price, "split_ratio": split, "cash_dividend": dividend,
+                "adjustment_basis": "raw-ohlcv-v1"}
+    return None
 
 
 def _last_close(payload, *, through: str | None = None) -> Decimal | None:
