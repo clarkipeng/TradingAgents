@@ -559,12 +559,18 @@ class TradingAgentsGraph:
         # deterministically resolved instrument identity for all agents.
         temporal = current_context()
         is_replay = temporal is not None and temporal.mode is TemporalMode.REPLAY
+        is_frozen_research = (
+            temporal is not None and temporal.mode is TemporalMode.FROZEN_EVIDENCE
+        )
         is_scenario_capture = (
             temporal is not None
             and temporal.mode is TemporalMode.LIVE_CAPTURE
             and temporal.scenario_id is not None
         )
-        historical = is_replay or is_scenario_capture or self.config.get("backtest_mode")
+        historical = (
+            is_replay or is_frozen_research or is_scenario_capture
+            or self.config.get("backtest_mode")
+        )
         snapshot_name = "tradingagents.memory_context"
         if self.config.get("analysts_only"):
             # A portfolio sweep terminates at analyst reports.  No active

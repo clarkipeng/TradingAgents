@@ -257,8 +257,16 @@ def _run_portfolio_day(
         }
 
     as_of = parse_timestamp(f"{day}T21:30:00Z")
+    # A backfill may compute new model output, but it must not call mutable
+    # data providers and label their response historical. Its tool boundary
+    # therefore reads only the evidence world eligible at the requested day.
+    data_mode = (
+        TemporalMode.FROZEN_EVIDENCE
+        if as_of < datetime.now(timezone.utc)
+        else TemporalMode.LIVE_CAPTURE
+    )
     context = TemporalContext.at(
-        TemporalMode.LIVE_CAPTURE, as_of, store=store,
+        data_mode, as_of, store=store,
         run_id=run_id or str(uuid.uuid4()),
     )
     context.model_budget = DailyModelBudget(

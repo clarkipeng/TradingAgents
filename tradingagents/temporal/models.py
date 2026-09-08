@@ -16,6 +16,7 @@ from .clock import format_timestamp
 class TemporalMode(str, Enum):
     LIVE = "live"
     LIVE_CAPTURE = "live_capture"
+    FROZEN_EVIDENCE = "frozen_evidence"
     REPLAY = "replay"
 
 
