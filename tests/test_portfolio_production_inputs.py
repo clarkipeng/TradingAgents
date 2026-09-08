@@ -1,8 +1,9 @@
 from datetime import datetime, timezone
+from decimal import Decimal
 
 import pytest
 
-from tradingagents.portfolio_run import production_day_inputs
+from tradingagents.portfolio_run import _last_close, production_day_inputs
 from tradingagents.temporal import (
     TemporalContext,
     TemporalMode,
@@ -67,3 +68,9 @@ def test_production_quote_replays_through_temporal_boundary_without_provider(tmp
         replayed = quote("NVDA", "2026-09-07")
     assert str(replayed) == "101.25"
     assert calls == ["NVDA"]
+
+
+def test_last_close_uses_latest_eligible_session_not_csv_order():
+    payload = "Date,Close\n2026-09-08,999\n2026-09-05,100\n2026-09-07,101\n"
+    assert _last_close(payload, through="2026-09-07") == Decimal("101")
+    assert _last_close("Date,Close\n2026-09-07,NaN\n", through="2026-09-07") is None
