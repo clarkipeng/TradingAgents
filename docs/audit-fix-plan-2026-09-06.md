@@ -1,9 +1,9 @@
 # Audit fix plan
 
-Status: proposed implementation, 2026-09-06.
+Status: implementation in progress; current verified outcomes and remaining work are in [doing.md](../doing.md).
 Baseline: `afbd64f` on `agent-trading-simulation-backtest`.
 Sources: [the 33-finding audit](audit-2026-09-06.md), the attached review transcript, current code, and the existing engineering taste canon.
-This planning pass changed documentation only; it did not deploy, fetch providers, or rerun paid days.
+The packages below define the required completion gates; they are not claims of deployment or operational verification.
 
 ## Outcome and order
 
@@ -264,7 +264,7 @@ One clean trading day is insufficient for this cutover: require representative l
 ## Coverage ledger: all 33 findings
 
 IDs follow the durable audit, not the shortened chat summary.
-All implementation items are planned, not complete.
+This ledger maps required proof to every finding. Package completion is recorded in [doing.md](../doing.md), separately from individual passing checks.
 
 | ID | Finding | Package | Required proof |
 | --- | --- | --- | --- |
@@ -325,7 +325,7 @@ Durable prevention rules live in [taste.md](../taste.md), linked from `AGENTS.md
 
 Keep one integration owner and one change per coherent contract.
 Portfolio/store/supervisor edits overlap; do not assign simultaneous writers to the same files.
-No agent fleet is required for this plan.
+The user requested parallel implementation through Sightmesh: use one lead with bounded, non-overlapping owners and reuse existing workers when useful.
 Each change records its invariant, focused checks, outcome, and rollback condition; update this ledger and `doing.md` together.
 
 Use fixture-backed integration, fault injection, and representative stored data first.
