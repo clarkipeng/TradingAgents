@@ -12,8 +12,11 @@ from .errors import VendorError
 from .stockstats_utils import (
     StockstatsUtils,
     _assert_ohlcv_not_stale,
+    cache_ohlcv,
+    cached_profile,
     filter_financials_by_date,
     load_ohlcv,
+    read_cached_ohlcv_window,
     yf_retry,
 )
 from .symbol_utils import NoMarketDataError, normalize_symbol
@@ -38,13 +41,22 @@ def get_YFin_data_online(
 
     # Resolve broker/forex symbols to Yahoo's convention (XAUUSD+ -> GC=F).
     canonical = normalize_symbol(symbol)
-    ticker = yf.Ticker(canonical)
+
+    # Reuse the exact captured OHLCV vintage shared with stockstats before
+    # asking Yahoo for another copy.  A cache miss keeps the legacy provider
+    # path intact and publishes its result for sibling indicator calls.
+    data = read_cached_ohlcv_window(symbol, start_date, end_date)
+    if data is not None:
+        ticker = None
+    else:
+        ticker = yf.Ticker(canonical)
 
     # yfinance treats ``end`` as EXCLUSIVE, so it would drop the requested
     # end_date row (and the current day when end_date is today). Request one day
     # past end_date so the requested range is actually inclusive (#986/#987).
     end_inclusive = (end_dt + relativedelta(days=1)).strftime("%Y-%m-%d")
-    data = yf_retry(lambda: ticker.history(start=start_date, end=end_inclusive))
+    if ticker is not None:
+        data = yf_retry(lambda: ticker.history(start=start_date, end=end_inclusive))
 
     # Empty result means the symbol is unknown/delisted. Raise a typed error
     # instead of returning prose: the routing layer turns it into a single
@@ -54,9 +66,15 @@ def get_YFin_data_online(
             symbol, canonical, f"no rows between {start_date} and {end_date}"
         )
 
+    if "Date" in data.columns:
+        data = data.set_index("Date")
+
     # Remove timezone info from index for cleaner output
     if data.index.tz is not None:
         data.index = data.index.tz_localize(None)
+
+    if ticker is not None:
+        cache_ohlcv(canonical, data, adjustment_policy="yfinance-history-v1")
 
     # Reject a stale frame (e.g. a year-old partial response) before it is
     # formatted into the report. Raises NoMarketDataError, which the router
@@ -294,8 +312,12 @@ def get_fundamentals(
     """Get company fundamentals overview from yfinance."""
     canonical = normalize_symbol(ticker)
     try:
-        ticker_obj = yf.Ticker(canonical)
-        info = yf_retry(lambda: ticker_obj.info)
+        profile_vintage = curr_date or datetime.now().strftime("%Y-%m-%d")
+        info = cached_profile(
+            canonical,
+            profile_vintage,
+            lambda: yf_retry(lambda: yf.Ticker(canonical).info),
+        )
 
         if not info:
             raise NoMarketDataError(ticker, canonical, "no fundamentals returned")
