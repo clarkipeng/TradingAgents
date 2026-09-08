@@ -101,7 +101,6 @@ def test_load_ohlcv_reuses_fresh_same_day_cache(tmp_path, monkeypatch):
     end = (TODAY + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
     cache_file = tmp_path / f"AAPL-YFin-data-{start}-{end}.csv"
     pd.DataFrame({"Date": ["2026-07-18"], "Close": [100.0]}).to_csv(cache_file, index=False)
-    su._write_cache_metadata(str(cache_file), symbol="AAPL", start=start, end=end)
 
     def _fail_download(*a, **k):
         raise AssertionError("fresh cache must not refetch")
@@ -118,7 +117,6 @@ def test_load_ohlcv_reuses_one_immutable_disk_vintage_in_process(tmp_path, monke
     end = (TODAY + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
     cache_file = tmp_path / f"AAPL-YFin-data-{start}-{end}.csv"
     pd.DataFrame({"Date": ["2026-07-18"], "Close": [100.0]}).to_csv(cache_file, index=False)
-    su._write_cache_metadata(str(cache_file), symbol="AAPL", start=start, end=end)
     su._ohlcv_memory_cache.clear()
     reads = []
     original_read_csv = su.pd.read_csv

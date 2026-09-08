@@ -8,15 +8,11 @@ comparison supplies evidence.
 from __future__ import annotations
 
 import re
-from hashlib import sha256
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
-import tiktoken
-
 BRIEF_FORMAT_VERSION = "analyst-brief-v1"
 COMPACTION_POLICY_VERSION = "analyst-compaction-disabled-v1"
-TOKENIZER_VERSION = "o200k_base"
 ANALYST_ORDER = ("market", "sentiment", "news", "fundamentals")
 _CITATION = re.compile(r"\[evidence:[^\]\s]+\]")
 _DATE = re.compile(r"\b\d{4}-\d{2}-\d{2}\b")
@@ -53,8 +49,7 @@ class BriefComparison:
 
 
 def _tokens(text: str) -> int:
-    """Count model tokenizer tokens, never whitespace-delimited words."""
-    return len(tiktoken.get_encoding(TOKENIZER_VERSION).encode(text))
+    return len(re.findall(r"\S+", text))
 
 
 def build_analyst_brief_sections(
@@ -120,26 +115,3 @@ def compare_brief_variants(
         baseline_dates=tuple(dict.fromkeys(_DATE.findall(baseline))),
         candidate_dates=tuple(dict.fromkeys(_DATE.findall(candidate))),
     )
-
-
-def frozen_comparison_artifact(
-    baseline: str, candidate: str, *, scenario_id: str,
-) -> dict[str, object]:
-    """Produce durable, model-free evidence for a future quality gate.
-
-    This is deliberately an artifact, not an enablement switch: a caller must
-    retain it with its frozen scenario and add fresh-model quality evidence
-    before it may change the disabled compaction policy.
-    """
-    comparison = compare_brief_variants(baseline, candidate, scenario_id=scenario_id)
-    return {
-        "scenario_id": scenario_id,
-        "format_version": comparison.format_version,
-        "policy_version": comparison.policy_version,
-        "evidence_pending": comparison.evidence_pending,
-        "baseline_sha256": sha256(baseline.encode("utf-8")).hexdigest(),
-        "candidate_sha256": sha256(candidate.encode("utf-8")).hexdigest(),
-        "baseline_tokens": comparison.baseline_tokens,
-        "candidate_tokens": comparison.candidate_tokens,
-        "candidate_preserves_evidence": comparison.candidate_preserves_evidence,
-    }

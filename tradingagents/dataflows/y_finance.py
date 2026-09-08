@@ -56,9 +56,7 @@ def get_YFin_data_online(
     # past end_date so the requested range is actually inclusive (#986/#987).
     end_inclusive = (end_dt + relativedelta(days=1)).strftime("%Y-%m-%d")
     if ticker is not None:
-        data = yf_retry(lambda: ticker.history(
-            start=start_date, end=end_inclusive, auto_adjust=False,
-        ))
+        data = yf_retry(lambda: ticker.history(start=start_date, end=end_inclusive))
 
     # Empty result means the symbol is unknown/delisted. Raise a typed error
     # instead of returning prose: the routing layer turns it into a single
@@ -76,10 +74,7 @@ def get_YFin_data_online(
         data.index = data.index.tz_localize(None)
 
     if ticker is not None:
-        cache_ohlcv(
-            canonical, data, start=start_date, end_exclusive=end_inclusive,
-            adjustment_policy="yfinance-raw-ohlcv-v1",
-        )
+        cache_ohlcv(canonical, data, adjustment_policy="yfinance-history-v1")
 
     # Reject a stale frame (e.g. a year-old partial response) before it is
     # formatted into the report. Raises NoMarketDataError, which the router

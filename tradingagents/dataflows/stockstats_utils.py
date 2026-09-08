@@ -27,13 +27,9 @@ MAX_OHLCV_STALE_DAYS = 10
 # up today's close soon after it publishes, long enough that a day with no bar
 # at all (weekend, holiday) cannot trigger a download on every call.
 OHLCV_CACHE_TTL_SECONDS = 900
-OHLCV_CACHE_SCHEMA_VERSION = 2
-# All shared frames are raw, split/dividend-unadjusted Yahoo bars.  Consumers
-# may calculate their own derived indicators, but never mix incompatible price
-# bases in one cache identity.
-OHLCV_CACHE_ADJUSTMENT_POLICY = "yfinance-raw-ohlcv-v1"
+OHLCV_CACHE_SCHEMA_VERSION = 1
+OHLCV_CACHE_ADJUSTMENT_POLICY = "yfinance-history-v1"
 OHLCV_HISTORY_ADJUSTMENT_POLICY = OHLCV_CACHE_ADJUSTMENT_POLICY
-PROFILE_CACHE_POLICY = "yfinance-info-v1"
 PROFILE_CACHE_TTL_SECONDS = 900
 _OHLCV_MEMORY_CACHE_MAX_ENTRIES = 32
 _ohlcv_memory_cache: OrderedDict[str, tuple[tuple[int, int], pd.DataFrame]] = OrderedDict()
@@ -42,9 +38,9 @@ _profile_cache: OrderedDict[tuple[str, str], tuple[float, dict]] = OrderedDict()
 _profile_cache_lock = Lock()
 
 
-def cached_profile(symbol: str, vintage: str, fetcher, *, policy: str = PROFILE_CACHE_POLICY) -> dict:
+def cached_profile(symbol: str, vintage: str, fetcher) -> dict:
     """Bounded same-vintage profile reuse; the fetcher remains injectable."""
-    key = (normalize_symbol(symbol), vintage, policy)
+    key = (normalize_symbol(symbol), vintage)
     now = time.monotonic()
     with _profile_cache_lock:
         cached = _profile_cache.get(key)
@@ -208,19 +204,13 @@ def _read_cached_ohlcv(data_file: str) -> pd.DataFrame:
     return frame
 
 
-def _cache_file_for(
-    symbol: str,
-    today_date: pd.Timestamp | None = None,
-    *,
-    start: str | None = None,
-    end_exclusive: str | None = None,
-) -> str:
-    """Return a cache path whose name declares its exact covered window."""
+def _cache_file_for(symbol: str, today_date: pd.Timestamp | None = None) -> str:
+    """Return the one canonical OHLCV cache path for a symbol/window."""
     canonical = normalize_symbol(symbol)
     safe_symbol = safe_ticker_component(canonical)
     today = today_date if today_date is not None else pd.Timestamp.today()
-    start = start or (today - pd.DateOffset(years=5)).strftime("%Y-%m-%d")
-    end = end_exclusive or (today + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+    start = (today - pd.DateOffset(years=5)).strftime("%Y-%m-%d")
+    end = (today + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
     config = get_config()
     return os.path.join(config["data_cache_dir"], f"{safe_symbol}-YFin-data-{start}-{end}.csv")
 
@@ -229,13 +219,10 @@ def _cache_metadata_path(data_file: str) -> str:
     return f"{data_file}.meta.json"
 
 
-def _cache_policy_matches(
-    data_file: str, policy: str, *, symbol: str | None = None,
-    start: str | None = None, end_exclusive: str | None = None,
-) -> bool:
+def _cache_policy_matches(data_file: str, policy: str) -> bool:
     metadata_path = _cache_metadata_path(data_file)
     if not os.path.isfile(metadata_path):
-        return False
+        return True  # old cache files remain readable during migration
     try:
         with open(metadata_path, encoding="utf-8") as handle:
             metadata = json.load(handle)
@@ -244,11 +231,6 @@ def _cache_policy_matches(
     return (
         metadata.get("schema_version") == OHLCV_CACHE_SCHEMA_VERSION
         and metadata.get("adjustment_policy") == policy
-        and isinstance(metadata.get("window_start"), str)
-        and isinstance(metadata.get("window_end_exclusive"), str)
-        and (symbol is None or metadata.get("symbol") == normalize_symbol(symbol))
-        and (start is None or metadata["window_start"] <= start)
-        and (end_exclusive is None or metadata["window_end_exclusive"] >= end_exclusive)
     )
 
 
@@ -268,24 +250,19 @@ def _write_cache_metadata(data_file: str, *, symbol: str, start: str, end: str) 
     os.replace(temporary, _cache_metadata_path(data_file))
 
 
-def cache_ohlcv(
-    symbol: str,
-    data: pd.DataFrame,
-    *,
-    start: str,
-    end_exclusive: str,
-    today_date: pd.Timestamp | None = None,
-    adjustment_policy: str = OHLCV_CACHE_ADJUSTMENT_POLICY,
-) -> str:
+def cache_ohlcv(symbol: str, data: pd.DataFrame, *, today_date: pd.Timestamp | None = None,
+                adjustment_policy: str = OHLCV_CACHE_ADJUSTMENT_POLICY) -> str:
     """Persist one normalized OHLCV vintage for sibling consumers."""
     today = today_date if today_date is not None else pd.Timestamp.today()
-    path = _cache_file_for(symbol, today, start=start, end_exclusive=end_exclusive)
+    path = _cache_file_for(symbol, today)
     os.makedirs(os.path.dirname(path), exist_ok=True)
+    start = (today - pd.DateOffset(years=5)).strftime("%Y-%m-%d")
+    end = (today + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
     frame = _ensure_date_column(data.reset_index() if isinstance(data.index, pd.DatetimeIndex) else data.copy())
     temporary = f"{path}.partial"
     frame.to_csv(temporary, index=False, encoding="utf-8")
     os.replace(temporary, path)
-    _write_cache_metadata(path, symbol=symbol, start=start, end=end_exclusive)
+    _write_cache_metadata(path, symbol=symbol, start=start, end=end)
     metadata_path = _cache_metadata_path(path)
     with open(metadata_path, encoding="utf-8") as handle:
         metadata = json.load(handle)
@@ -301,15 +278,18 @@ def cache_ohlcv(
 
 def read_cached_ohlcv_window(symbol: str, start_date: str, end_date: str) -> pd.DataFrame | None:
     """Read an existing yfinance vintage without contacting a provider."""
-    requested_end_exclusive = (pd.Timestamp(end_date) + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
-    path = _cache_file_for(symbol, start=start_date, end_exclusive=requested_end_exclusive)
+    path = _cache_file_for(symbol)
     if not os.path.isfile(path):
         return None
-    if not _cache_policy_matches(
-        path, OHLCV_HISTORY_ADJUSTMENT_POLICY, symbol=symbol,
-        start=start_date, end_exclusive=requested_end_exclusive,
-    ):
-        return None
+    metadata_path = _cache_metadata_path(path)
+    if os.path.isfile(metadata_path):
+        try:
+            with open(metadata_path, encoding="utf-8") as handle:
+                metadata = json.load(handle)
+        except (OSError, json.JSONDecodeError):
+            return None
+        if metadata.get("adjustment_policy") != OHLCV_HISTORY_ADJUSTMENT_POLICY:
+            return None
     requested_end = pd.Timestamp(end_date)
     if _needs_same_day_refresh(path, requested_end, pd.Timestamp.today()):
         return None
@@ -346,9 +326,7 @@ def load_ohlcv(symbol: str, curr_date: str) -> pd.DataFrame:
     end_str = (today_date + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
 
     os.makedirs(config["data_cache_dir"], exist_ok=True)
-    data_file = _cache_file_for(
-        canonical, today_date, start=start_str, end_exclusive=end_str,
-    )
+    data_file = _cache_file_for(canonical, today_date)
 
     # A cached file may be empty if a prior fetch failed (unknown symbol,
     # transient rate limit). Treat an empty/columnless cache as a miss and
@@ -359,10 +337,7 @@ def load_ohlcv(symbol: str, curr_date: str) -> pd.DataFrame:
         # Serve the cache only when it is usable and not a stale snapshot of the
         # day being requested (#1150); otherwise fall through and refetch.
         if (
-            _cache_policy_matches(
-                data_file, OHLCV_CACHE_ADJUSTMENT_POLICY, symbol=canonical,
-                start=start_str, end_exclusive=end_str,
-            )
+            _cache_policy_matches(data_file, OHLCV_CACHE_ADJUSTMENT_POLICY)
             and not cached.empty
             and "Close" in cached.columns
             and not _needs_same_day_refresh(data_file, curr_date_dt, today_date)

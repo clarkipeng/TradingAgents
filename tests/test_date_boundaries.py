@@ -21,10 +21,9 @@ def test_get_yfin_requests_inclusive_end(monkeypatch, tmp_path):
         def __init__(self, symbol):
             pass
 
-        def history(self, start, end, **kwargs):
+        def history(self, start, end):
             captured["start"] = start
             captured["end"] = end
-            captured.update(kwargs)
             idx = pd.to_datetime(["2025-05-08", "2025-05-09"])
             return pd.DataFrame(
                 {"Open": [1.0, 2.0], "High": [1.0, 2.0], "Low": [1.0, 2.0],
@@ -37,7 +36,6 @@ def test_get_yfin_requests_inclusive_end(monkeypatch, tmp_path):
 
     # end is requested one day past end_date so 2025-05-09 is included (#987).
     assert captured["end"] == "2025-05-10"
-    assert captured["auto_adjust"] is False
     # Header still reflects the requested range, not the internal +1 day.
     assert "to 2025-05-09" in out
 
@@ -54,7 +52,7 @@ def test_get_yfin_reuses_shared_cached_vintage(monkeypatch, tmp_path):
         def __init__(self, symbol):
             calls.append(symbol)
 
-        def history(self, start, end, **_kwargs):
+        def history(self, start, end):
             calls.append((start, end))
             return pd.DataFrame(
                 {"Open": [1.0], "High": [1.0], "Low": [1.0], "Close": [1.0], "Volume": [1]},

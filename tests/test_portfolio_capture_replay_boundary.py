@@ -1,5 +1,4 @@
 """Capture and replay the actual multi-ticker, four-analyst portfolio path."""
-import json
 import socket
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
@@ -62,9 +61,6 @@ def test_actual_portfolio_capture_replays_without_providers(tmp_path, monkeypatc
         scenario_id = f"portfolio-{day}"
         scenario = store.get_scenario(scenario_id)
         assert scenario is not None
-        summary = json.loads(store.read_artifact(store.get_research_run(captured["run_id"]).report_artifact_hash))
-        assert summary["brief_policy"]["compaction_enabled"] is False
-        assert summary["brief_policy"]["comparison"]["evidence_pending"] is True
         assert len(scenario.metadata["replay_manifest"]["workers"]) == 2
         for stream in scenario.metadata["replay_manifest"]["workers"]:
             assert stream["llm_call_count"] >= 4

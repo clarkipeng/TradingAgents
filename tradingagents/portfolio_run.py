@@ -505,23 +505,6 @@ def _run_portfolio_day(
         "research_call_count": research_calls,
         "elapsed_seconds": round(time.monotonic() - started, 3),
     }
-    # Preserve an evaluation artifact at the portfolio seam without changing
-    # the current CIO prompt. Any future brief-compaction policy must replace
-    # this disabled baseline only after frozen-scenario quality evidence.
-    from tradingagents.analyst_brief import (
-        BRIEF_FORMAT_VERSION,
-        COMPACTION_POLICY_VERSION,
-        frozen_comparison_artifact,
-    )
-    brief_baseline = json.dumps(briefs, ensure_ascii=False, sort_keys=True)
-    summary["brief_policy"] = {
-        "format_version": BRIEF_FORMAT_VERSION,
-        "policy_version": COMPACTION_POLICY_VERSION,
-        "compaction_enabled": False,
-        "comparison": frozen_comparison_artifact(
-            brief_baseline, brief_baseline, scenario_id=scenario_id,
-        ),
-    }
     from tradingagents.portfolio_replay import build_portfolio_replay_manifest
     replay_manifest = build_portfolio_replay_manifest(
         store, parent_run_id=context.run_id or "", tickers=tickers,
