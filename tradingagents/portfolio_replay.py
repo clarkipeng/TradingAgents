@@ -116,6 +116,66 @@ def replay_portfolio_day(
     return {"scenario_id": scenario_id, "workers": workers, "cio": cio}
 
 
+def replay_production_portfolio_day(
+    store: Any,
+    scenario_id: str,
+    *,
+    worker_graph_factory: Any,
+    cio_entrypoint: Any,
+) -> dict[str, Any]:
+    """Replay named portfolio streams through real graph/CIO entrypoints.
+
+    Factories are injected so this composition cannot construct a live client.
+    Each tape is private to its named worker; ordering between workers never
+    affects prompt matching or consumption.
+    """
+    from tradingagents.temporal import TemporalContext, TemporalMode, temporal_context
+    from tradingagents.temporal_adapters.langchain import TapeChatModel
+
+    scenario = store.get_scenario(scenario_id)
+    if scenario is None:
+        raise KeyError(f"unknown scenario: {scenario_id}")
+    manifest = scenario.metadata.get("replay_manifest")
+    if not isinstance(manifest, Mapping):
+        raise ValueError("portfolio scenario has no replay manifest")
+
+    def worker(ticker: str, source_run_id: str) -> Mapping[str, Any]:
+        stream = next(item for item in manifest["workers"] if item["run_id"] == source_run_id)
+        tape = TapeChatModel.from_store(store, source_run_id=source_run_id)
+        context = TemporalContext.at(
+            TemporalMode.REPLAY, scenario.as_of, scenario_id=scenario_id,
+            store=store, source_run_id=source_run_id,
+        )
+        context.instrument_context = stream.get("instrument_context")
+        with temporal_context(context):
+            result, _signal = worker_graph_factory(tape).propagate(
+                ticker, scenario.metadata["trade_date"], temporal=context
+            )
+        if tape._cursor != len(tape.calls):
+            raise ValueError("portfolio replay did not consume its complete LLM stream")
+        if len(store.list_tool_traces(context.run_id)) != stream["tool_call_count"]:
+            raise ValueError("portfolio replay did not consume its complete tool stream")
+        return {
+            "ticker": ticker, "result": result,
+            "llm_call_count": stream["llm_call_count"], "llm_digest": stream["llm_digest"],
+            "tool_call_count": stream["tool_call_count"], "tool_digest": stream["tool_digest"],
+        }
+
+    def cio(source_run_id: str) -> Mapping[str, Any]:
+        stream = manifest["cio"]
+        tape = TapeChatModel.from_store(store, source_run_id=source_run_id)
+        result = cio_entrypoint(tape)
+        if tape._cursor != len(tape.calls):
+            raise ValueError("portfolio replay did not consume its complete LLM stream")
+        return {
+            "result": result, "llm_call_count": stream["llm_call_count"],
+            "llm_digest": stream["llm_digest"], "tool_call_count": stream["tool_call_count"],
+            "tool_digest": stream["tool_digest"],
+        }
+
+    return replay_portfolio_day(store, scenario_id, replay_worker=worker, replay_cio=cio)
+
+
 def _assert_consumed(stream: Mapping[str, Any], result: Mapping[str, Any]) -> None:
     if result.get("llm_call_count") != stream["llm_call_count"]:
         raise ValueError("portfolio replay did not consume its complete LLM stream")
