@@ -1,0 +1,22 @@
+[
+  {
+    "path": "workspace-artifacts/london/.context/temporal-wayback/temporal.sqlite3",
+    "outcome": "sqlite-backup-and-quick-check-passed"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/temporal-forward/temporal.sqlite3",
+    "outcome": "sqlite-backup-and-quick-check-passed"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/temporal-gdelt/temporal.sqlite3",
+    "outcome": "sqlite-backup-and-quick-check-passed"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/temporal-graph/temporal.sqlite3",
+    "outcome": "sqlite-backup-and-quick-check-passed"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/temporal-demo/temporal.sqlite3",
+    "outcome": "sqlite-backup-and-quick-check-passed"
+  }
+]

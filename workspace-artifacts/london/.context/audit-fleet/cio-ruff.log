@@ -1,0 +1,82 @@
+I001 [*] Import block is un-sorted or un-formatted
+ --> tests/test_portfolio_cio_failure.py:2:1
+  |
+1 |   """A provider failure must not be interpreted as a hold-book proposal."""
+2 | / from decimal import Decimal
+3 | |
+4 | |
+5 | | from tradingagents import portfolio_run
+6 | | from tradingagents.temporal import TemporalStore
+  | |________________________________________________^
+help: Organize imports
+  |
+3 |
+  -
+4 | from tradingagents import portfolio_run
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> tradingagents/portfolio_run.py:9:1
+   |
+ 7 |   """
+ 8 |
+ 9 | / from __future__ import annotations
+10 | |
+11 | | import json
+12 | | import logging
+13 | | import math
+14 | | import time
+15 | | from csv import DictReader
+16 | | from concurrent.futures import ThreadPoolExecutor, as_completed
+17 | | from contextlib import contextmanager
+18 | | from datetime import date, datetime, timedelta, timezone
+19 | | from decimal import Decimal, ROUND_DOWN, localcontext
+20 | | from tradingagents.model_budget import DailyModelBudget
+21 | |
+22 | | from tradingagents.temporal import TemporalRunInvalidError, TemporalStore
+23 | | from tradingagents.temporal.clock import format_timestamp, parse_timestamp
+24 | | from tradingagents.temporal.store import PORTFOLIO_CLAIM_STALE_SECONDS
+25 | | from tradingagents.temporal.simulation import Order, OrderSide
+   | |______________________________________________________________^
+26 |
+27 |   DEFAULT_CONSTRAINTS = {
+   |
+help: Organize imports
+   |
+14 | import time
+   - from csv import DictReader
+15 | from concurrent.futures import ThreadPoolExecutor, as_completed
+16 | from contextlib import contextmanager
+17 + from csv import DictReader
+18 | from datetime import date, datetime, timedelta, timezone
+   - from decimal import Decimal, ROUND_DOWN, localcontext
+19 + from decimal import ROUND_DOWN, Decimal, localcontext
+20 +
+21 | from tradingagents.model_budget import DailyModelBudget
+   -
+22 | from tradingagents.temporal import TemporalRunInvalidError, TemporalStore
+23 | from tradingagents.temporal.clock import format_timestamp, parse_timestamp
+24 + from tradingagents.temporal.simulation import Order, OrderSide
+25 | from tradingagents.temporal.store import PORTFOLIO_CLAIM_STALE_SECONDS
+   - from tradingagents.temporal.simulation import Order, OrderSide
+26 |
+   |
+
+F401 [*] `tradingagents.temporal.store.PORTFOLIO_CLAIM_STALE_SECONDS` imported but unused
+  --> tradingagents/portfolio_run.py:24:42
+   |
+22 | from tradingagents.temporal import TemporalRunInvalidError, TemporalStore
+23 | from tradingagents.temporal.clock import format_timestamp, parse_timestamp
+24 | from tradingagents.temporal.store import PORTFOLIO_CLAIM_STALE_SECONDS
+   |                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+25 | from tradingagents.temporal.simulation import Order, OrderSide
+   |
+help: Remove unused import: `tradingagents.temporal.store.PORTFOLIO_CLAIM_STALE_SECONDS`
+   |
+23 | from tradingagents.temporal.clock import format_timestamp, parse_timestamp
+   - from tradingagents.temporal.store import PORTFOLIO_CLAIM_STALE_SECONDS
+24 | from tradingagents.temporal.simulation import Order, OrderSide
+   |
+
+Found 3 errors.
+[*] 3 fixable with the `--fix` option.

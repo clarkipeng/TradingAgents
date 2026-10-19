@@ -1,0 +1,220 @@
+[
+  {
+    "path": "/Users/clarkpeng/Documents/Code/TradingAgents",
+    "exists": true,
+    "head": "85946c2f60768ab2dae23a5a36cd927662feef94",
+    "branch": "refs/heads/main",
+    "changes": [
+      {
+        "status": " M",
+        "path": "CHANGELOG.md"
+      },
+      {
+        "status": " M",
+        "path": "pyproject.toml"
+      },
+      {
+        "status": " M",
+        "path": "tradingagents/agents/analysts/news_analyst.py"
+      },
+      {
+        "status": " M",
+        "path": "tradingagents/agents/utils/agent_states.py"
+      },
+      {
+        "status": " M",
+        "path": "tradingagents/dataflows/polymarket.py"
+      },
+      {
+        "status": " M",
+        "path": "tradingagents/default_config.py"
+      },
+      {
+        "status": " M",
+        "path": "tradingagents/graph/propagation.py"
+      },
+      {
+        "status": " M",
+        "path": "tradingagents/graph/trading_graph.py"
+      },
+      {
+        "status": "??",
+        "path": "Dockerfile.poller"
+      },
+      {
+        "status": "??",
+        "path": "docker-compose.poller.yml"
+      },
+      {
+        "status": "??",
+        "path": "docs/paper/trading-agents-portfolio.md"
+      },
+      {
+        "status": "??",
+        "path": "docs/poller-deployment.md"
+      },
+      {
+        "status": "??",
+        "path": "docs/portfolio-and-macro-design.md"
+      },
+      {
+        "status": "??",
+        "path": "fly.toml"
+      },
+      {
+        "status": "??",
+        "path": "scripts/deploy_fly.sh"
+      },
+      {
+        "status": "??",
+        "path": "scripts/media_poller.py"
+      },
+      {
+        "status": "??",
+        "path": "tests/test_macro_brief.py"
+      },
+      {
+        "status": "??",
+        "path": "tests/test_media_store.py"
+      },
+      {
+        "status": "??",
+        "path": "tests/test_poller_window.py"
+      },
+      {
+        "status": "??",
+        "path": "tests/test_trading_clock.py"
+      },
+      {
+        "status": "??",
+        "path": "tradingagents/dataflows/macro_brief.py"
+      },
+      {
+        "status": "??",
+        "path": "tradingagents/dataflows/media_sources.py"
+      },
+      {
+        "status": "??",
+        "path": "tradingagents/dataflows/media_store.py"
+      },
+      {
+        "status": "??",
+        "path": "tradingagents/dataflows/trading_clock.py"
+      },
+      {
+        "status": "??",
+        "path": "tradingagents/poller.py"
+      },
+      {
+        "status": "??",
+        "path": "uv.lock"
+      }
+    ],
+    "ignored_top_level": [
+      ".context",
+      ".pytest_cache",
+      ".ruff_cache",
+      ".env",
+      ".venv",
+      "tradingagents.egg-info"
+    ]
+  },
+  {
+    "path": "/Users/clarkpeng/.local/share/sightmesh/.cdesktop-workspaces/0a11-ta-sol-execution/TradingAgents",
+    "exists": true,
+    "head": "a649cce2c97442f80ab684b6a9c3bf8c519b9bee",
+    "branch": "refs/heads/cdt/0a11-ta-sol-execution",
+    "changes": [],
+    "ignored_top_level": [
+      ".pytest_cache",
+      ".ruff_cache"
+    ]
+  },
+  {
+    "path": "/Users/clarkpeng/.local/share/sightmesh/.cdesktop-workspaces/8224-ta-audit-lead/TradingAgents",
+    "exists": true,
+    "head": "d93c66bc11699e7440f61f4cce3bf60375c497df",
+    "branch": "refs/heads/cdt/8224-ta-audit-lead",
+    "changes": [
+      {
+        "status": " M",
+        "path": ".context/audit-fleet/lead-handoff.md"
+      }
+    ],
+    "ignored_top_level": [
+      ".pytest_cache"
+    ]
+  },
+  {
+    "path": "/Users/clarkpeng/.local/share/sightmesh/.cdesktop-workspaces/8ba5-ta-round2-terra/TradingAgents",
+    "exists": true,
+    "head": "96ae9d74268be204af1a1b0ef1bc8fb69925da57",
+    "branch": "refs/heads/fleet/round3",
+    "changes": [],
+    "ignored_top_level": [
+      ".pytest_cache",
+      "tradingagents.egg-info"
+    ]
+  },
+  {
+    "path": "/Users/clarkpeng/.local/share/sightmesh/.cdesktop-workspaces/bf9a-ta-luna-p4-resum/TradingAgents",
+    "exists": true,
+    "head": "fc3040f5211c13288c0b624fa9810fbe209e680b",
+    "branch": "refs/heads/cdt/bf9a-ta-luna-p4-resum",
+    "changes": [],
+    "ignored_top_level": [
+      ".pytest_cache",
+      "__pycache__",
+      "tradingagents.egg-info"
+    ]
+  },
+  {
+    "path": "/Users/clarkpeng/.local/share/sightmesh/.cdesktop-workspaces/c983-ta-sol-review/TradingAgents",
+    "exists": true,
+    "head": "fb6d48cce83f0ec1df4f5fea6687275d26718189",
+    "branch": "refs/heads/cdt/c983-ta-sol-review",
+    "changes": [],
+    "ignored_top_level": [
+      ".pytest_cache",
+      "tradingagents.egg-info"
+    ]
+  },
+  {
+    "path": "/Users/clarkpeng/conductor/workspaces/taste-corpus/columbus/.context/distribution/TradingAgents",
+    "exists": true,
+    "head": "afbd64f6e36602c0f403042a4fc94b3c4c79de5f",
+    "branch": "refs/heads/cp/taste-token-efficiency-20260906",
+    "changes": [],
+    "ignored_top_level": []
+  },
+  {
+    "path": "/Users/clarkpeng/conductor/workspaces/TradingAgents/london",
+    "exists": true,
+    "head": "f0393345a9f2301f713c3c4ff46785a18e9f3405",
+    "branch": "refs/heads/agent-trading-simulation-backtest",
+    "changes": [
+      {
+        "status": " M",
+        "path": "AGENTS.md"
+      },
+      {
+        "status": " M",
+        "path": "docs/production-runbook.md"
+      },
+      {
+        "status": " M",
+        "path": "doing.md"
+      },
+      {
+        "status": " M",
+        "path": "taste.md"
+      }
+    ],
+    "ignored_top_level": [
+      ".pytest_cache",
+      ".ruff_cache",
+      ".env",
+      "tradingagents.egg-info"
+    ]
+  }
+]

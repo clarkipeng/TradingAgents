@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en" data-theme="luxury">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Temporal Agent Evaluation — shared core + TradingAgents adapter</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/daisyui.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/themes.css">
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.2.4/dist/index.global.js"></script>
+    <style>
+      *, *::before, *::after { box-sizing: border-box; }
+      :where(.grid, .flex, .layout-grid, .layout-flex) > * { min-width: 0; }
+      :where(p, h1, h2, h3, h4, h5, h6, li, dd, blockquote, figcaption, td, th, .badge, .label) { overflow-wrap: anywhere; }
+      :where(img, svg, video, canvas, iframe) { max-width: 100%; height: auto; }
+      .plan-kicker { letter-spacing: .15em; text-transform: uppercase; font-size: .72rem; opacity: .65; }
+      .flow-caption { max-width: 50rem; }
+      .decision-card { border-left: 3px solid color-mix(in oklab, var(--color-primary) 70%, transparent); }
+      code { white-space: normal; }
+    </style>
+  </head>
+  <body class="min-h-screen bg-base-200 text-base-content">
+    <main class="mx-auto max-w-7xl p-5 sm:p-8 lg:p-12">
+      <header class="rounded-box bg-base-100 p-7 shadow-sm lg:p-10">
+        <p class="plan-kicker">Technical plan · before implementation</p>
+        <div class="mt-3 grid gap-6 lg:grid-cols-[1.45fr_.55fr] lg:items-end">
+          <div>
+            <h1 class="text-4xl font-black tracking-tight sm:text-5xl">Temporal agent evaluation</h1>
+            <p class="mt-4 max-w-3xl text-lg leading-8 text-base-content/75">Build one versioned tool-data substrate that lets an agent see only what was available at a chosen time, then use it first as an optional TradingAgents backtest mode and later as a standalone product.</p>
+          </div>
+          <div class="rounded-box bg-primary p-5 text-primary-content">
+            <p class="font-semibold">Recommendation</p>
+            <p class="mt-2 text-sm leading-6">Shared core + repo adapter. Do not fork the existing agent graph or start with a whole-web crawler.</p>
+          </div>
+        </div>
+      </header>
+
+      <section class="mt-8 grid gap-5 lg:grid-cols-3">
+        <article class="card card-border bg-base-100"><div class="card-body"><p class="plan-kicker">Existing repo</p><h2 class="card-title">Keep the analysis system</h2><p>The LangGraph pipeline, analyst roles, prompts, structured decisions, reports, and existing vendor routing stay in place.</p><p class="text-sm text-base-content/65"><code>trading_graph.py</code> · <code>dataflows/interface.py</code> · <code>agents/</code></p></div></article>
+        <article class="card card-border bg-base-100"><div class="card-body"><p class="plan-kicker">New capability</p><h2 class="card-title">Add a time boundary</h2><p>A capture/replay layer records tool inputs and source responses, selects only versions available at virtual time <code>T</code>, and emits an auditable trace.</p></div></article>
+        <article class="card card-border bg-base-100"><div class="card-body"><p class="plan-kicker">Product seam</p><h2 class="card-title">Make the core generic</h2><p>The core is tool-agnostic. Trading data, web research, internal APIs, code tools, and browser actions become connectors rather than product-specific assumptions.</p></div></article>
+      </section>
+
+      <section class="mt-10 rounded-box bg-base-100 p-6 shadow-sm lg:p-8">
+        <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-end"><div><p class="plan-kicker">The boundary that avoids a rewrite</p><h2 class="mt-2 text-2xl font-bold">Current tool names remain stable; their data source becomes selectable</h2></div><span class="badge badge-success badge-lg badge-soft">Additive</span></div>
+        <div class="mermaid mt-6">
+flowchart TD
+  A[TradingAgents Graph\nexisting agents + reports] --> B[Existing tool surface\nget_news · get_stock_data · get_indicators]
+  B --> C{Run mode}
+  C -->|live: default| D[Existing vendor routing\nYahoo · Alpha Vantage · FRED · Polymarket]
+  C -->|capture| E[Capture proxy\ncall live source, seal evidence]
+  C -->|replay| F[Temporal gateway\nvirtual clock + immutable captures]
+  E --> G[(Versioned evidence store)]
+  F --> G
+  F --> H[Decision + trace + citations]
+        </div>
+        <p class="flow-caption mt-5 text-sm leading-6 text-base-content/70">The graph stays the decision engine. The new layer sits at the tool/data boundary. The one direct-call exception—StockTwits and Reddit prefetch in the sentiment analyst—moves behind the same source adapter so it can be captured and replayed.</p>
+      </section>
+
+      <section class="mt-10 grid gap-6 xl:grid-cols-[1fr_1fr]">
+        <div class="rounded-box bg-base-100 p-6 shadow-sm lg:p-8">
+          <p class="plan-kicker">What already exists—and what it misses</p>
+          <h2 class="mt-2 text-2xl font-bold">The gap is the changing external world</h2>
+          <div class="mt-5 overflow-x-auto"><table class="table table-sm"><thead><tr><th>Existing category</th><th>Useful today</th><th>Missing for this product</th></tr></thead><tbody>
+            <tr><td>LangSmith / agent observability</td><td>Traces, datasets, scoring, A/B evaluation</td><td>Does not preserve the web/API world a run observed</td></tr>
+            <tr><td>WebArena / BrowserGym</td><td>Repeatable simulated browser tasks</td><td>Fixed apps/tasks, not historical external research</td></tr>
+            <tr><td>Wayback / WARC tools</td><td>Capture and replay pages</td><td>Not an agent-ready search/tool contract or action simulator</td></tr>
+            <tr><td>GDELT / market datasets</td><td>Historical domain data</td><td>One source family; no unified provenance across agent tools</td></tr>
+            <tr><td>TradingAgents today</td><td>Multi-agent financial reasoning and reports</td><td>No scheduler, portfolio/fills, immutable data tape, or virtual time</td></tr>
+          </tbody></table></div>
+          <div role="alert" class="alert alert-info mt-5 text-sm"><span><strong>What the market wastes today:</strong> teams separately buy tracing, snapshots, evaluation datasets, browser tests, and sector data—then cannot prove the external state behind a past agent decision.</span></div>
+        </div>
+
+        <div class="rounded-box bg-base-100 p-6 shadow-sm lg:p-8">
+          <p class="plan-kicker">Common agent calls worth normalizing first</p>
+          <h2 class="mt-2 text-2xl font-bold">A small universal “tool tape” beats an internet clone</h2>
+          <div class="mt-5 grid gap-3 sm:grid-cols-2">
+            <div class="decision-card rounded-box bg-base-200 p-4"><h3 class="font-semibold">Research web</h3><p class="mt-1 text-sm">search, open URL, read/extract, click, download</p></div>
+            <div class="decision-card rounded-box bg-base-200 p-4"><h3 class="font-semibold">Structured data</h3><p class="mt-1 text-sm">HTTP/API request, SQL query, data-vendor lookup</p></div>
+            <div class="decision-card rounded-box bg-base-200 p-4"><h3 class="font-semibold">Knowledge work</h3><p class="mt-1 text-sm">search docs/Slack/email, write a cited research note</p></div>
+            <div class="decision-card rounded-box bg-base-200 p-4"><h3 class="font-semibold">Software work</h3><p class="mt-1 text-sm">search repo, read file, run test, apply patch</p></div>
+            <div class="decision-card rounded-box bg-base-200 p-4 sm:col-span-2"><h3 class="font-semibold">Actions</h3><p class="mt-1 text-sm">submit order, create ticket, send message, deploy—always through a separately modeled stateful simulator or approved live connector.</p></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="mt-10 rounded-box bg-base-100 p-6 shadow-sm lg:p-8">
+        <p class="plan-kicker">One core, two surfaces</p>
+        <h2 class="mt-2 text-2xl font-bold">Build once; package twice</h2>
+        <div class="mt-6 grid gap-5 lg:grid-cols-2">
+          <article class="card card-border bg-base-200"><div class="card-body"><div class="flex items-center justify-between"><h3 class="card-title">TradingAgents integration</h3><span class="badge badge-primary badge-soft">first adopter</span></div><ul class="mt-2 list-disc space-y-2 pl-5 text-sm leading-6"><li>Optional <code>live</code>, <code>capture</code>, and <code>replay</code> data modes.</li><li>Historical runs produce reports plus evidence citations and decision traces.</li><li>Scenario runner compares decisions; execution/portfolio simulation is a later module.</li><li>Preserves default live behavior and existing tool names.</li></ul></div></article>
+          <article class="card card-border bg-base-200"><div class="card-body"><div class="flex items-center justify-between"><h3 class="card-title">General product</h3><span class="badge badge-secondary badge-soft">commercializable</span></div><ul class="mt-2 list-disc space-y-2 pl-5 text-sm leading-6"><li>SDK/proxy captures any JSON tool call plus browser/API evidence.</li><li>Private, versioned corpus with virtual-time retrieval and cryptographic provenance.</li><li>Evaluation runner integrates with existing trace platforms instead of replacing them.</li><li>Self-hosted mode targets regulated research, finance, security, and enterprise agents.</li></ul></div></article>
+        </div>
+      </section>
+
+      <section class="mt-10 rounded-box bg-base-100 p-6 shadow-sm lg:p-8">
+        <p class="plan-kicker">Phased delivery</p>
+        <h2 class="mt-2 text-2xl font-bold">Earn the abstraction before extracting a company</h2>
+        <ul class="steps steps-vertical mt-6 w-full lg:steps-horizontal">
+          <li class="step step-primary"><span class="font-semibold">1. Core tape</span><br><span class="text-xs">captures, virtual clock, replay selector, trace</span></li>
+          <li class="step"><span class="font-semibold">2. Repo adapter</span><br><span class="text-xs">wrap existing dataflows; fix direct social calls</span></li>
+          <li class="step"><span class="font-semibold">3. Scenarios</span><br><span class="text-xs">run date ranges; compare decisions and evidence</span></li>
+          <li class="step"><span class="font-semibold">4. Actions</span><br><span class="text-xs">deterministic portfolio/order simulator</span></li>
+          <li class="step"><span class="font-semibold">5. Extract</span><br><span class="text-xs">standalone SDK/service after two domains use it</span></li>
+        </ul>
+        <div class="mt-7 grid gap-5 lg:grid-cols-2"><div><h3 class="font-semibold">Initial evidence contract</h3><pre class="mt-3 overflow-x-auto rounded-box bg-neutral p-4 text-xs text-neutral-content"><code>{
+  tool, request, response, source_url,
+  captured_at, available_at, published_at?,
+  content_hash, connector_version
+}</code></pre></div><div><h3 class="font-semibold">Non-goals for v1</h3><ul class="mt-3 list-disc space-y-2 pl-5 text-sm leading-6"><li>“Archive the whole web.” Start with explicit sources and tool calls.</li><li>Live broker credentials or real capital.</li><li>Replacing LangSmith, browser benchmarks, or web archives.</li><li>Claiming exact historical availability when only an archive capture exists.</li></ul></div></div>
+      </section>
+
+      <section class="mt-10 rounded-box bg-base-100 p-6 shadow-sm lg:p-8">
+        <p class="plan-kicker">Decision needed before code</p>
+        <h2 class="mt-2 text-2xl font-bold">Confirm the first adopter and the first evidence corpus</h2>
+        <form class="mt-5 grid gap-5 lg:grid-cols-2" data-lavish-question="temporal-plan" onsubmit="event.preventDefault(); const data = new FormData(event.currentTarget); const corpus = data.get('corpus'); const rollout = data.get('rollout'); if (corpus && rollout) window.lavish.queuePrompt('Adopt the temporal-evaluation plan with rollout: ' + rollout + '. Start with evidence corpus: ' + corpus + '.', {tag: 'plan-choice', text: 'Temporal evaluation: ' + rollout + ' / ' + corpus, element: event.currentTarget, data: {rollout, corpus}});">
+          <fieldset class="fieldset rounded-box bg-base-200 p-4"><legend class="fieldset-legend">First rollout</legend><label class="label cursor-pointer justify-start gap-3"><input class="radio radio-primary" type="radio" name="rollout" value="shared-core-tradingagents-adapter" checked> Shared core + TradingAgents adapter</label><label class="label cursor-pointer justify-start gap-3"><input class="radio" type="radio" name="rollout" value="standalone-service-first"> Standalone service first</label><p class="label">Recommended: prove it inside the existing repo while protecting a generic boundary.</p></fieldset>
+          <fieldset class="fieldset rounded-box bg-base-200 p-4"><legend class="fieldset-legend">First evidence corpus</legend><label class="label cursor-pointer justify-start gap-3"><input class="radio radio-primary" type="radio" name="corpus" value="market-and-filings" checked> Market data + SEC/FRED-style sources</label><label class="label cursor-pointer justify-start gap-3"><input class="radio" type="radio" name="corpus" value="targeted-finance-web"> Targeted finance web + news captures</label><label class="label cursor-pointer justify-start gap-3"><input class="radio" type="radio" name="corpus" value="general-web-research"> Generic web research calls</label></fieldset>
+          <div class="lg:col-span-2 flex flex-wrap items-center gap-3"><button class="btn btn-primary" type="submit">Queue this plan choice</button><p class="text-sm text-base-content/65">You can also annotate any item or send a free-form note in the review surface.</p></div>
+        </form>
+      </section>
+    </main>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11.15.0/dist/mermaid.esm.min.mjs";
+      const diagrams = [...document.querySelectorAll('.mermaid')].map((el) => ({ el, src: el.textContent }));
+      const query = window.matchMedia('(prefers-color-scheme: dark)'); let applied;
+      async function render() { const theme = query.matches ? 'dark' : 'default'; if (theme === applied) return; mermaid.initialize({startOnLoad:false, theme, securityLevel:'strict'}); for (const {el,src} of diagrams) { el.removeAttribute('data-processed'); el.textContent=src; } await mermaid.run({nodes:diagrams.map((d)=>d.el)}); applied=theme; }
+      window.addEventListener('load', render, {once:true}); query.addEventListener('change', render);
+    </script>
+  </body>
+</html>

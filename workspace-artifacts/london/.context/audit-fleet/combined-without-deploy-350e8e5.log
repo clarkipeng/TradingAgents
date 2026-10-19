@@ -1,0 +1,13 @@
+........................................................................ [  4%]
+.................................s...................................... [  8%]
+........................................................................ [ 12%]
+........................................................................ [ 16%]
+........................................................................ [ 20%]
+........................................................................ [ 24%]
+...........
+=========================== short test summary info ============================
+SKIPPED [1] tests/test_bedrock_provider.py:74: could not import 'langchain_aws': No module named 'langchain_aws'
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! KeyboardInterrupt !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/dataflows/gdelt_common.py:24: KeyboardInterrupt
+(to show a full traceback on KeyboardInterrupt use --full-trace)
+442 passed, 1 skipped, 14 deselected in 113.37s (0:01:53)

@@ -1,0 +1,335 @@
+{"scenario_id": "tsla-2023-01-price-cuts", "arm": "fixed_feeds", "rep": 0, "run_id": "3a8d05ff-67ce-4ca1-ba97-d93c70a464c0", "decision_head": "**Rating**: Underweight\n\n**Executive Summary**: Maintain TSL", "elapsed_seconds": 77.6, "recorded_at": "2026-08-24T02:49:46.862559+00:00"}
+{"scenario_id": "tsla-2023-01-price-cuts", "arm": "brief", "rep": 0, "run_id": "426e4d54-ed21-48e2-b496-46114afb717f", "decision_head": "**Rating**: Underweight\n\n**Executive Summary**: Keep TSLA at", "elapsed_seconds": 98.9, "recorded_at": "2026-08-24T02:51:25.785943+00:00"}
+{"scenario_id": "tsla-2023-01-price-cuts", "arm": "search", "rep": 0, "run_id": "be4d1244-8b84-4afe-8c92-ad93a1896fc3", "decision_head": "**Rating**: Underweight\n\n**Executive Summary**: Rate TSLA Un", "elapsed_seconds": 98.5, "recorded_at": "2026-08-24T02:53:04.321151+00:00"}
+{"scenario_id": "tsla-2023-01-price-cuts", "arm": "fixed_feeds", "rep": 1, "run_id": "71e89a38-4a07-4b36-9921-fdb6472f3b00", "decision_head": "**Rating**: Underweight\n\n**Executive Summary**: Rate TSLA Un", "elapsed_seconds": 77.5, "recorded_at": "2026-08-24T02:54:21.833221+00:00"}
+{"scenario_id": "tsla-2023-01-price-cuts", "arm": "brief", "rep": 1, "run_id": "705c85a7-cb3b-4b22-baa5-08a42a64e07e", "decision_head": "**Rating**: Underweight\n\n**Executive Summary**: Rate TSLA Un", "elapsed_seconds": 86.8, "recorded_at": "2026-08-24T02:55:48.649763+00:00"}
+{"scenario_id": "tsla-2023-01-price-cuts", "arm": "search", "rep": 1, "run_id": "1f6a4fa3-b7d4-4f56-a8a2-c252e0215153", "decision_head": "**Rating**: Underweight\n\n**Executive Summary**: Rate TSLA Un", "elapsed_seconds": 101.8, "recorded_at": "2026-08-24T02:57:30.489266+00:00"}
+{"scenario_id": "tsla-2023-01-price-cuts", "arm": "fixed_feeds", "rep": 2, "run_id": "f208cee2-0ef6-42ce-b693-f522ccfd03f4", "decision_head": "**Rating**: Underweight\n\n**Executive Summary**: Rate TSLA Un", "elapsed_seconds": 83.7, "recorded_at": "2026-08-24T02:58:54.221181+00:00"}
+{"scenario_id": "tsla-2023-01-price-cuts", "arm": "brief", "rep": 2, "run_id": "6794ae47-45a1-4b42-922c-8407a018b881", "decision_head": "**Rating**: Underweight\n\n**Executive Summary**: Rate TSLA Un", "elapsed_seconds": 97.3, "recorded_at": "2026-08-24T03:00:31.505173+00:00"}
+{"scenario_id": "tsla-2023-01-price-cuts", "arm": "search", "rep": 2, "run_id": "58b5574c-b879-4dd1-8fe7-b6f905add7e5", "decision_head": "**Rating**: Underweight\n\n**Executive Summary**: Underweight ", "elapsed_seconds": 107.7, "recorded_at": "2026-08-24T03:02:19.264148+00:00"}
+{"scenario_id": "tsla-2023-01-price-cuts", "runs": {"fixed_feeds": ["3a8d05ff-67ce-4ca1-ba97-d93c70a464c0", "71e89a38-4a07-4b36-9921-fdb6472f3b00", "f208cee2-0ef6-42ce-b693-f522ccfd03f4"], "brief": ["426e4d54-ed21-48e2-b496-46114afb717f", "705c85a7-cb3b-4b22-baa5-08a42a64e07e", "6794ae47-45a1-4b42-922c-8407a018b881"], "search": ["be4d1244-8b84-4afe-8c92-ad93a1896fc3", "1f6a4fa3-b7d4-4f56-a8a2-c252e0215153", "58b5574c-b879-4dd1-8fe7-b6f905add7e5"]}}
+.venv/bin/tradingagents temporal-compare-repeated-runs --left-run-ids 3a8d05ff-67ce-4ca1-ba97-d93c70a464c0,71e89a38-4a07-4b36-9921-fdb6472f3b00,f208cee2-0ef6-42ce-b693-f522ccfd03f4 --right-run-ids 426e4d54-ed21-48e2-b496-46114afb717f,705c85a7-cb3b-4b22-baa5-08a42a64e07e,6794ae47-45a1-4b42-922c-8407a018b881 --id tsla-2023-01-price-cuts --store /Users/clarkpeng/.tradingagents/temporal  # fixed_feeds vs brief
+.venv/bin/tradingagents temporal-compare-repeated-runs --left-run-ids 3a8d05ff-67ce-4ca1-ba97-d93c70a464c0,71e89a38-4a07-4b36-9921-fdb6472f3b00,f208cee2-0ef6-42ce-b693-f522ccfd03f4 --right-run-ids be4d1244-8b84-4afe-8c92-ad93a1896fc3,1f6a4fa3-b7d4-4f56-a8a2-c252e0215153,58b5574c-b879-4dd1-8fe7-b6f905add7e5 --id tsla-2023-01-price-cuts --store /Users/clarkpeng/.tradingagents/temporal  # fixed_feeds vs search
+.venv/bin/tradingagents temporal-compare-repeated-runs --left-run-ids 426e4d54-ed21-48e2-b496-46114afb717f,705c85a7-cb3b-4b22-baa5-08a42a64e07e,6794ae47-45a1-4b42-922c-8407a018b881 --right-run-ids be4d1244-8b84-4afe-8c92-ad93a1896fc3,1f6a4fa3-b7d4-4f56-a8a2-c252e0215153,58b5574c-b879-4dd1-8fe7-b6f905add7e5 --id tsla-2023-01-price-cuts --store /Users/clarkpeng/.tradingagents/temporal  # brief vs search
+{"scenario_id": "msft-2023-01-openai-investment", "arm": "fixed_feeds", "rep": 0, "run_id": "7f836a84-7baf-420e-b641-08c6354a4a46", "decision_head": "**Rating**: Overweight\n\n**Executive Summary**: Overweight MS", "elapsed_seconds": 84.4, "recorded_at": "2026-08-24T03:03:46.577457+00:00"}
+{"scenario_id": "msft-2023-01-openai-investment", "arm": "brief", "rep": 0, "run_id": "2d90b504-2eec-4797-81d0-6ca2f0d48a0a", "decision_head": "**Rating**: Overweight\n\n**Executive Summary**: Rate MSFT Ove", "elapsed_seconds": 119.0, "recorded_at": "2026-08-24T03:05:45.620604+00:00"}
+{"scenario_id": "msft-2023-01-openai-investment", "arm": "search", "rep": 0, "run_id": "71ad8d21-e579-42d5-8f37-ba62af5a7b59", "decision_head": "**Rating**: Overweight\n\n**Executive Summary**: Rate MSFT Ove", "elapsed_seconds": 116.3, "recorded_at": "2026-08-24T03:07:41.911210+00:00"}
+{"scenario_id": "msft-2023-01-openai-investment", "arm": "fixed_feeds", "rep": 1, "run_id": "6dfad1fb-baa5-4fd3-98d6-e37b96e5ca7f", "decision_head": "**Rating**: Overweight\n\n**Executive Summary**: Rate MSFT Ove", "elapsed_seconds": 87.9, "recorded_at": "2026-08-24T03:09:09.805023+00:00"}
+{"scenario_id": "msft-2023-01-openai-investment", "arm": "brief", "rep": 1, "run_id": "01d4cfb0-1570-4d76-b1ce-1663581301a4", "decision_head": "**Rating**: Overweight\n\n**Executive Summary**: Overweight MS", "elapsed_seconds": 106.6, "recorded_at": "2026-08-24T03:10:56.438273+00:00"}
+{"scenario_id": "msft-2023-01-openai-investment", "arm": "search", "rep": 1, "run_id": "7cfe9ba9-0313-4b55-8d1c-05aa89fb8ec3", "decision_head": "**Rating**: Overweight\n\n**Executive Summary**: Rate MSFT Ove", "elapsed_seconds": 109.6, "recorded_at": "2026-08-24T03:12:46.072987+00:00"}
+{"scenario_id": "msft-2023-01-openai-investment", "arm": "fixed_feeds", "rep": 2, "run_id": "81054d14-45a4-4c76-992b-e982785289e2", "decision_head": "**Rating**: Overweight\n\n**Executive Summary**: Overweight MS", "elapsed_seconds": 81.7, "recorded_at": "2026-08-24T03:14:07.832192+00:00"}
+{"scenario_id": "msft-2023-01-openai-investment", "arm": "brief", "rep": 2, "run_id": "d04ad859-63b8-4bfb-bf3b-967fa54d392d", "decision_head": "**Rating**: Overweight\n\n**Executive Summary**: Overweight MS", "elapsed_seconds": 103.7, "recorded_at": "2026-08-24T03:15:51.602533+00:00"}
+Traceback (most recent call last):
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/scripts/plan_a_experiment.py", line 132, in <module>
+    raise SystemExit(main())
+                     ~~~~^^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/scripts/plan_a_experiment.py", line 117, in main
+    runs[arm].append(run_arm(store, scenario_id, arm, rep))
+                     ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/scripts/plan_a_experiment.py", line 80, in run_arm
+    trace = replay_scenario(graph, store, scenario_id)
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/temporal_adapters/tradingagents.py", line 348, in replay_scenario
+    final_state, _signal = graph.propagate(
+                           ~~~~~~~~~~~~~~~^
+        ticker,
+        ^^^^^^^
+    ...<2 lines>...
+        temporal=context,
+        ^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/graph/trading_graph.py", line 463, in propagate
+    result = self._run_graph(company_name, trade_date, asset_type=asset_type)
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/graph/trading_graph.py", line 635, in _run_graph
+    final_state = self.graph.invoke(init_agent_state, **args)
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/langgraph/pregel/main.py", line 3913, in invoke
+    for chunk in self.stream(
+                 ~~~~~~~~~~~^
+        input,
+        ^^^^^^
+    ...<11 lines>...
+        **kwargs,
+        ^^^^^^^^^
+    ):
+    ^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/langgraph/pregel/main.py", line 2967, in stream
+    for _ in runner.tick(
+             ~~~~~~~~~~~^
+        [t for t in loop.tasks.values() if not t.writes],
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<2 lines>...
+        schedule_task=loop.accept_push,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ):
+    ^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/langgraph/pregel/_runner.py", line 207, in tick
+    run_with_retry(
+    ~~~~~~~~~~~~~~^
+        t,
+        ^^
+    ...<10 lines>...
+        },
+        ^^
+    )
+    ^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/langgraph/pregel/_retry.py", line 617, in run_with_retry
+    return task.proc.invoke(task.input, config)
+           ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/langgraph/_internal/_runnable.py", line 684, in invoke
+    input = context.run(step.invoke, input, config, **kwargs)
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/langgraph/_internal/_runnable.py", line 426, in invoke
+    ret = self.func(*args, **kwargs)
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/langgraph/prebuilt/tool_node.py", line 822, in _func
+    outputs = list(
+        executor.map(self._run_one, tool_calls, input_types, tool_runtimes)
+    )
+  File "/Users/clarkpeng/.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/concurrent/futures/_base.py", line 619, in result_iterator
+    yield _result_or_cancel(fs.pop())
+          ~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "/Users/clarkpeng/.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/concurrent/futures/_base.py", line 317, in _result_or_cancel
+    return fut.result(timeout)
+           ~~~~~~~~~~^^^^^^^^^
+  File "/Users/clarkpeng/.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/concurrent/futures/_base.py", line 456, in result
+    return self.__get_result()
+           ~~~~~~~~~~~~~~~~~^^
+  File "/Users/clarkpeng/.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/concurrent/futures/_base.py", line 401, in __get_result
+    raise self._exception
+  File "/Users/clarkpeng/.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/concurrent/futures/thread.py", line 59, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/langchain_core/runnables/config.py", line 650, in _wrapped_fn
+    return contexts.pop().run(fn, *args)
+           ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/langgraph/prebuilt/tool_node.py", line 1046, in _run_one
+    return self._execute_tool_sync(tool_request, input_type, config)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/langgraph/prebuilt/tool_node.py", line 1006, in _execute_tool_sync
+    content = _handle_tool_error(e, flag=self._handle_tool_errors)
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/langgraph/prebuilt/tool_node.py", line 434, in _handle_tool_error
+    content = flag(e)  # type: ignore [assignment, call-arg]
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/langgraph/prebuilt/tool_node.py", line 391, in _default_handle_tool_errors
+    raise e
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/langgraph/prebuilt/tool_node.py", line 958, in _execute_tool_sync
+    response = tool.invoke(call_args, config)
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/langchain_core/tools/base.py", line 738, in invoke
+    return self.run(tool_input, **kwargs)
+           ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/langchain_core/tools/base.py", line 1100, in run
+    raise error_to_raise
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/langchain_core/tools/base.py", line 1066, in run
+    response = context.run(self._run, *tool_args, **tool_kwargs)
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/langchain_core/tools/structured.py", line 97, in _run
+    return self.func(*args, **kwargs)
+           ~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/temporal_adapters/langchain.py", line 114, in fetch
+    result = store.fetch_document(doc_key, as_of=context.clock.as_of, page=page)
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/temporal/store.py", line 1160, in fetch_document
+    raise KeyError(f"unknown or ineligible document: {doc_key}")
+KeyError: 'unknown or ineligible document: ba56c06c70b8cab21c86e23751ef864b258e15d91ea4fd04810727cecd9756e4'
+During task with name 'tools_news' and id 'c5d44e2f-68fb-78e1-9e75-3fe9d2a14d5c'
+SCENARIO FAILED: msft-2023-01-openai-investment
+{"scenario_id": "nvda-2026-08-18-v3", "arm": "fixed_feeds", "rep": 0, "run_id": "4ece038d-720f-4be8-960e-485d1c5bef31", "decision_head": "**Rating**: Overweight\n\n**Executive Summary**: Initiate or a", "elapsed_seconds": 115.9, "recorded_at": "2026-08-24T03:18:24.244549+00:00"}
+Traceback (most recent call last):
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/httpx/_transports/default.py", line 101, in map_httpcore_exceptions
+    yield
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/httpx/_transports/default.py", line 250, in handle_request
+    resp = self._pool.handle_request(req)
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/httpcore/_sync/connection_pool.py", line 256, in handle_request
+    raise exc from None
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/httpcore/_sync/connection_pool.py", line 236, in handle_request
+    response = connection.handle_request(
+        pool_request.request
+    )
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/httpcore/_sync/connection.py", line 101, in handle_request
+    raise exc
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/httpcore/_sync/connection.py", line 78, in handle_request
+    stream = self._connect(request)
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/httpcore/_sync/connection.py", line 124, in _connect
+    stream = self._network_backend.connect_tcp(**kwargs)
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/httpcore/_backends/sync.py", line 207, in connect_tcp
+    with map_exceptions(exc_map):
+         ~~~~~~~~~~~~~~^^^^^^^^^
+  File "/Users/clarkpeng/.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/contextlib.py", line 162, in __exit__
+    self.gen.throw(value)
+    ~~~~~~~~~~~~~~^^^^^^^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/httpcore/_exceptions.py", line 14, in map_exceptions
+    raise to_exc(exc) from exc
+httpcore.ConnectError: [Errno 8] nodename nor servname provided, or not known
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/openai/_base_client.py", line 1080, in request
+    response = self._send_request(
+        request,
+        stream=stream or self._should_stream_response_body(request=request),
+        **kwargs,
+    )
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/openai/_client.py", line 491, in _send_request
+    response = self._send_with_auth_retry(request, stream=stream, **kwargs)
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/openai/_client.py", line 469, in _send_with_auth_retry
+    response = super()._send_request(request, stream=stream, **kwargs)
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/openai/_base_client.py", line 1005, in _send_request
+    return self._client.send(request, stream=stream, **kwargs)
+           ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/httpx/_client.py", line 914, in send
+    response = self._send_handling_auth(
+        request,
+    ...<2 lines>...
+        history=[],
+    )
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/httpx/_client.py", line 942, in _send_handling_auth
+    response = self._send_handling_redirects(
+        request,
+        follow_redirects=follow_redirects,
+        history=history,
+    )
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/httpx/_client.py", line 979, in _send_handling_redirects
+    response = self._send_single_request(request)
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/httpx/_client.py", line 1014, in _send_single_request
+    response = transport.handle_request(request)
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/httpx/_transports/default.py", line 249, in handle_request
+    with map_httpcore_exceptions():
+         ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/clarkpeng/.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/contextlib.py", line 162, in __exit__
+    self.gen.throw(value)
+    ~~~~~~~~~~~~~~^^^^^^^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/httpx/_transports/default.py", line 118, in map_httpcore_exceptions
+    raise mapped_exc(message) from exc
+httpx.ConnectError: [Errno 8] nodename nor servname provided, or not known
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/scripts/plan_a_experiment.py", line 132, in <module>
+    raise SystemExit(main())
+                     ~~~~^^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/scripts/plan_a_experiment.py", line 117, in main
+    runs[arm].append(run_arm(store, scenario_id, arm, rep))
+                     ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/scripts/plan_a_experiment.py", line 80, in run_arm
+    trace = replay_scenario(graph, store, scenario_id)
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/temporal_adapters/tradingagents.py", line 348, in replay_scenario
+    final_state, _signal = graph.propagate(
+                           ~~~~~~~~~~~~~~~^
+        ticker,
+        ^^^^^^^
+    ...<2 lines>...
+        temporal=context,
+        ^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/graph/trading_graph.py", line 463, in propagate
+    result = self._run_graph(company_name, trade_date, asset_type=asset_type)
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/graph/trading_graph.py", line 635, in _run_graph
+    final_state = self.graph.invoke(init_agent_state, **args)
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/langgraph/pregel/main.py", line 3913, in invoke
+    for chunk in self.stream(
+                 ~~~~~~~~~~~^
+        input,
+        ^^^^^^
+    ...<11 lines>...
+        **kwargs,
+        ^^^^^^^^^
+    ):
+    ^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/langgraph/pregel/main.py", line 2967, in stream
+    for _ in runner.tick(
+             ~~~~~~~~~~~^
+        [t for t in loop.tasks.values() if not t.writes],
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<2 lines>...
+        schedule_task=loop.accept_push,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ):
+    ^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/langgraph/pregel/_runner.py", line 207, in tick
+    run_with_retry(
+    ~~~~~~~~~~~~~~^
+        t,
+        ^^
+    ...<10 lines>...
+        },
+        ^^
+    )
+    ^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/langgraph/pregel/_retry.py", line 617, in run_with_retry
+    return task.proc.invoke(task.input, config)
+           ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/langgraph/_internal/_runnable.py", line 684, in invoke
+    input = context.run(step.invoke, input, config, **kwargs)
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/langgraph/_internal/_runnable.py", line 426, in invoke
+    ret = self.func(*args, **kwargs)
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/agents/analysts/market_analyst.py", line 88, in market_analyst_node
+    result = chain.invoke(state["messages"])
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/langchain_core/runnables/base.py", line 3444, in invoke
+    input_ = context.run(step.invoke, input_, config)
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/langchain_core/runnables/base.py", line 6002, in invoke
+    return self.bound.invoke(
+           ~~~~~~~~~~~~~~~~~^
+        input,
+        ^^^^^^
+        self._merge_configs(config),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        **{**self.kwargs, **kwargs},
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/llm_clients/openai_client.py", line 36, in invoke
+    return normalize_content(super().invoke(input, config, **kwargs))
+                             ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/langchain_core/language_models/chat_models.py", line 476, in invoke
+    self.generate_prompt(
+    ~~~~~~~~~~~~~~~~~~~~^
+        [self._convert_input(input)],
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+        **kwargs,
+        ^^^^^^^^^
+    ).generations[0][0],
+    ^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/langchain_core/language_models/chat_models.py", line 1849, in generate_prompt
+    return self.generate(prompt_messages, stop=stop, callbacks=callbacks, **kwargs)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/langchain_core/language_models/chat_models.py", line 1656, in generate
+    self._generate_with_cache(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^
+        m,
+        ^^
+    ...<2 lines>...
+        **kwargs,
+        ^^^^^^^^^
+    )
+    ^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/langchain_core/language_models/chat_models.py", line 1994, in _generate_with_cache
+    result = self._generate(
+        messages, stop=stop, run_manager=run_manager, **kwargs
+    )
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/langchain_openai/chat_models/base.py", line 1747, in _generate
+    _handle_openai_api_error(e)
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/langchain_openai/chat_models/base.py", line 1729, in _generate
+    raw_response = self.root_client.responses.with_raw_response.create(
+        **payload
+    )
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/openai/_legacy_response.py", line 369, in wrapped
+    return cast(LegacyAPIResponse[R], func(*args, **kwargs))
+                                      ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/openai/resources/responses/responses.py", line 1016, in create
+    return self._post(
+           ~~~~~~~~~~^
+        "/responses",
+        ^^^^^^^^^^^^^
+    ...<47 lines>...
+        stream_cls=Stream[ResponseStreamEvent],
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/openai/_base_client.py", line 1375, in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+                           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/openai/_base_client.py", line 1115, in request
+    raise APIConnectionError(request=request) from err
+openai.APIConnectionError: Connection error.
+During task with name 'Market Analyst' and id 'ab007b49-eec8-108e-4f1c-b38d2aca4e5a'
+SCENARIO FAILED: nvda-2026-08-18-v3
+PLAN A COMPLETE

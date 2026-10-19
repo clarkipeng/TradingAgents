@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en" data-theme="luxury">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Temporal Agent Evaluation — Proposed Backend Architecture</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/daisyui.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/themes.css">
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.2.4/dist/index.global.js"></script>
+    <style>
+      *, *::before, *::after { box-sizing: border-box; }
+      :where(.grid, .flex) > * { min-width: 0; }
+      :where(p,h1,h2,h3,li,td,th,code) { overflow-wrap:anywhere; }
+      .eyebrow { letter-spacing:.14em; text-transform:uppercase; font-size:.72rem; opacity:.65; }
+      .arch-card { border-top:3px solid color-mix(in oklab, var(--color-primary) 70%, transparent); }
+      .strong-card { border-top-color:var(--color-secondary); }
+    </style>
+  </head>
+  <body class="min-h-screen bg-base-200 text-base-content">
+    <main class="mx-auto max-w-7xl p-5 sm:p-8 lg:p-12">
+      <header class="rounded-box bg-base-100 p-7 shadow-sm lg:p-10">
+        <p class="eyebrow">Architecture review · no implementation started</p>
+        <div class="mt-3 grid gap-6 lg:grid-cols-[1.4fr_.6fr] lg:items-end">
+          <div><h1 class="text-4xl font-black tracking-tight sm:text-5xl">The backend is the agent’s world</h1><p class="mt-4 max-w-3xl text-lg leading-8 text-base-content/75">Yes: agents ask our temporal gateway for every external datum. Permitted collectors populate the backend separately. A replay run reads only sealed evidence—never the live internet.</p></div>
+          <div class="rounded-box bg-primary p-5 text-primary-content"><p class="font-semibold">Critical distinction</p><p class="mt-2 text-sm leading-6">Store every permitted response the agent may see, not “the whole web.” The source registry defines that universe and its legal/operational limits.</p></div>
+        </div>
+      </header>
+
+      <section class="mt-8 rounded-box bg-base-100 p-6 shadow-sm lg:p-8">
+        <p class="eyebrow">Which traffic is allowed?</p><h2 class="mt-2 text-2xl font-bold">One-way external ingress; one agent-facing gateway</h2>
+        <div class="mermaid mt-6">
+flowchart TD
+  subgraph E[Permitted external sources]
+    S1[APIs & market vendors]
+    S2[Websites & search pages]
+    S3[Feeds / webhooks / bulk files]
+    S4[Enterprise systems]
+  end
+  subgraph I[Ingestion plane]
+    C[Collectors & browser capture]
+    V[Validate · redact · timestamp · hash]
+  end
+  subgraph B[Temporal evidence backend]
+    O[(Raw object store\nWARC / JSON / files)]
+    M[(Metadata & provenance\nPostgres)]
+    X[(Derived indexes\ntext / semantic)]
+  end
+  subgraph G[Only agent data path]
+    T[Temporal tool gateway\npolicy + virtual time + citations]
+  end
+  subgraph A[Consumers]
+    TA[TradingAgents adapter]
+    GA[Generic SDK / HTTP / MCP]
+    R[Scenario runner & action simulator]
+  end
+  S1 --> C
+  S2 --> C
+  S3 --> C
+  S4 --> C
+  C --> V --> O
+  V --> M
+  O --> X
+  M --> X
+  O --> T
+  M --> T
+  X --> T
+  T --> TA
+  T --> GA
+  TA --> R
+  GA --> R
+        </div>
+        <div role="alert" class="alert alert-warning mt-6 text-sm"><span><strong>Replay prohibition:</strong> the gateway has no collector/network escape hatch in replay mode. A missing record is an explicit evidence-missing result, not a fresher answer.</span></div>
+      </section>
+
+      <section class="mt-10 grid gap-5 lg:grid-cols-3">
+        <article class="arch-card card bg-base-100 shadow-sm"><div class="card-body"><p class="eyebrow">Control plane</p><h2 class="card-title">What may exist</h2><p>Source registry, credentials reference, poll cadence, timestamp policy, access classification, retention/license, tool schemas, and scenario definitions.</p><p class="text-sm text-base-content/65">The policy layer prevents “crawl anything” from becoming an unbounded or unsafe system.</p></div></article>
+        <article class="arch-card strong-card card bg-base-100 shadow-sm"><div class="card-body"><p class="eyebrow">Evidence plane</p><h2 class="card-title">What was known</h2><p>Immutable raw artifacts plus versioned metadata. Every response retains content hash, source, observed time, available time, and confidence.</p><p class="text-sm text-base-content/65">Raw evidence is authoritative; text/vector indexes are rebuildable derivatives.</p></div></article>
+        <article class="arch-card card bg-base-100 shadow-sm"><div class="card-body"><p class="eyebrow">Evaluation plane</p><h2 class="card-title">What the agent did</h2><p>Virtual-time tool traces, model configuration, cited evidence, scorecards, and separately stateful action simulations.</p><p class="text-sm text-base-content/65">A market quote is evidence. A fill is a simulator policy result.</p></div></article>
+      </section>
+
+      <section class="mt-10 rounded-box bg-base-100 p-6 shadow-sm lg:p-8"><p class="eyebrow">Capture and replay are deliberately different</p><h2 class="mt-2 text-2xl font-bold">The gateway always fronts the agent; its mode determines what can happen behind it</h2>
+        <div class="mt-6 overflow-x-auto"><table class="table table-zebra"><thead><tr><th>Mode</th><th>On a request</th><th>External access</th><th>Required write</th><th>Why it exists</th></tr></thead><tbody>
+          <tr><td><span class="badge badge-success badge-soft">live</span></td><td>Serve approved fresh collector/vendor data</td><td>Collectors only</td><td>Optional trace</td><td>Preserves current production behavior</td></tr>
+          <tr><td><span class="badge badge-primary badge-soft">capture</span></td><td>Acquire if necessary, seal evidence, then return it</td><td>Collectors only</td><td>Evidence record before response</td><td>Builds a future replay corpus</td></tr>
+          <tr><td><span class="badge badge-warning badge-soft">replay</span></td><td>Select the latest eligible stored evidence</td><td>Forbidden</td><td>Run trace only</td><td>Backtesting, regression tests, audit</td></tr>
+        </tbody></table></div>
+        <p class="mt-5 text-sm text-base-content/70">`available_at ≤ scenario.as_of` is enforced by the gateway, not trusted to an agent prompt. Captured errors are replayed too; history must not improve merely because a source is reachable today.</p>
+      </section>
+
+      <section class="mt-10 grid gap-6 xl:grid-cols-[.9fr_1.1fr]">
+        <div class="rounded-box bg-base-100 p-6 shadow-sm lg:p-8"><p class="eyebrow">Storage model</p><h2 class="mt-2 text-2xl font-bold">Three stores, distinct jobs</h2><div class="mt-5 space-y-4">
+          <div class="rounded-box bg-base-200 p-4"><h3 class="font-semibold">Raw object store</h3><p class="mt-1 text-sm">Content-addressed WARC/WACZ, HTTP, JSON, PDFs, exports, screenshots. S3-compatible; local filesystem/MinIO initially.</p></div>
+          <div class="rounded-box bg-base-200 p-4"><h3 class="font-semibold">Metadata/provenance database</h3><p class="mt-1 text-sm">Postgres first: artifacts, evidence versions, request snapshots, sources, policies, scenarios, runs, action events.</p></div>
+          <div class="rounded-box bg-base-200 p-4"><h3 class="font-semibold">Derived retrieval indexes</h3><p class="mt-1 text-sm">Postgres full text first; optional external search/vector store later. Rebuildable and never the lone source of truth.</p></div>
+        </div></div>
+        <div class="rounded-box bg-base-100 p-6 shadow-sm lg:p-8"><p class="eyebrow">What an agent-visible record means</p><h2 class="mt-2 text-2xl font-bold">Evidence is a version, not a URL</h2><pre class="mt-5 overflow-x-auto rounded-box bg-neutral p-5 text-xs text-neutral-content"><code>{
+  "tool": "research.search",
+  "request": {"query": "Fed rate decision"},
+  "response": {"results": []},
+  "artifact_hash": "sha256:…",
+  "source_url": "https://…",
+  "source_published_at": "optional claim",
+  "observed_at": "2025-05-07T13:58:01Z",
+  "available_at": "2025-05-07T13:58:04Z",
+  "confidence": "exact | reconstructed",
+  "connector_version": "…"
+}</code></pre><p class="mt-4 text-sm text-base-content/70">Exact replay uses a captured request/response snapshot. Historical corpus search supports new queries over versions available at time T, but records its own ranking algorithm/version rather than claiming third-party historical ranking.</p></div>
+      </section>
+
+      <section class="mt-10 rounded-box bg-base-100 p-6 shadow-sm lg:p-8"><p class="eyebrow">Minimal-negative integration</p><h2 class="mt-2 text-2xl font-bold">TradingAgents changes only at data boundaries</h2><div class="mt-6 grid gap-5 lg:grid-cols-2"><div><h3 class="font-semibold">Retained exactly as-is in default live mode</h3><ul class="mt-3 list-disc space-y-2 pl-5 text-sm leading-6"><li>LangGraph agent topology, prompts, structured output, reports, memory, checkpointing.</li><li>Existing public tool names and configured vendor routing.</li><li>Live output shape and error semantics when no temporal context is present.</li></ul></div><div><h3 class="font-semibold">Additive adapter responsibilities</h3><ul class="mt-3 list-disc space-y-2 pl-5 text-sm leading-6"><li>Wrap the vendor-routing boundary once rather than edit every analyst.</li><li>Move direct Reddit, StockTwits, and Polymarket retrieval through the same gateway.</li><li>Add an optional run context and sidecar trace; do not rewrite existing reports.</li><li>Introduce portfolio/fill simulation later as an independent action environment.</li></ul></div></div></section>
+
+      <section class="mt-10 rounded-box bg-base-100 p-6 shadow-sm lg:p-8"><p class="eyebrow">Build order and proof gates</p><h2 class="mt-2 text-2xl font-bold">We stop or extract based on evidence, not momentum</h2><ul class="steps steps-vertical mt-6 w-full lg:steps-horizontal"><li class="step step-primary">Generic core<br><span class="text-xs">no finance imports</span></li><li class="step">One adapter<br><span class="text-xs">TradingAgents capture/replay</span></li><li class="step">One proof<br><span class="text-xs">offline zero-network trace</span></li><li class="step">Second domain<br><span class="text-xs">same core unchanged</span></li><li class="step">Product decision<br><span class="text-xs">only if users value it</span></li></ul><div role="alert" class="alert alert-info mt-7 text-sm"><span><strong>Not yet:</strong> global crawling, Kafka, a dedicated vector DB, live broker credentials, or a standalone company. Those are scale/product decisions after the first proof.</span></div></section>
+    </main>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11.15.0/dist/mermaid.esm.min.mjs";
+      const diagrams = [...document.querySelectorAll('.mermaid')].map((el) => ({el, src:el.textContent}));
+      const dark = window.matchMedia('(prefers-color-scheme: dark)'); let applied;
+      async function render(){const theme=dark.matches?'dark':'default';if(theme===applied)return;mermaid.initialize({startOnLoad:false,theme,securityLevel:'strict'});for(const {el,src} of diagrams){el.removeAttribute('data-processed');el.textContent=src;}await mermaid.run({nodes:diagrams.map((d)=>d.el)});applied=theme;}
+      window.addEventListener('load',render,{once:true});dark.addEventListener('change',render);
+    </script>
+  </body>
+</html>

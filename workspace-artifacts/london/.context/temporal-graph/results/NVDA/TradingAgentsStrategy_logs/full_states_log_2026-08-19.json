@@ -1,0 +1,25 @@
+{
+    "company_of_interest": "NVDA",
+    "trade_date": "2026-08-19",
+    "market_report": "",
+    "sentiment_report": "analysis: HOLD",
+    "news_report": "",
+    "fundamentals_report": "",
+    "investment_debate_state": {
+        "bull_history": "\nBull Analyst: analysis: HOLD",
+        "bear_history": "\nBear Analyst: analysis: HOLD",
+        "history": "\nBull Analyst: analysis: HOLD\nBear Analyst: analysis: HOLD",
+        "current_response": "analysis: HOLD",
+        "judge_decision": "analysis: HOLD"
+    },
+    "trader_investment_decision": "analysis: HOLD",
+    "risk_debate_state": {
+        "aggressive_history": "\nAggressive Analyst: analysis: HOLD",
+        "conservative_history": "\nConservative Analyst: analysis: HOLD",
+        "neutral_history": "\nNeutral Analyst: analysis: HOLD",
+        "history": "\nAggressive Analyst: analysis: HOLD\nConservative Analyst: analysis: HOLD\nNeutral Analyst: analysis: HOLD",
+        "judge_decision": "analysis: HOLD"
+    },
+    "investment_plan": "analysis: HOLD",
+    "final_trade_decision": "analysis: HOLD"
+}

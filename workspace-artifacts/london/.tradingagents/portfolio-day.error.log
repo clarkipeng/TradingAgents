@@ -1,0 +1,382 @@
+Reddit RSS fetch failed for r/stocks · AAPL (HTTPError)
+Reddit RSS fetch failed for r/investing · AAPL (HTTPError)
+Reddit RSS fetch failed for r/investing · AMZN (HTTPError)
+Reddit RSS fetch failed for r/stocks · AVGO (HTTPError)
+Reddit RSS fetch failed for r/investing · AVGO (HTTPError)
+$BRK.B: possibly delisted; no timezone found
+$BRK.B: possibly delisted; no timezone found
+
+1 Failed download:
+['BRK.B']: possibly delisted; no timezone found
+Reddit RSS fetch failed for r/stocks · COIN (HTTPError)
+Reddit RSS fetch failed for r/investing · COIN (HTTPError)
+failed to persist temporal LLM response
+Traceback (most recent call last):
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/temporal_adapters/langchain.py", line 321, in _finish
+    self.store.finish_llm_call(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        str(run_id),
+        ^^^^^^^^^^^^
+    ...<2 lines>...
+        completed_at=datetime.now(timezone.utc),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/temporal/store.py", line 994, in finish_llm_call
+    response_hash = self.put_artifact(response_json.encode("utf-8")) if response_json else None
+                    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/temporal/store.py", line 296, in put_artifact
+    connection.execute(
+    ~~~~~~~~~~~~~~~~~~^
+        """
+        ^^^
+    ...<3 lines>...
+        (content_hash, media_type, len(content), str(relative_path)),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+sqlite3.OperationalError: database is locked
+failed to persist temporal LLM request
+Traceback (most recent call last):
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/temporal_adapters/langchain.py", line 302, in _begin
+    self.store.begin_llm_call(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^
+        str(run_id),
+        ^^^^^^^^^^^^
+    ...<4 lines>...
+        temporal_run_id=context.run_id if context else None,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/temporal/store.py", line 946, in begin_llm_call
+    request_hash = self.put_artifact(request_json.encode("utf-8"))
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/temporal/store.py", line 296, in put_artifact
+    connection.execute(
+    ~~~~~~~~~~~~~~~~~~^
+        """
+        ^^^
+    ...<3 lines>...
+        (content_hash, media_type, len(content), str(relative_path)),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+sqlite3.OperationalError: database is locked
+failed to persist temporal LLM response
+Traceback (most recent call last):
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/temporal_adapters/langchain.py", line 321, in _finish
+    self.store.finish_llm_call(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        str(run_id),
+        ^^^^^^^^^^^^
+    ...<2 lines>...
+        completed_at=datetime.now(timezone.utc),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/temporal/store.py", line 1006, in finish_llm_call
+    raise KeyError(f"unknown LLM run: {run_id}")
+KeyError: 'unknown LLM run: 01a05b6c-a348-7a30-93c6-694996b5ee7b'
+failed to persist temporal LLM request
+Traceback (most recent call last):
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/temporal_adapters/langchain.py", line 302, in _begin
+    self.store.begin_llm_call(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^
+        str(run_id),
+        ^^^^^^^^^^^^
+    ...<4 lines>...
+        temporal_run_id=context.run_id if context else None,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/temporal/store.py", line 946, in begin_llm_call
+    request_hash = self.put_artifact(request_json.encode("utf-8"))
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/temporal/store.py", line 296, in put_artifact
+    connection.execute(
+    ~~~~~~~~~~~~~~~~~~^
+        """
+        ^^^
+    ...<3 lines>...
+        (content_hash, media_type, len(content), str(relative_path)),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+sqlite3.OperationalError: database is locked
+failed to persist temporal LLM response
+Traceback (most recent call last):
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/temporal_adapters/langchain.py", line 321, in _finish
+    self.store.finish_llm_call(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        str(run_id),
+        ^^^^^^^^^^^^
+    ...<2 lines>...
+        completed_at=datetime.now(timezone.utc),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/temporal/store.py", line 1006, in finish_llm_call
+    raise KeyError(f"unknown LLM run: {run_id}")
+KeyError: 'unknown LLM run: 01a05b88-e67d-7cb2-8352-9a5b5fea3c64'
+failed to persist temporal LLM response
+Traceback (most recent call last):
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/temporal_adapters/langchain.py", line 321, in _finish
+    self.store.finish_llm_call(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        str(run_id),
+        ^^^^^^^^^^^^
+    ...<2 lines>...
+        completed_at=datetime.now(timezone.utc),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/temporal/store.py", line 994, in finish_llm_call
+    response_hash = self.put_artifact(response_json.encode("utf-8")) if response_json else None
+                    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/temporal/store.py", line 296, in put_artifact
+    connection.execute(
+    ~~~~~~~~~~~~~~~~~~^
+        """
+        ^^^
+    ...<3 lines>...
+        (content_hash, media_type, len(content), str(relative_path)),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+sqlite3.OperationalError: database is locked
+failed to persist temporal LLM request
+Traceback (most recent call last):
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/temporal_adapters/langchain.py", line 302, in _begin
+    self.store.begin_llm_call(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^
+        str(run_id),
+        ^^^^^^^^^^^^
+    ...<4 lines>...
+        temporal_run_id=context.run_id if context else None,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/temporal/store.py", line 946, in begin_llm_call
+    request_hash = self.put_artifact(request_json.encode("utf-8"))
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/temporal/store.py", line 296, in put_artifact
+    connection.execute(
+    ~~~~~~~~~~~~~~~~~~^
+        """
+        ^^^
+    ...<3 lines>...
+        (content_hash, media_type, len(content), str(relative_path)),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+sqlite3.OperationalError: database is locked
+failed to persist temporal LLM response
+Traceback (most recent call last):
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/temporal_adapters/langchain.py", line 321, in _finish
+    self.store.finish_llm_call(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        str(run_id),
+        ^^^^^^^^^^^^
+    ...<2 lines>...
+        completed_at=datetime.now(timezone.utc),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/temporal/store.py", line 994, in finish_llm_call
+    response_hash = self.put_artifact(response_json.encode("utf-8")) if response_json else None
+                    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/temporal/store.py", line 296, in put_artifact
+    connection.execute(
+    ~~~~~~~~~~~~~~~~~~^
+        """
+        ^^^
+    ...<3 lines>...
+        (content_hash, media_type, len(content), str(relative_path)),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+sqlite3.OperationalError: database is locked
+failed to persist temporal LLM request
+Traceback (most recent call last):
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/temporal_adapters/langchain.py", line 302, in _begin
+    self.store.begin_llm_call(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^
+        str(run_id),
+        ^^^^^^^^^^^^
+    ...<4 lines>...
+        temporal_run_id=context.run_id if context else None,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/temporal/store.py", line 946, in begin_llm_call
+    request_hash = self.put_artifact(request_json.encode("utf-8"))
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/temporal/store.py", line 296, in put_artifact
+    connection.execute(
+    ~~~~~~~~~~~~~~~~~~^
+        """
+        ^^^
+    ...<3 lines>...
+        (content_hash, media_type, len(content), str(relative_path)),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+sqlite3.OperationalError: database is locked
+failed to persist temporal LLM response
+Traceback (most recent call last):
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/temporal_adapters/langchain.py", line 321, in _finish
+    self.store.finish_llm_call(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        str(run_id),
+        ^^^^^^^^^^^^
+    ...<2 lines>...
+        completed_at=datetime.now(timezone.utc),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/temporal/store.py", line 994, in finish_llm_call
+    response_hash = self.put_artifact(response_json.encode("utf-8")) if response_json else None
+                    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/temporal/store.py", line 296, in put_artifact
+    connection.execute(
+    ~~~~~~~~~~~~~~~~~~^
+        """
+        ^^^
+    ...<3 lines>...
+        (content_hash, media_type, len(content), str(relative_path)),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+sqlite3.OperationalError: database is locked
+failed to persist temporal LLM request
+Traceback (most recent call last):
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/temporal_adapters/langchain.py", line 302, in _begin
+    self.store.begin_llm_call(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^
+        str(run_id),
+        ^^^^^^^^^^^^
+    ...<4 lines>...
+        temporal_run_id=context.run_id if context else None,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/temporal/store.py", line 946, in begin_llm_call
+    request_hash = self.put_artifact(request_json.encode("utf-8"))
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/temporal/store.py", line 296, in put_artifact
+    connection.execute(
+    ~~~~~~~~~~~~~~~~~~^
+        """
+        ^^^
+    ...<3 lines>...
+        (content_hash, media_type, len(content), str(relative_path)),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+sqlite3.OperationalError: database is locked
+failed to persist temporal LLM response
+Traceback (most recent call last):
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/temporal_adapters/langchain.py", line 321, in _finish
+    self.store.finish_llm_call(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        str(run_id),
+        ^^^^^^^^^^^^
+    ...<2 lines>...
+        completed_at=datetime.now(timezone.utc),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/temporal/store.py", line 994, in finish_llm_call
+    response_hash = self.put_artifact(response_json.encode("utf-8")) if response_json else None
+                    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/temporal/store.py", line 296, in put_artifact
+    connection.execute(
+    ~~~~~~~~~~~~~~~~~~^
+        """
+        ^^^
+    ...<3 lines>...
+        (content_hash, media_type, len(content), str(relative_path)),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+sqlite3.OperationalError: database is locked
+failed to persist temporal LLM request
+Traceback (most recent call last):
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/temporal_adapters/langchain.py", line 302, in _begin
+    self.store.begin_llm_call(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^
+        str(run_id),
+        ^^^^^^^^^^^^
+    ...<4 lines>...
+        temporal_run_id=context.run_id if context else None,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/temporal/store.py", line 946, in begin_llm_call
+    request_hash = self.put_artifact(request_json.encode("utf-8"))
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/temporal/store.py", line 296, in put_artifact
+    connection.execute(
+    ~~~~~~~~~~~~~~~~~~^
+        """
+        ^^^
+    ...<3 lines>...
+        (content_hash, media_type, len(content), str(relative_path)),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+sqlite3.OperationalError: database is locked
+failed to persist temporal LLM response
+Traceback (most recent call last):
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/temporal_adapters/langchain.py", line 321, in _finish
+    self.store.finish_llm_call(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        str(run_id),
+        ^^^^^^^^^^^^
+    ...<2 lines>...
+        completed_at=datetime.now(timezone.utc),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/temporal/store.py", line 994, in finish_llm_call
+    response_hash = self.put_artifact(response_json.encode("utf-8")) if response_json else None
+                    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/tradingagents/temporal/store.py", line 296, in put_artifact
+    connection.execute(
+    ~~~~~~~~~~~~~~~~~~^
+        """
+        ^^^
+    ...<3 lines>...
+        (content_hash, media_type, len(content), str(relative_path)),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+sqlite3.OperationalError: database is locked
+Reddit RSS fetch failed for r/stocks · PLTR (HTTPError)
+Reddit RSS fetch failed for r/investing · PLTR (HTTPError)
+Reddit RSS fetch failed for r/investing · TSLA (HTTPError)
+Reddit RSS fetch failed for r/stocks · UNH (HTTPError)
+Reddit RSS fetch failed for r/investing · UNH (HTTPError)
+Reddit RSS fetch failed for r/stocks · V (HTTPError)
+Reddit RSS fetch failed for r/investing · V (HTTPError)
+Reddit RSS fetch failed for r/investing · XOM (HTTPError)
+Reddit RSS fetch failed for r/stocks · AMD (HTTPError)
+Reddit RSS fetch failed for r/investing · AMD (HTTPError)
+Reddit RSS fetch failed for r/stocks · AMAT (HTTPError)
+Reddit RSS fetch failed for r/investing · AMAT (HTTPError)
+$BRK.B: possibly delisted; no timezone found
+$BRK.B: possibly delisted; no timezone found
+
+1 Failed download:
+['BRK.B']: possibly delisted; no timezone found
+Reddit RSS fetch failed for r/investing · AAPL (HTTPError)
+Reddit RSS fetch failed for r/wallstreetbets · AMZN (HTTPError)
+Reddit RSS fetch failed for r/wallstreetbets · AVGO (HTTPError)
+Reddit RSS fetch failed for r/wallstreetbets · COIN (HTTPError)
+Reddit RSS fetch failed for r/stocks · AMZN (HTTPError)
+Reddit RSS fetch failed for r/stocks · AVGO (HTTPError)
+Reddit RSS fetch failed for r/stocks · COIN (HTTPError)
+Reddit RSS fetch failed for r/investing · AVGO (HTTPError)
+Reddit RSS fetch failed for r/investing · AMZN (HTTPError)
+Reddit RSS fetch failed for r/investing · COIN (HTTPError)
+Reddit RSS fetch failed for r/stocks · COST (HTTPError)
+Reddit RSS fetch failed for r/wallstreetbets · CRM (HTTPError)
+Reddit RSS fetch failed for r/wallstreetbets · GOOGL (HTTPError)
+Reddit RSS fetch failed for r/stocks · CRM (HTTPError)
+Reddit RSS fetch failed for r/stocks · GOOGL (HTTPError)
+Reddit RSS fetch failed for r/investing · CRM (HTTPError)
+failures: BRK.B: NoMarketDataError, research pool: deadline_exceeded

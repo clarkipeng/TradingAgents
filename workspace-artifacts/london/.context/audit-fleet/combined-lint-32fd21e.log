@@ -1,0 +1,582 @@
+E402 Module level import not at top of file
+  --> scripts/plan_a_experiment.py:32:1
+   |
+30 | sys.path.insert(0, str(PROJECT_DIR))
+31 |
+32 | from dotenv import load_dotenv
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+33 |
+34 | load_dotenv(PROJECT_DIR / ".env", override=False)
+   |
+help: Move module level imports to top of file
+
+E402 Module level import not at top of file
+  --> scripts/plan_a_experiment.py:36:1
+   |
+34 | load_dotenv(PROJECT_DIR / ".env", override=False)
+35 |
+36 | from tradingagents.default_config import DEFAULT_CONFIG
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+37 | from tradingagents.graph.trading_graph import TradingAgentsGraph
+38 | from tradingagents.temporal import TemporalStore
+   |
+help: Move module level imports to top of file
+
+E402 Module level import not at top of file
+  --> scripts/plan_a_experiment.py:37:1
+   |
+36 | from tradingagents.default_config import DEFAULT_CONFIG
+37 | from tradingagents.graph.trading_graph import TradingAgentsGraph
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+38 | from tradingagents.temporal import TemporalStore
+39 | from tradingagents.temporal_adapters.langchain import LangChainTapeRecorder
+   |
+help: Move module level imports to top of file
+
+E402 Module level import not at top of file
+  --> scripts/plan_a_experiment.py:38:1
+   |
+36 | from tradingagents.default_config import DEFAULT_CONFIG
+37 | from tradingagents.graph.trading_graph import TradingAgentsGraph
+38 | from tradingagents.temporal import TemporalStore
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+39 | from tradingagents.temporal_adapters.langchain import LangChainTapeRecorder
+40 | from tradingagents.temporal_adapters.tradingagents import replay_scenario
+   |
+help: Move module level imports to top of file
+
+E402 Module level import not at top of file
+  --> scripts/plan_a_experiment.py:39:1
+   |
+37 | from tradingagents.graph.trading_graph import TradingAgentsGraph
+38 | from tradingagents.temporal import TemporalStore
+39 | from tradingagents.temporal_adapters.langchain import LangChainTapeRecorder
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+40 | from tradingagents.temporal_adapters.tradingagents import replay_scenario
+   |
+help: Move module level imports to top of file
+
+E402 Module level import not at top of file
+  --> scripts/plan_a_experiment.py:40:1
+   |
+38 | from tradingagents.temporal import TemporalStore
+39 | from tradingagents.temporal_adapters.langchain import LangChainTapeRecorder
+40 | from tradingagents.temporal_adapters.tradingagents import replay_scenario
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+41 |
+42 | STORE_PATH = os.environ.get(
+   |
+help: Move module level imports to top of file
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> tests/test_analysts_only_memory.py:26:5
+   |
+24 |       # unused read; no provider/model execution is needed to prove it.
+25 |       graph._run_graph = graph._run_graph
+26 | /     from tradingagents.temporal import TemporalContext, TemporalMode, temporal_context
+27 | |     from datetime import datetime, timezone
+   | |___________________________________________^
+28 |       with temporal_context(TemporalContext.at(TemporalMode.LIVE, datetime.now(timezone.utc))):
+29 |           # Force only setup by replacing compiled graph invocation.
+   |
+help: Organize imports
+   |
+25 |     graph._run_graph = graph._run_graph
+   -     from tradingagents.temporal import TemporalContext, TemporalMode, temporal_context
+26 |     from datetime import datetime, timezone
+27 +
+28 +     from tradingagents.temporal import TemporalContext, TemporalMode, temporal_context
+29 |     with temporal_context(TemporalContext.at(TemporalMode.LIVE, datetime.now(timezone.utc))):
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> tests/test_market_data_validator.py:82:9
+   |
+81 |     def test_tool_capture_and_replay_use_the_temporal_boundary(self, tmp_path, monkeypatch):
+82 |         from tradingagents.agents.utils.market_data_validation_tools import get_verified_market_snapshot
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+83 |         monkeypatch.setattr(validator, "load_ohlcv", lambda s, d: _sample_ohlcv())
+84 |         store = TemporalStore(tmp_path)
+   |
+help: Organize imports
+   |
+81 |     def test_tool_capture_and_replay_use_the_temporal_boundary(self, tmp_path, monkeypatch):
+   -         from tradingagents.agents.utils.market_data_validation_tools import get_verified_market_snapshot
+82 +         from tradingagents.agents.utils.market_data_validation_tools import (
+83 +             get_verified_market_snapshot,
+84 +         )
+85 |         monkeypatch.setattr(validator, "load_ohlcv", lambda s, d: _sample_ohlcv())
+   |
+
+SIM117 Use a single `with` statement with multiple contexts instead of nested `with` statements
+   --> tests/test_polymarket.py:98:9
+    |
+ 96 |               _market("Broken?", 0.5, volume="lots", end_date="2030-12-31T00:00:00Z")
+ 97 |           )
+ 98 | /         with mock.patch.object(polymarket, "_request", return_value=wrong_typed):
+ 99 | |             with self.assertRaises(ProviderResponseError):
+    | |__________________________________________________________^
+100 |                   polymarket.iter_forward_markets("anything", limit=10)
+    |
+help: Combine `with` statements
+
+F821 Undefined name `pytest`
+  --> tests/test_portfolio_lifecycle.py:75:33
+   |
+73 |         store, ["A", "B", "C"], day="2026-09-01",
+74 |         research_fn=lambda ticker, context: {"rating": "Buy", "brief": "b"},
+75 |         complete_llm=lambda *_: pytest.fail("thin quotes must stop the CIO"),
+   |                                 ^^^^^^
+76 |         quote_fn=lambda symbol, day: Decimal("10") if symbol == "A" else None,
+77 |     )
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> tests/test_portfolio_replay.py:1:1
+   |
+ 1 | / from datetime import datetime, timezone
+ 2 | |
+ 3 | | import pytest
+ 4 | |
+ 5 | | from tradingagents.portfolio_replay import (
+ 6 | |     build_portfolio_replay_manifest,
+ 7 | |     replay_production_portfolio_day,
+ 8 | |     replay_portfolio_day,
+ 9 | |     stream_digest,
+10 | |     validate_portfolio_replay_manifest,
+11 | | )
+12 | | from tradingagents.portfolio_run import run_portfolio_day
+13 | | from tradingagents.temporal import (
+14 | |     TemporalContext,
+15 | |     TemporalGateway,
+16 | |     TemporalMode,
+17 | |     TemporalStore,
+18 | |     current_context,
+19 | |     temporal_context,
+20 | | )
+   | |_^
+help: Organize imports
+  |
+6 |     build_portfolio_replay_manifest,
+7 +     replay_portfolio_day,
+8 |     replay_production_portfolio_day,
+  -     replay_portfolio_day,
+9 |     stream_digest,
+  |
+
+C420 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead
+   --> tests/test_portfolio_run.py:100:15
+    |
+ 98 |     weights); scaling down is deterministic and can only reduce exposure.
+ 99 |     Rejecting them liquidated the book over rounding epsilon."""
+100 |     ratings = {t: "Hold" for t in ("NVDA", "MSFT", "AAPL", "AMZN")}
+    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+101 |
+102 |     def eager_llm(prompt: str) -> str:
+    |
+help: Replace with `dict.fromkeys(iterable)`)
+    |
+99  |     Rejecting them liquidated the book over rounding epsilon."""
+    -     ratings = {t: "Hold" for t in ("NVDA", "MSFT", "AAPL", "AMZN")}
+100 +     ratings = dict.fromkeys(("NVDA", "MSFT", "AAPL", "AMZN"), "Hold")
+101 |
+    |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> tests/test_ranking_equivalence.py:10:1
+   |
+ 8 |   """
+ 9 |
+10 | / from __future__ import annotations
+11 | |
+12 | | import contextlib
+13 | | import hashlib
+14 | | import math
+15 | | import random
+16 | | import sqlite3
+17 | | from dataclasses import dataclass
+18 | | from datetime import datetime, timedelta, timezone
+19 | |
+20 | | from tradingagents.temporal.models import canonical_json
+21 | | from tradingagents.temporal.ranking import (
+22 | |     INDEX_VERSION,
+23 | |     RECENCY_HALF_LIFE_DAYS,
+24 | |     STATIC_STORE_ALIASES,
+25 | |     TITLE_WEIGHT,
+26 | |     BODY_WEIGHT,
+27 | |     _terms,
+28 | |     build_eligible_index,
+29 | |     rank,
+30 | | )
+   | |_^
+help: Organize imports
+   |
+21 | from tradingagents.temporal.ranking import (
+22 +     BODY_WEIGHT,
+23 |     INDEX_VERSION,
+24 |     RECENCY_HALF_LIFE_DAYS,
+25 |     STATIC_STORE_ALIASES,
+26 |     TITLE_WEIGHT,
+   -     BODY_WEIGHT,
+27 |     _terms,
+28 |     build_eligible_index,
+29 |     rank,
+30 | )
+   -
+31 |
+   |
+
+SIM115 Use a context manager for opening files
+   --> tests/test_temporal_capture.py:189:17
+    |
+187 |     store = TemporalStore(tmp_path)
+188 |     with store.write_lock():
+189 |         probe = open(tmp_path / "mutator.lock", "a+")
+    |                 ^^^^
+190 |         try:
+191 |             try:
+    |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> tests/test_x_posts_tool.py:88:5
+   |
+86 |   @pytest.mark.unit
+87 |   def test_graph_registers_x_posts_with_the_temporal_tools(monkeypatch):
+88 | /     from tradingagents.default_config import DEFAULT_CONFIG
+89 | |     from tradingagents.graph.trading_graph import TradingAgentsGraph
+90 | |     import copy
+   | |_______________^
+91 |
+92 |       config = copy.deepcopy(DEFAULT_CONFIG)
+   |
+help: Organize imports
+   |
+87 | def test_graph_registers_x_posts_with_the_temporal_tools(monkeypatch):
+88 +     import copy
+89 +
+90 |     from tradingagents.default_config import DEFAULT_CONFIG
+91 |     from tradingagents.graph.trading_graph import TradingAgentsGraph
+   -     import copy
+92 |
+   |
+
+SIM300 [*] Yoda condition detected
+  --> tests/test_x_roster_poller.py:41:12
+   |
+39 |       assert len(set(X_ROSTER_TICKERS)) == 50
+40 |       assert all(ticker == ticker.upper() for ticker in X_ROSTER_TICKERS)
+41 |       assert X_ROSTER_STATIC_SLOTS == tuple(
+   |  ____________^
+42 | |         ("x", f"cashtag:{ticker}") for ticker in X_ROSTER_TICKERS
+43 | |     )
+   | |_____^
+44 |       assert X_ROSTER_V1_PROTOCOL_ID.startswith("protocol_")
+45 |       assert X_ROSTER_V1_COLLECTOR_SEMANTICS_ID.startswith("collector_")
+   |
+   |
+40 |     assert all(ticker == ticker.upper() for ticker in X_ROSTER_TICKERS)
+   -     assert X_ROSTER_STATIC_SLOTS == tuple(
+41 +     assert tuple(
+42 |         ("x", f"cashtag:{ticker}") for ticker in X_ROSTER_TICKERS
+   -     )
+43 +     ) == X_ROSTER_STATIC_SLOTS
+44 |     assert X_ROSTER_V1_PROTOCOL_ID.startswith("protocol_")
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> tradingagents/agents/analysts/fundamentals_analyst.py:1:1
+   |
+ 1 | / from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+ 2 | |
+ 3 | | from tradingagents.agents.utils.agent_utils import (
+ 4 | |     get_balance_sheet,
+ 5 | |     get_cashflow,
+ 6 | |     get_fundamentals,
+ 7 | |     get_income_statement,
+ 8 | |     get_instrument_context_from_state,
+ 9 | |     get_language_instruction,
+10 | |     get_evidence_brief_guidance,
+11 | |     get_temporal_search_guidance,
+12 | | )
+   | |_^
+help: Organize imports
+   |
+5  |     get_cashflow,
+6  +     get_evidence_brief_guidance,
+7  |     get_fundamentals,
+8  |     get_income_statement,
+9  |     get_instrument_context_from_state,
+10 |     get_language_instruction,
+   -     get_evidence_brief_guidance,
+11 |     get_temporal_search_guidance,
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> tradingagents/agents/analysts/market_analyst.py:1:1
+   |
+ 1 | / from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+ 2 | |
+ 3 | | from tradingagents.agents.utils.agent_utils import (
+ 4 | |     get_indicators,
+ 5 | |     get_instrument_context_from_state,
+ 6 | |     get_language_instruction,
+ 7 | |     get_stock_data,
+ 8 | |     get_evidence_brief_guidance,
+ 9 | |     get_temporal_search_guidance,
+10 | |     get_verified_market_snapshot,
+11 | | )
+   | |_^
+help: Organize imports
+  |
+3 | from tradingagents.agents.utils.agent_utils import (
+4 +     get_evidence_brief_guidance,
+5 |     get_indicators,
+6 |     get_instrument_context_from_state,
+7 |     get_language_instruction,
+8 |     get_stock_data,
+  -     get_evidence_brief_guidance,
+9 |     get_temporal_search_guidance,
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> tradingagents/agents/analysts/news_analyst.py:1:1
+   |
+ 1 | / from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+ 2 | |
+ 3 | | from tradingagents.agents.utils.agent_utils import (
+ 4 | |     get_global_news,
+ 5 | |     get_hacker_news,
+ 6 | |     get_insider_transactions,
+ 7 | |     get_instrument_context_from_state,
+ 8 | |     get_language_instruction,
+ 9 | |     get_macro_indicators,
+10 | |     get_news,
+11 | |     get_prediction_markets,
+12 | |     get_evidence_brief_guidance,
+13 | |     get_temporal_search_guidance,
+14 | | )
+15 | | from tradingagents.dataflows.config import get_config
+16 | | from tradingagents.dataflows.media_history import collected_media_enabled
+   | |_________________________________________________________________________^
+help: Organize imports
+   |
+3  | from tradingagents.agents.utils.agent_utils import (
+4  +     get_evidence_brief_guidance,
+5  |     get_global_news,
+--------------------------------------------------------------------------------
+12 |     get_prediction_markets,
+   -     get_evidence_brief_guidance,
+13 |     get_temporal_search_guidance,
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+   --> tradingagents/poller.py:34:1
+    |
+ 32 |   """
+ 33 |
+ 34 | / from __future__ import annotations
+ 35 | |
+ 36 | | import argparse
+ 37 | | import hashlib
+ 38 | | import json
+ 39 | | import logging
+ 40 | | import math
+ 41 | | import os
+ 42 | | import re
+ 43 | | import secrets
+ 44 | | import signal
+ 45 | | import time
+ 46 | | from collections.abc import Mapping
+ 47 | | from copy import deepcopy
+ 48 | | from dataclasses import dataclass
+ 49 | | from datetime import datetime, timedelta, timezone
+ 50 | |
+ 51 | | from tradingagents import global_research
+ 52 | | from tradingagents.collector_contract import (
+ 53 | |     COLLECTOR_POLICY as _GLOBAL_ONLY_COLLECTOR_POLICY,
+ 54 | |     DISCOVERY_POLICY as _DISCOVERY_POLICY,
+ 55 | |     discovery_policy_manifest,
+ 56 | | )
+ 57 | | from tradingagents.collector_health import (
+ 58 | |     CollectorHealthState,
+ 59 | |     start_collector_health_server,
+ 60 | | )
+ 61 | | from tradingagents.dataflows import media_store
+ 62 | | from tradingagents.dataflows.media_sources import (
+ 63 | |     FETCHERS,
+ 64 | |     GLOBAL_X_ADAPTER_POLICY,
+ 65 | |     GLOBAL_X_SHADOW_ADAPTER_POLICY,
+ 66 | |     KEYLESS_SOURCES,
+ 67 | |     SELECTABLE_SOURCES,
+ 68 | |     ProviderResponseError,
+ 69 | |     ProviderTransientError,
+ 70 | |     fetch_global_news,
+ 71 | |     fetch_polymarket_odds,
+ 72 | |     fetch_top_news_headlines,
+ 73 | |     fetch_x_recent_counts,
+ 74 | |     fetch_x_roster_slot,
+ 75 | |     fetch_x_topic,
+ 76 | |     fetch_x_trends,
+ 77 | |     looks_company_authored,
+ 78 | | )
+ 79 | | from tradingagents.dataflows.media_store import open_store
+ 80 | | from tradingagents.dataflows.x_roster import (
+ 81 | |     X_ROSTER_STATIC_SLOTS,
+ 82 | |     X_ROSTER_V1_COLLECTOR_SEMANTICS_ID,
+ 83 | |     X_ROSTER_V1_POLICY,
+ 84 | |     X_ROSTER_V1_PROTOCOL_ID,
+ 85 | |     x_roster_cycle_resolution,
+ 86 | | )
+ 87 | | from tradingagents.dataflows.shadow_sources import (
+ 88 | |     SOURCE_SHADOW_STATIC_SLOTS,
+ 89 | |     SOURCE_SHADOW_V1_COLLECTOR_SEMANTICS_ID,
+ 90 | |     SOURCE_SHADOW_V1_POLICY,
+ 91 | |     SOURCE_SHADOW_V1_PROTOCOL_ID,
+ 92 | |     fetch_source_shadow_slot,
+ 93 | |     source_shadow_cycle_resolution,
+ 94 | |     source_shadow_cycle_spec,
+ 95 | | )
+ 96 | | from tradingagents.dataflows.trading_clock import TradingClock
+ 97 | | from tradingagents.dataflows.x_shadow import (
+ 98 | |     X_SHADOW_COLLECTOR_SEMANTICS_ID,
+ 99 | |     X_SHADOW_POLICY,
+100 | |     X_SHADOW_PROTOCOL_ID,
+101 | |     X_SHADOW_STATIC_SLOTS,
+102 | | )
+103 | | from tradingagents.default_config import DEFAULT_CONFIG
+104 | | from tradingagents.global_research import (
+105 | |     _evidence_id,
+106 | |     _formal_query_slots,
+107 | |     _raw_content_id,
+108 | |     is_formally_eligible_evidence,
+109 | | )
+110 | | from tradingagents.logging_utils import safe_exception_site as _exception_site
+111 | | from tradingagents.logging_utils import safe_exception_type as _exception_kind
+112 | | from tradingagents.operations import emit_alert, probe_alert_webhook
+113 | | from tradingagents.research_protocol import (
+114 | |     GLOBAL_EVENT_V2_COLLECTION_PROTOCOL_ID,
+115 | |     GLOBAL_EVENT_V2_COLLECTOR_SEMANTICS_ID,
+116 | |     GLOBAL_EVENT_V2_COLLECTOR_SEMANTICS_MANIFEST,
+117 | |     GLOBAL_EVENT_V2_CURRENT_COLLECTOR_IDENTITY,
+118 | |     GLOBAL_EVENT_V2_OPERATIONAL_PRIOR_COLLECTOR_IDENTITIES,
+119 | |     GLOBAL_EVENT_V2_PROTOCOL,
+120 | |     build_identity,
+121 | |     canonical_json,
+122 | |     content_id,
+123 | |     global_news_query_slot_label,
+124 | | )
+125 | | from tradingagents.x_cycle import x_cycle_structural_state
+    | |__________________________________________________________^
+126 |
+127 |   logger = logging.getLogger("media_poller")
+    |
+help: Organize imports
+    |
+79  | from tradingagents.dataflows.media_store import open_store
+    - from tradingagents.dataflows.x_roster import (
+    -     X_ROSTER_STATIC_SLOTS,
+    -     X_ROSTER_V1_COLLECTOR_SEMANTICS_ID,
+    -     X_ROSTER_V1_POLICY,
+    -     X_ROSTER_V1_PROTOCOL_ID,
+    -     x_roster_cycle_resolution,
+    - )
+80  | from tradingagents.dataflows.shadow_sources import (
+--------------------------------------------------------------------------------
+89  | from tradingagents.dataflows.trading_clock import TradingClock
+90  + from tradingagents.dataflows.x_roster import (
+91  +     X_ROSTER_STATIC_SLOTS,
+92  +     X_ROSTER_V1_COLLECTOR_SEMANTICS_ID,
+93  +     X_ROSTER_V1_POLICY,
+94  +     X_ROSTER_V1_PROTOCOL_ID,
+95  +     x_roster_cycle_resolution,
+96  + )
+97  | from tradingagents.dataflows.x_shadow import (
+--------------------------------------------------------------------------------
+109 | )
+    - from tradingagents.logging_utils import safe_exception_site as _exception_site
+    - from tradingagents.logging_utils import safe_exception_type as _exception_kind
+110 + from tradingagents.logging_utils import (
+111 +     safe_exception_site as _exception_site,
+112 +     safe_exception_type as _exception_kind,
+113 + )
+114 | from tradingagents.operations import emit_alert, probe_alert_webhook
+    |
+
+B023 Function definition does not bind loop variable `shadow_period_utc`
+    --> tradingagents/poller.py:3705:55
+     |
+3703 |                 # are terminal. It cannot change either result.
+3704 |                 _run_post_cycle_hook(
+3705 |                     lambda: poll_x_shadow_once(store, shadow_period_utc, max_topics=x_topic_limit),
+     |                                                       ^^^^^^^^^^^^^^^^^
+3706 |                     stop,
+3707 |                     lease_guard=lease_guard,
+     |
+
+B023 Function definition does not bind loop variable `shadow_period_utc`
+    --> tradingagents/poller.py:3715:60
+     |
+3713 |                     lease_guard.assert_held()
+3714 |                 _run_post_cycle_hook(
+3715 |                     lambda: poll_source_shadow_once(store, shadow_period_utc),
+     |                                                            ^^^^^^^^^^^^^^^^^
+3716 |                     stop,
+3717 |                     lease_guard=lease_guard,
+     |
+
+B023 Function definition does not bind loop variable `shadow_period_utc`
+    --> tradingagents/poller.py:3726:55
+     |
+3724 |                     lease_guard.assert_held()
+3725 |                 _run_post_cycle_hook(
+3726 |                     lambda: poll_x_roster_once(store, shadow_period_utc),
+     |                                                       ^^^^^^^^^^^^^^^^^
+3727 |                     stop,
+3728 |                     lease_guard=lease_guard,
+     |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> tradingagents/temporal_adapters/tradingagents.py:3:1
+   |
+ 1 |   """Bridge TradingAgents dataflow calls into the temporal core without changing tool shapes."""
+ 2 |
+ 3 | / from __future__ import annotations
+ 4 | |
+ 5 | | from collections.abc import Callable, Iterable, Mapping
+ 6 | | from dataclasses import dataclass
+ 7 | | from datetime import datetime, timedelta, timezone
+ 8 | | from decimal import Decimal
+ 9 | | from typing import Any
+10 | |
+11 | | from tradingagents.temporal import (
+12 | |     FactualClaim,
+13 | |     ReplayMissError,
+14 | |     Fill,
+15 | |     MarketQuote,
+16 | |     Order,
+17 | |     OrderSide,
+18 | |     PortfolioSimulator,
+19 | |     ResearchTrace,
+20 | |     TemporalContext,
+21 | |     TemporalGateway,
+22 | |     TemporalMode,
+23 | |     TemporalStore,
+24 | |     cited_claims_from_markdown,
+25 | |     current_context,
+26 | |     temporal_context,
+27 | |     trace_from_tool_run,
+28 | | )
+   | |_^
+help: Organize imports
+   |
+12 |     FactualClaim,
+   -     ReplayMissError,
+13 |     Fill,
+--------------------------------------------------------------------------------
+17 |     PortfolioSimulator,
+18 +     ReplayMissError,
+19 |     ResearchTrace,
+   |
+
+Found 24 errors.
+[*] 12 fixable with the `--fix` option.

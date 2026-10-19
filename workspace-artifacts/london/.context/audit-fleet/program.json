@@ -1,0 +1,47 @@
+{
+  "program": "ta-audit-20260906",
+  "state": "cancelled",
+  "base": "4d1fafd88ec91926adae35c164efab99d666f623",
+  "lead_session": "df867712-0bb8-43b5-87cd-92bb3f3127d5",
+  "lead_workspace": "822403cb-f787-4151-84e6-ccfc15084873",
+  "lead_worktree": "/Users/clarkpeng/.local/share/sightmesh/.cdesktop-workspaces/8224-ta-audit-lead/TradingAgents",
+  "wake_subscription": "7b17d96c-6b31-4c23-8374-6778c6cfad4e",
+  "wake_delivery": "notified",
+  "conductor_push": "unavailable_no_authenticated_api",
+  "repowire_push": "unavailable_no_pane",
+  "fallback_label": "io.tradingagents.audit-fleet-wake-20260906",
+  "fallback_seconds": 900,
+  "children": [
+    "a8e7b01c-84cc-4b89-bc60-384a8a86d8f5",
+    "44f16653-0565-417d-9b8b-7422d929f612"
+  ],
+  "native_parent_probe_ack": "befa60b3-b6c5-4bae-ba17-417b460287f3",
+  "baseline_tests": "25 passed in 2.84s",
+  "wake_guard_validation": "6 targeted fixtures including review-pending and root-owned no-op guards",
+  "integrated_head": "d51e422",
+  "fallback_recovery": "launchd job reloaded and kickstarted after loaded-state check failed",
+  "fallback_verified_at": "2026-09-08T01:10:52Z",
+  "fallback_verification": {
+    "loaded": true,
+    "last_exit_code": 0,
+    "receipt": "wake_queued"
+  },
+  "execution_owner": "44f16653-0565-417d-9b8b-7422d929f612",
+  "cache_owner": "df867712-0bb8-43b5-87cd-92bb3f3127d5",
+  "combined_gate": "1782 passed, 71 subtests, 1 optional skip, 14 integration deselected; deployment wrapper 102 passed; Ruff passed",
+  "continuation": "disabled_by_user",
+  "integration_owner": "london-codex",
+  "candidate_head": "d51e422",
+  "continuation_reason": "Delivered worker candidates and deployment-fixture correction are integrated. Remaining audit scope is London-owned; no worker has a new assignment. Suppress idle model wakeups.",
+  "worker_status": {
+    "Terra": "idle",
+    "Sol": "idle",
+    "Luna": "idle"
+  },
+  "verified_at": "2026-09-08 04:38 UTC",
+  "paused_by_user": true,
+  "pause_reason": "User requested disabling TradingAgents",
+  "paused_at": "2026-09-15T02:33:46.781635+00:00",
+  "cloud_pause": "verified_zero_machines",
+  "cloud_pause_verified_at": "2026-09-16T02:28:05.554080+00:00"
+}

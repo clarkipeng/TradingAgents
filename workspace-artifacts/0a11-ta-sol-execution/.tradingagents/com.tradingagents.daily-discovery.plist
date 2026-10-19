@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.tradingagents.daily-discovery</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/clarkpeng/conductor/workspaces/TradingAgents/london/scripts/run_daily_discovery.sh</string>
+    </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>TRADINGAGENTS_COMMAND</key>
+        <string>/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/bin/tradingagents</string>
+        <key>TRADINGAGENTS_TEMPORAL_STORE</key>
+        <string>/Users/clarkpeng/.tradingagents/temporal</string>
+    </dict>
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>18</integer>
+        <key>Minute</key>
+        <integer>30</integer>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.tradingagents/daily-discovery.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.tradingagents/daily-discovery.error.log</string>
+</dict>
+</plist>

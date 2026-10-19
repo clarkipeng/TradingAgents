@@ -1,0 +1,336 @@
+........................................................................ [  3%]
+.................................s...................................... [  7%]
+........................................................................ [ 11%]
+........................................................................ [ 15%]
+............................F.....................FFF.FF...
+=================================== FAILURES ===================================
+___________ test_success_is_bound_to_the_target_process_incarnation ____________
+
+fake_deploy_env = ({'ANTHROPIC_API_KEY': 'sk-ant-api03-ukxmpwdYFBPx3oO79m3z3dKvWXw2E-t8FlXQ1dl1lBXCUaaPZta1GEyXdUwMCDtt5HqZxwK7paClvWRL7...var/folders/bb/q9_4j2pn5w53238kcp71jh8m0000gn/T/pytest-of-clarkpeng/pytest-109/test_success_is_bound_to_the_t0/state'))
+
+    @pytest.mark.unit
+    def test_success_is_bound_to_the_target_process_incarnation(fake_deploy_env):
+        env, state_dir = fake_deploy_env
+        env["COLLECTOR_HEALTH_TIMEOUT_SECONDS"] = "3"
+    
+>       result = _run(env)
+                 ^^^^^^^^^
+
+tests/test_deploy_collector.py:808: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_deploy_collector.py:717: in _run
+    return subprocess.run(
+../../../../.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/subprocess.py:556: in run
+    stdout, stderr = process.communicate(input, timeout=timeout)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../../../.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/subprocess.py:1222: in communicate
+    stdout, stderr = self._communicate(input, endtime, timeout)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../../../.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/subprocess.py:2155: in _communicate
+    self._check_timeout(endtime, orig_timeout, stdout, stderr)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <Popen: returncode: -9 args: ['/Users/clarkpeng/conductor/workspaces/Trading...>
+endtime = 5186.5195005, orig_timeout = 10
+stdout_seq = [b'collector deploy owns the shared remote lock for tradagent\n', b'collector deployment is runtime-ready at aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa on Machine machine-old\n']
+stderr_seq = [], skip_check_and_raise = False
+
+    def _check_timeout(self, endtime, orig_timeout, stdout_seq, stderr_seq,
+                       skip_check_and_raise=False):
+        """Convenience for checking if a timeout has expired."""
+        if endtime is None:
+            return
+        if skip_check_and_raise or _time() > endtime:
+>           raise TimeoutExpired(
+                    self.args, orig_timeout,
+                    output=b''.join(stdout_seq) if stdout_seq else None,
+                    stderr=b''.join(stderr_seq) if stderr_seq else None)
+E           subprocess.TimeoutExpired: Command '['/Users/clarkpeng/conductor/workspaces/TradingAgents/london/scripts/deploy_collector.sh', 'tradagent']' timed out after 10 seconds
+
+../../../../.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/subprocess.py:1269: TimeoutExpired
+__________ test_fenced_rollback_lineage_allows_the_next_serial_deploy __________
+
+fake_deploy_env = ({'ANTHROPIC_API_KEY': 'sk-ant-api03-ukxmpwdYFBPx3oO79m3z3dKvWXw2E-t8FlXQ1dl1lBXCUaaPZta1GEyXdUwMCDtt5HqZxwK7paClvWRL7...var/folders/bb/q9_4j2pn5w53238kcp71jh8m0000gn/T/pytest-of-clarkpeng/pytest-109/test_fenced_rollback_lineage_a0/state'))
+
+    @pytest.mark.unit
+    def test_fenced_rollback_lineage_allows_the_next_serial_deploy(fake_deploy_env):
+        env, state_dir = fake_deploy_env
+        env["FAKE_SCENARIO"] = "baseline_after_fenced_rollback"
+    
+        result = _run(env)
+    
+>       assert result.returncode == 0, result.stderr
+E       AssertionError: collector readiness and revision did not pass within 3s
+E         restoring the previous collector image/config under an exclusive Machine lease
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/Users/clarkpeng/conductor/workspaces/TradingAgents/london/scripts/deploy_collector.sh', 'trad...and revision did not pass within 3s\nrestoring the previous collector image/config under an exclusive Machine lease\n').returncode
+
+tests/test_deploy_collector.py:1074: AssertionError
+_________ test_primary_deploy_failure_uses_one_fenced_machine_rollback _________
+
+fake_deploy_env = ({'ANTHROPIC_API_KEY': 'sk-ant-api03-ukxmpwdYFBPx3oO79m3z3dKvWXw2E-t8FlXQ1dl1lBXCUaaPZta1GEyXdUwMCDtt5HqZxwK7paClvWRL7...var/folders/bb/q9_4j2pn5w53238kcp71jh8m0000gn/T/pytest-of-clarkpeng/pytest-109/test_primary_deploy_failure_us0/state'))
+
+    @pytest.mark.unit
+    def test_primary_deploy_failure_uses_one_fenced_machine_rollback(fake_deploy_env):
+        env, state_dir = fake_deploy_env
+        env["FAKE_SCENARIO"] = "deploy_failure_changed"
+        env["COLLECTOR_ROLLBACK_TIMEOUT_SECONDS"] = "4"
+    
+>       result = _run(env)
+                 ^^^^^^^^^
+
+tests/test_deploy_collector.py:1085: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_deploy_collector.py:717: in _run
+    return subprocess.run(
+../../../../.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/subprocess.py:556: in run
+    stdout, stderr = process.communicate(input, timeout=timeout)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../../../.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/subprocess.py:1222: in communicate
+    stdout, stderr = self._communicate(input, endtime, timeout)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../../../.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/subprocess.py:2155: in _communicate
+    self._check_timeout(endtime, orig_timeout, stdout, stderr)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <Popen: returncode: -9 args: ['/Users/clarkpeng/conductor/workspaces/Trading...>
+endtime = 5348.852930875, orig_timeout = 10
+stdout_seq = [b'collector deploy owns the shared remote lock for tradagent\n', b'fenced Fly rollback verified\n', b'previous collector image and configuration restored\n']
+stderr_seq = [b'collector deployment command failed\n', b'restoring the previous collector image/config under an exclusive Machine lease\n']
+skip_check_and_raise = False
+
+    def _check_timeout(self, endtime, orig_timeout, stdout_seq, stderr_seq,
+                       skip_check_and_raise=False):
+        """Convenience for checking if a timeout has expired."""
+        if endtime is None:
+            return
+        if skip_check_and_raise or _time() > endtime:
+>           raise TimeoutExpired(
+                    self.args, orig_timeout,
+                    output=b''.join(stdout_seq) if stdout_seq else None,
+                    stderr=b''.join(stderr_seq) if stderr_seq else None)
+E           subprocess.TimeoutExpired: Command '['/Users/clarkpeng/conductor/workspaces/TradingAgents/london/scripts/deploy_collector.sh', 'tradagent']' timed out after 10 seconds
+
+../../../../.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/subprocess.py:1269: TimeoutExpired
+_________ test_one_time_legacy_rollback_requires_stable_runtime_probes _________
+
+fake_deploy_env = ({'ANTHROPIC_API_KEY': 'sk-ant-api03-ukxmpwdYFBPx3oO79m3z3dKvWXw2E-t8FlXQ1dl1lBXCUaaPZta1GEyXdUwMCDtt5HqZxwK7paClvWRL7...var/folders/bb/q9_4j2pn5w53238kcp71jh8m0000gn/T/pytest-of-clarkpeng/pytest-109/test_one_time_legacy_rollback_0/state'))
+
+    @pytest.mark.unit
+    def test_one_time_legacy_rollback_requires_stable_runtime_probes(fake_deploy_env):
+        env, state_dir = fake_deploy_env
+        env["FAKE_SCENARIO"] = "legacy_deploy_failure_changed"
+        env["COLLECTOR_DEPLOY_ALLOW_UNHEALTHY_BASELINE"] = "true"
+        env["COLLECTOR_ROLLBACK_TIMEOUT_SECONDS"] = "4"
+    
+>       result = _run(env)
+                 ^^^^^^^^^
+
+tests/test_deploy_collector.py:1123: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_deploy_collector.py:717: in _run
+    return subprocess.run(
+../../../../.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/subprocess.py:556: in run
+    stdout, stderr = process.communicate(input, timeout=timeout)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../../../.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/subprocess.py:1222: in communicate
+    stdout, stderr = self._communicate(input, endtime, timeout)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../../../.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/subprocess.py:2155: in _communicate
+    self._check_timeout(endtime, orig_timeout, stdout, stderr)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <Popen: returncode: -9 args: ['/Users/clarkpeng/conductor/workspaces/Trading...>
+endtime = 5359.077081333, orig_timeout = 10
+stdout_seq = [b'collector deploy owns the shared remote lock for tradagent\n', b'fenced Fly rollback verified\n', b'previous collector image and configuration restored\n']
+stderr_seq = [b'WARNING: break-glass deployment from a baseline without a passing collector_health check; rollback can restore that...ctor deployment command failed\n', b'restoring the previous collector image/config under an exclusive Machine lease\n']
+skip_check_and_raise = False
+
+    def _check_timeout(self, endtime, orig_timeout, stdout_seq, stderr_seq,
+                       skip_check_and_raise=False):
+        """Convenience for checking if a timeout has expired."""
+        if endtime is None:
+            return
+        if skip_check_and_raise or _time() > endtime:
+>           raise TimeoutExpired(
+                    self.args, orig_timeout,
+                    output=b''.join(stdout_seq) if stdout_seq else None,
+                    stderr=b''.join(stderr_seq) if stderr_seq else None)
+E           subprocess.TimeoutExpired: Command '['/Users/clarkpeng/conductor/workspaces/TradingAgents/london/scripts/deploy_collector.sh', 'tradagent']' timed out after 10 seconds
+
+../../../../.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/subprocess.py:1269: TimeoutExpired
+_ test_legacy_rollback_requires_consecutive_bound_observations[legacy_status_gap] _
+
+scenario = 'legacy_status_gap'
+fake_deploy_env = ({'ANTHROPIC_API_KEY': 'sk-ant-api03-ukxmpwdYFBPx3oO79m3z3dKvWXw2E-t8FlXQ1dl1lBXCUaaPZta1GEyXdUwMCDtt5HqZxwK7paClvWRL7...var/folders/bb/q9_4j2pn5w53238kcp71jh8m0000gn/T/pytest-of-clarkpeng/pytest-109/test_legacy_rollback_requires_0/state'))
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("scenario", ["legacy_status_gap", "legacy_tuple_change"])
+    def test_legacy_rollback_requires_consecutive_bound_observations(
+        scenario,
+        fake_deploy_env,
+    ):
+        env, state_dir = fake_deploy_env
+        env["FAKE_SCENARIO"] = scenario
+        env["COLLECTOR_DEPLOY_ALLOW_UNHEALTHY_BASELINE"] = "true"
+        env["COLLECTOR_ROLLBACK_TIMEOUT_SECONDS"] = "6"
+    
+>       result = _run(env)
+                 ^^^^^^^^^
+
+tests/test_deploy_collector.py:1173: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_deploy_collector.py:717: in _run
+    return subprocess.run(
+../../../../.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/subprocess.py:556: in run
+    stdout, stderr = process.communicate(input, timeout=timeout)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../../../.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/subprocess.py:1222: in communicate
+    stdout, stderr = self._communicate(input, endtime, timeout)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../../../.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/subprocess.py:2155: in _communicate
+    self._check_timeout(endtime, orig_timeout, stdout, stderr)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <Popen: returncode: -9 args: ['/Users/clarkpeng/conductor/workspaces/Trading...>
+endtime = 5376.703681416, orig_timeout = 10
+stdout_seq = [b'collector deploy owns the shared remote lock for tradagent\n', b'fenced Fly rollback verified\n']
+stderr_seq = [b'WARNING: break-glass deployment from a baseline without a passing collector_health check; rollback can restore that...ctor deployment command failed\n', b'restoring the previous collector image/config under an exclusive Machine lease\n']
+skip_check_and_raise = False
+
+    def _check_timeout(self, endtime, orig_timeout, stdout_seq, stderr_seq,
+                       skip_check_and_raise=False):
+        """Convenience for checking if a timeout has expired."""
+        if endtime is None:
+            return
+        if skip_check_and_raise or _time() > endtime:
+>           raise TimeoutExpired(
+                    self.args, orig_timeout,
+                    output=b''.join(stdout_seq) if stdout_seq else None,
+                    stderr=b''.join(stderr_seq) if stderr_seq else None)
+E           subprocess.TimeoutExpired: Command '['/Users/clarkpeng/conductor/workspaces/TradingAgents/london/scripts/deploy_collector.sh', 'tradagent']' timed out after 10 seconds
+
+../../../../.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/subprocess.py:1269: TimeoutExpired
+_ test_legacy_rollback_requires_consecutive_bound_observations[legacy_tuple_change] _
+
+scenario = 'legacy_tuple_change'
+fake_deploy_env = ({'ANTHROPIC_API_KEY': 'sk-ant-api03-ukxmpwdYFBPx3oO79m3z3dKvWXw2E-t8FlXQ1dl1lBXCUaaPZta1GEyXdUwMCDtt5HqZxwK7paClvWRL7...var/folders/bb/q9_4j2pn5w53238kcp71jh8m0000gn/T/pytest-of-clarkpeng/pytest-109/test_legacy_rollback_requires_1/state'))
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("scenario", ["legacy_status_gap", "legacy_tuple_change"])
+    def test_legacy_rollback_requires_consecutive_bound_observations(
+        scenario,
+        fake_deploy_env,
+    ):
+        env, state_dir = fake_deploy_env
+        env["FAKE_SCENARIO"] = scenario
+        env["COLLECTOR_DEPLOY_ALLOW_UNHEALTHY_BASELINE"] = "true"
+        env["COLLECTOR_ROLLBACK_TIMEOUT_SECONDS"] = "6"
+    
+>       result = _run(env)
+                 ^^^^^^^^^
+
+tests/test_deploy_collector.py:1173: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_deploy_collector.py:717: in _run
+    return subprocess.run(
+../../../../.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/subprocess.py:556: in run
+    stdout, stderr = process.communicate(input, timeout=timeout)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../../../.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/subprocess.py:1222: in communicate
+    stdout, stderr = self._communicate(input, endtime, timeout)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../../../.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/subprocess.py:2155: in _communicate
+    self._check_timeout(endtime, orig_timeout, stdout, stderr)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <Popen: returncode: -9 args: ['/Users/clarkpeng/conductor/workspaces/Trading...>
+endtime = 5386.865066208, orig_timeout = 10
+stdout_seq = [b'collector deploy owns the shared remote lock for tradagent\n', b'fenced Fly rollback verified\n']
+stderr_seq = [b'WARNING: break-glass deployment from a baseline without a passing collector_health check; rollback can restore that...ctor deployment command failed\n', b'restoring the previous collector image/config under an exclusive Machine lease\n']
+skip_check_and_raise = False
+
+    def _check_timeout(self, endtime, orig_timeout, stdout_seq, stderr_seq,
+                       skip_check_and_raise=False):
+        """Convenience for checking if a timeout has expired."""
+        if endtime is None:
+            return
+        if skip_check_and_raise or _time() > endtime:
+>           raise TimeoutExpired(
+                    self.args, orig_timeout,
+                    output=b''.join(stdout_seq) if stdout_seq else None,
+                    stderr=b''.join(stderr_seq) if stderr_seq else None)
+E           subprocess.TimeoutExpired: Command '['/Users/clarkpeng/conductor/workspaces/TradingAgents/london/scripts/deploy_collector.sh', 'tradagent']' timed out after 10 seconds
+
+../../../../.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/subprocess.py:1269: TimeoutExpired
+=========================== short test summary info ============================
+SKIPPED [1] tests/test_bedrock_provider.py:74: could not import 'langchain_aws': No module named 'langchain_aws'
+FAILED tests/test_deploy_collector.py::test_success_is_bound_to_the_target_process_incarnation
+FAILED tests/test_deploy_collector.py::test_fenced_rollback_lineage_allows_the_next_serial_deploy
+FAILED tests/test_deploy_collector.py::test_primary_deploy_failure_uses_one_fenced_machine_rollback
+FAILED tests/test_deploy_collector.py::test_one_time_legacy_rollback_requires_stable_runtime_probes
+FAILED tests/test_deploy_collector.py::test_legacy_rollback_requires_consecutive_bound_observations[legacy_status_gap]
+FAILED tests/test_deploy_collector.py::test_legacy_rollback_requires_consecutive_bound_observations[legacy_tuple_change]
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! KeyboardInterrupt !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+/Users/clarkpeng/.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/selectors.py:398: KeyboardInterrupt
+(to show a full traceback on KeyboardInterrupt use --full-trace)
+6 failed, 340 passed, 1 skipped, 14 deselected in 263.63s (0:04:23)
+Traceback (most recent call last):
+  File "/Users/clarkpeng/.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/subprocess.py", line 1140, in __del__
+    _warn("subprocess %s is still running" % self.pid,
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+          ResourceWarning, source=self)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ResourceWarning: subprocess 75780 is still running
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/bin/pytest", line 10, in <module>
+    sys.exit(_console_main())
+             ~~~~~~~~~~~~~^^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/_pytest/config/__init__.py", line 253, in _console_main
+    code = _main(prog=_get_prog_name(sys.argv))
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/_pytest/config/__init__.py", line 229, in _main
+    ret: ExitCode | int = config.hook.pytest_cmdline_main(config=config)
+                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/pluggy/_hooks.py", line 512, in __call__
+    return self._hookexec(self.name, self._hookimpls.copy(), kwargs, firstresult)
+           ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/pluggy/_manager.py", line 120, in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/pluggy/_callers.py", line 167, in _multicall
+    raise exception
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/pluggy/_callers.py", line 121, in _multicall
+    res = hook_impl.function(*args)
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/_pytest/main.py", line 377, in pytest_cmdline_main
+    return wrap_session(config, _main)
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/_pytest/main.py", line 372, in wrap_session
+    config._ensure_unconfigure()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/_pytest/config/__init__.py", line 1212, in _ensure_unconfigure
+    self.hook.pytest_unconfigure(config=self)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/pluggy/_hooks.py", line 512, in __call__
+    return self._hookexec(self.name, self._hookimpls.copy(), kwargs, firstresult)
+           ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/pluggy/_manager.py", line 120, in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/pluggy/_callers.py", line 167, in _multicall
+    raise exception
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/pluggy/_callers.py", line 121, in _multicall
+    res = hook_impl.function(*args)
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/_pytest/unraisableexception.py", line 173, in pytest_unconfigure
+    collect_unraisable(config)
+    ~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/_pytest/unraisableexception.py", line 79, in collect_unraisable
+    raise errors[0]
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.venv/lib/python3.13/site-packages/_pytest/unraisableexception.py", line 67, in collect_unraisable
+    warnings.warn(pytest.PytestUnraisableExceptionWarning(msg))
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pytest.PytestUnraisableExceptionWarning: Exception ignored in: <function Popen.__del__ at 0x103eab6a0>
+Enable tracemalloc to get traceback where the object was allocated.
+See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.

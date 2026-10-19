@@ -1,0 +1,1407 @@
+[
+  {
+    "path": "workspace-artifacts/0a11-ta-sol-execution/.context/audit-fleet/lead-handoff.md",
+    "bytes": 11182,
+    "sha256": "79fa889ff54ff14f39cb4690a16d0e20ad54c503be16e71ab257dc614ed3d585"
+  },
+  {
+    "path": "workspace-artifacts/0a11-ta-sol-execution/.context/audit-fleet/luna-ops-handoff.md",
+    "bytes": 2639,
+    "sha256": "e7483aab70f099d358a67658d21f5f70da8b2698cd902c938fa9eabac06eb510"
+  },
+  {
+    "path": "workspace-artifacts/0a11-ta-sol-execution/.context/audit-fleet/luna-ops-prompt.md",
+    "bytes": 952,
+    "sha256": "2a501d150238d0ef9791d5e8fad260698ee6a6f6f330c36b23aabe4569d1a86d"
+  },
+  {
+    "path": "workspace-artifacts/0a11-ta-sol-execution/.context/audit-fleet/luna-store-handoff.md",
+    "bytes": 2011,
+    "sha256": "ce07e1690954594e9810432c731c461cd33a82a412bfd57d2bcc70f7a7ab5697"
+  },
+  {
+    "path": "workspace-artifacts/0a11-ta-sol-execution/.context/audit-fleet/luna-store-prompt.md",
+    "bytes": 865,
+    "sha256": "5507230a34110402a0118d1ce90f03861bcaf9ee8611c2c4ba3cfcf14f86048a"
+  },
+  {
+    "path": "workspace-artifacts/0a11-ta-sol-execution/.context/audit-fleet/sol-execution-handoff.md",
+    "bytes": 2293,
+    "sha256": "129d61f7f829f5ac980f2d9b0e24522c6e34a3a61acdaaeb6eb427d0ea63462a"
+  },
+  {
+    "path": "workspace-artifacts/0a11-ta-sol-execution/.context/audit-fleet/sol-review-prompt.md",
+    "bytes": 615,
+    "sha256": "11af26f67719b5579abbfb7bb7274fc95d260447f14ba404a847ceef02c4d8c6"
+  },
+  {
+    "path": "workspace-artifacts/0a11-ta-sol-execution/.context/audit-fleet/sol-review.md",
+    "bytes": 2982,
+    "sha256": "ec750298059330fd9f9ae20244cc7d13a9a5a987088040e9795642ec67d0d288"
+  },
+  {
+    "path": "workspace-artifacts/0a11-ta-sol-execution/.context/handoffs/fleet/terra-summary.md",
+    "bytes": 2161,
+    "sha256": "4aeafe7e8da5f65bb5e214d63a467134483f22a55da353ae0f687ad641e57984"
+  },
+  {
+    "path": "workspace-artifacts/0a11-ta-sol-execution/.lavish/audit-fix-plan-2026-09-06.html",
+    "bytes": 48611,
+    "sha256": "0284e8baf279f42d6d1079d8f8c424f0e3de089fe8df38bc00a29bdd91d248a7"
+  },
+  {
+    "path": "workspace-artifacts/0a11-ta-sol-execution/.lavish/audit-source.md",
+    "bytes": 7384,
+    "sha256": "ea2e5ad37c203c11569d9e88beb5cc9aecf764e05591ed5c73a168b445aa14d1"
+  },
+  {
+    "path": "workspace-artifacts/0a11-ta-sol-execution/.lavish/portfolio-boundary.md",
+    "bytes": 2938,
+    "sha256": "42a713d940cd22a85465f3fed7ff0c6e2ec261c83f413a1c80c3d1df602d4359"
+  },
+  {
+    "path": "workspace-artifacts/0a11-ta-sol-execution/.lavish/temporal-agent-eval-plan.html",
+    "bytes": 14610,
+    "sha256": "2a66c9508faac910f0800e9a36e8ac67f6e207bcc4d1c28872ea5958c0189b14"
+  },
+  {
+    "path": "workspace-artifacts/0a11-ta-sol-execution/.lavish/temporal-agent-evaluation-architecture.html",
+    "bytes": 11400,
+    "sha256": "aef934a08f884ae420ee434ed2e09c5f74527f46c3ea752ae758b9bc41729d42"
+  },
+  {
+    "path": "workspace-artifacts/0a11-ta-sol-execution/.tradingagents/com.tradingagents.cloud-media-sync.plist",
+    "bytes": 1069,
+    "sha256": "49bbcfd1a9e3a6afeb54552705e616a32f5e59c5087dee5e46ebc23b472a1711"
+  },
+  {
+    "path": "workspace-artifacts/0a11-ta-sol-execution/.tradingagents/com.tradingagents.daily-discovery.plist",
+    "bytes": 1228,
+    "sha256": "ed98d259d81b027ab97ae57456bff28d78d3e3640b5487252b1966f62cf75493"
+  },
+  {
+    "path": "workspace-artifacts/0a11-ta-sol-execution/.tradingagents/com.tradingagents.media-poller.plist",
+    "bytes": 990,
+    "sha256": "70b59f5b53268fbbe40b8ee9b0bc212da3124ff9512447bebffabdf6397c2968"
+  },
+  {
+    "path": "workspace-artifacts/0a11-ta-sol-execution/.tradingagents/com.tradingagents.portfolio-day.plist",
+    "bytes": 898,
+    "sha256": "3c5e9e959d94e5ab22c815f6f0358947a1812d3178c73ce3eca4b55066e26803"
+  },
+  {
+    "path": "workspace-artifacts/0a11-ta-sol-execution/.tradingagents/com.tradingagents.temporal-reindex.plist",
+    "bytes": 1043,
+    "sha256": "de0e0cddf1dcd3155fcb2238a082c26a1804ed88d566834c681740850d2a13af"
+  },
+  {
+    "path": "workspace-artifacts/0a11-ta-sol-execution/.tradingagents/com.tradingagents.x-first-cycle-once.plist",
+    "bytes": 1294,
+    "sha256": "e0bcbf71f107b9ee62c5968c7be478b3826e715f36d13e6dc2307d466c6eb351"
+  },
+  {
+    "path": "workspace-artifacts/0a11-ta-sol-execution/.tradingagents/plan-a-comparisons-2026-08-24.txt",
+    "bytes": 4908,
+    "sha256": "d79295031477ce6fa9470acb3ae5cfe74f664bcca2b26d0494994999320d154f"
+  },
+  {
+    "path": "workspace-artifacts/0a11-ta-sol-execution/.tradingagents/plan-a-runs.jsonl",
+    "bytes": 8168,
+    "sha256": "a91de4e67175b553238da8c7f5b6190b5ff9e287d546571c22c143834dbf52dd"
+  },
+  {
+    "path": "workspace-artifacts/0a11-ta-sol-execution/.tradingagents/portfolio-backfill.log.1",
+    "bytes": 3479,
+    "sha256": "0501e0a6a08930b767ceaec3b8c194fcc9e98048d5323c2be304e371ddf3aedf"
+  },
+  {
+    "path": "workspace-artifacts/8224-ta-audit-lead/.context/audit-fleet/lead-handoff.md",
+    "bytes": 5528,
+    "sha256": "59070f9ff3880d574186f3804446b9172eedf8138f1c370e499ba9b5c50d5c3d"
+  },
+  {
+    "path": "workspace-artifacts/8224-ta-audit-lead/.context/audit-fleet/luna-ops-handoff.md",
+    "bytes": 2639,
+    "sha256": "e7483aab70f099d358a67658d21f5f70da8b2698cd902c938fa9eabac06eb510"
+  },
+  {
+    "path": "workspace-artifacts/8224-ta-audit-lead/.context/audit-fleet/luna-ops-prompt.md",
+    "bytes": 952,
+    "sha256": "2a501d150238d0ef9791d5e8fad260698ee6a6f6f330c36b23aabe4569d1a86d"
+  },
+  {
+    "path": "workspace-artifacts/8224-ta-audit-lead/.context/audit-fleet/luna-ops-successor-prompt.md",
+    "bytes": 923,
+    "sha256": "6d9a718717cf249c0be48e60456c74bf0362a72ec625d8a52a9a47a1fad19af1"
+  },
+  {
+    "path": "workspace-artifacts/8224-ta-audit-lead/.context/audit-fleet/luna-p4-successor-prompt.md",
+    "bytes": 992,
+    "sha256": "28d62590970fc2d10a07fb2d0c09734fd47a9ba94c9eddc2d971217e59250446"
+  },
+  {
+    "path": "workspace-artifacts/8224-ta-audit-lead/.context/audit-fleet/luna-p5-closeout.txt",
+    "bytes": 297,
+    "sha256": "4e50ad3359ebbea150757fa1f6126c37157f44ef888f7ffaaa33b9a861efe501"
+  },
+  {
+    "path": "workspace-artifacts/8224-ta-audit-lead/.context/audit-fleet/luna-store-handoff.md",
+    "bytes": 2011,
+    "sha256": "ce07e1690954594e9810432c731c461cd33a82a412bfd57d2bcc70f7a7ab5697"
+  },
+  {
+    "path": "workspace-artifacts/8224-ta-audit-lead/.context/audit-fleet/luna-store-prompt.md",
+    "bytes": 865,
+    "sha256": "5507230a34110402a0118d1ce90f03861bcaf9ee8611c2c4ba3cfcf14f86048a"
+  },
+  {
+    "path": "workspace-artifacts/8224-ta-audit-lead/.context/audit-fleet/sol-execution-closeout.txt",
+    "bytes": 220,
+    "sha256": "a6f1105ebf8f4c168c5c9fd96baa36e3e6eaabe91a1b6e0c561809a65528cd4f"
+  },
+  {
+    "path": "workspace-artifacts/8224-ta-audit-lead/.context/audit-fleet/sol-review-prompt.md",
+    "bytes": 615,
+    "sha256": "11af26f67719b5579abbfb7bb7274fc95d260447f14ba404a847ceef02c4d8c6"
+  },
+  {
+    "path": "workspace-artifacts/8224-ta-audit-lead/.context/audit-fleet/sol-review.md",
+    "bytes": 2982,
+    "sha256": "ec750298059330fd9f9ae20244cc7d13a9a5a987088040e9795642ec67d0d288"
+  },
+  {
+    "path": "workspace-artifacts/8224-ta-audit-lead/.context/handoffs/fleet/terra-summary.md",
+    "bytes": 2161,
+    "sha256": "4aeafe7e8da5f65bb5e214d63a467134483f22a55da353ae0f687ad641e57984"
+  },
+  {
+    "path": "workspace-artifacts/8224-ta-audit-lead/.lavish/audit-fix-plan-2026-09-06.html",
+    "bytes": 48611,
+    "sha256": "0284e8baf279f42d6d1079d8f8c424f0e3de089fe8df38bc00a29bdd91d248a7"
+  },
+  {
+    "path": "workspace-artifacts/8224-ta-audit-lead/.lavish/audit-source.md",
+    "bytes": 7384,
+    "sha256": "ea2e5ad37c203c11569d9e88beb5cc9aecf764e05591ed5c73a168b445aa14d1"
+  },
+  {
+    "path": "workspace-artifacts/8224-ta-audit-lead/.lavish/portfolio-boundary.md",
+    "bytes": 2938,
+    "sha256": "42a713d940cd22a85465f3fed7ff0c6e2ec261c83f413a1c80c3d1df602d4359"
+  },
+  {
+    "path": "workspace-artifacts/8224-ta-audit-lead/.lavish/temporal-agent-eval-plan.html",
+    "bytes": 14610,
+    "sha256": "2a66c9508faac910f0800e9a36e8ac67f6e207bcc4d1c28872ea5958c0189b14"
+  },
+  {
+    "path": "workspace-artifacts/8224-ta-audit-lead/.lavish/temporal-agent-evaluation-architecture.html",
+    "bytes": 11400,
+    "sha256": "aef934a08f884ae420ee434ed2e09c5f74527f46c3ea752ae758b9bc41729d42"
+  },
+  {
+    "path": "workspace-artifacts/8224-ta-audit-lead/.tradingagents/com.tradingagents.cloud-media-sync.plist",
+    "bytes": 1069,
+    "sha256": "49bbcfd1a9e3a6afeb54552705e616a32f5e59c5087dee5e46ebc23b472a1711"
+  },
+  {
+    "path": "workspace-artifacts/8224-ta-audit-lead/.tradingagents/com.tradingagents.daily-discovery.plist",
+    "bytes": 1228,
+    "sha256": "ed98d259d81b027ab97ae57456bff28d78d3e3640b5487252b1966f62cf75493"
+  },
+  {
+    "path": "workspace-artifacts/8224-ta-audit-lead/.tradingagents/com.tradingagents.media-poller.plist",
+    "bytes": 990,
+    "sha256": "70b59f5b53268fbbe40b8ee9b0bc212da3124ff9512447bebffabdf6397c2968"
+  },
+  {
+    "path": "workspace-artifacts/8224-ta-audit-lead/.tradingagents/com.tradingagents.portfolio-day.plist",
+    "bytes": 898,
+    "sha256": "3c5e9e959d94e5ab22c815f6f0358947a1812d3178c73ce3eca4b55066e26803"
+  },
+  {
+    "path": "workspace-artifacts/8224-ta-audit-lead/.tradingagents/com.tradingagents.temporal-reindex.plist",
+    "bytes": 1043,
+    "sha256": "de0e0cddf1dcd3155fcb2238a082c26a1804ed88d566834c681740850d2a13af"
+  },
+  {
+    "path": "workspace-artifacts/8224-ta-audit-lead/.tradingagents/com.tradingagents.x-first-cycle-once.plist",
+    "bytes": 1294,
+    "sha256": "e0bcbf71f107b9ee62c5968c7be478b3826e715f36d13e6dc2307d466c6eb351"
+  },
+  {
+    "path": "workspace-artifacts/8224-ta-audit-lead/.tradingagents/plan-a-comparisons-2026-08-24.txt",
+    "bytes": 4908,
+    "sha256": "d79295031477ce6fa9470acb3ae5cfe74f664bcca2b26d0494994999320d154f"
+  },
+  {
+    "path": "workspace-artifacts/8224-ta-audit-lead/.tradingagents/plan-a-runs.jsonl",
+    "bytes": 8168,
+    "sha256": "a91de4e67175b553238da8c7f5b6190b5ff9e287d546571c22c143834dbf52dd"
+  },
+  {
+    "path": "workspace-artifacts/8224-ta-audit-lead/.tradingagents/portfolio-backfill.log.1",
+    "bytes": 3479,
+    "sha256": "0501e0a6a08930b767ceaec3b8c194fcc9e98048d5323c2be304e371ddf3aedf"
+  },
+  {
+    "path": "workspace-artifacts/8ba5-ta-round2-terra/.context/handoffs/fleet/terra-summary.md",
+    "bytes": 2161,
+    "sha256": "4aeafe7e8da5f65bb5e214d63a467134483f22a55da353ae0f687ad641e57984"
+  },
+  {
+    "path": "workspace-artifacts/8ba5-ta-round2-terra/.context/round2-prompts/duplicate-closeout.md",
+    "bytes": 232,
+    "sha256": "a7334a21cc7c4bc13ad3d69600704ab830b470b2ac523b13411481105dcddccb"
+  },
+  {
+    "path": "workspace-artifacts/8ba5-ta-round2-terra/.context/round2-prompts/luna-day-repair.md",
+    "bytes": 2203,
+    "sha256": "6bcf5c7d178b9192cf7ac2a18d0c22888c1766d0d8e5832d064961f816802c80"
+  },
+  {
+    "path": "workspace-artifacts/8ba5-ta-round2-terra/.context/round2-prompts/luna-day.md",
+    "bytes": 2017,
+    "sha256": "d3b2b23ca672792a6c05a217ccb71abb26e15cc472bb354b8317de19299ab37d"
+  },
+  {
+    "path": "workspace-artifacts/8ba5-ta-round2-terra/.context/round2-prompts/luna-honesty.md",
+    "bytes": 1075,
+    "sha256": "00170e8573bd2d08bfa1f1a1a0e82a4e1597cdf9bb3d76465f3cb61443ba9e08"
+  },
+  {
+    "path": "workspace-artifacts/8ba5-ta-round2-terra/.context/round2-prompts/luna-reindex.md",
+    "bytes": 1365,
+    "sha256": "a6da125a5696089e986d51e1d979a8468fcd17e5d918ad92d43561bbae03c29d"
+  },
+  {
+    "path": "workspace-artifacts/8ba5-ta-round2-terra/.context/round3-prompts/luna-generation-review.md",
+    "bytes": 656,
+    "sha256": "043e83d58be207d7e01da54c809de22f3e28100026ccba297a26fa405e359465"
+  },
+  {
+    "path": "workspace-artifacts/8ba5-ta-round2-terra/.context/round3-prompts/luna-portfolio-review.md",
+    "bytes": 850,
+    "sha256": "5c29f1977a733eb6d7797a159a37e13ef24f5a55651740c24fe28b655888a73d"
+  },
+  {
+    "path": "workspace-artifacts/8ba5-ta-round2-terra/.lavish/temporal-agent-eval-plan.html",
+    "bytes": 14610,
+    "sha256": "2a66c9508faac910f0800e9a36e8ac67f6e207bcc4d1c28872ea5958c0189b14"
+  },
+  {
+    "path": "workspace-artifacts/8ba5-ta-round2-terra/.lavish/temporal-agent-evaluation-architecture.html",
+    "bytes": 11400,
+    "sha256": "aef934a08f884ae420ee434ed2e09c5f74527f46c3ea752ae758b9bc41729d42"
+  },
+  {
+    "path": "workspace-artifacts/8ba5-ta-round2-terra/.tradingagents/com.tradingagents.cloud-media-sync.plist",
+    "bytes": 1069,
+    "sha256": "49bbcfd1a9e3a6afeb54552705e616a32f5e59c5087dee5e46ebc23b472a1711"
+  },
+  {
+    "path": "workspace-artifacts/8ba5-ta-round2-terra/.tradingagents/com.tradingagents.daily-discovery.plist",
+    "bytes": 1228,
+    "sha256": "ed98d259d81b027ab97ae57456bff28d78d3e3640b5487252b1966f62cf75493"
+  },
+  {
+    "path": "workspace-artifacts/8ba5-ta-round2-terra/.tradingagents/com.tradingagents.media-poller.plist",
+    "bytes": 990,
+    "sha256": "70b59f5b53268fbbe40b8ee9b0bc212da3124ff9512447bebffabdf6397c2968"
+  },
+  {
+    "path": "workspace-artifacts/8ba5-ta-round2-terra/.tradingagents/com.tradingagents.portfolio-day.plist",
+    "bytes": 898,
+    "sha256": "3c5e9e959d94e5ab22c815f6f0358947a1812d3178c73ce3eca4b55066e26803"
+  },
+  {
+    "path": "workspace-artifacts/8ba5-ta-round2-terra/.tradingagents/com.tradingagents.temporal-reindex.plist",
+    "bytes": 1043,
+    "sha256": "de0e0cddf1dcd3155fcb2238a082c26a1804ed88d566834c681740850d2a13af"
+  },
+  {
+    "path": "workspace-artifacts/8ba5-ta-round2-terra/.tradingagents/com.tradingagents.x-first-cycle-once.plist",
+    "bytes": 1294,
+    "sha256": "e0bcbf71f107b9ee62c5968c7be478b3826e715f36d13e6dc2307d466c6eb351"
+  },
+  {
+    "path": "workspace-artifacts/8ba5-ta-round2-terra/.tradingagents/plan-a-comparisons-2026-08-24.txt",
+    "bytes": 4908,
+    "sha256": "d79295031477ce6fa9470acb3ae5cfe74f664bcca2b26d0494994999320d154f"
+  },
+  {
+    "path": "workspace-artifacts/8ba5-ta-round2-terra/.tradingagents/plan-a-runs.jsonl",
+    "bytes": 8168,
+    "sha256": "a91de4e67175b553238da8c7f5b6190b5ff9e287d546571c22c143834dbf52dd"
+  },
+  {
+    "path": "workspace-artifacts/bf9a-ta-luna-p4-resum/.context/audit-fleet/lead-handoff.md",
+    "bytes": 11182,
+    "sha256": "79fa889ff54ff14f39cb4690a16d0e20ad54c503be16e71ab257dc614ed3d585"
+  },
+  {
+    "path": "workspace-artifacts/bf9a-ta-luna-p4-resum/.context/audit-fleet/luna-backup-p6-handoff.md",
+    "bytes": 1746,
+    "sha256": "54e1bfeb6448bc7f6a2486fc3ec5a492c20879449840d62bbc30d47313ff5b64"
+  },
+  {
+    "path": "workspace-artifacts/bf9a-ta-luna-p4-resum/.context/audit-fleet/luna-ops-handoff.md",
+    "bytes": 2639,
+    "sha256": "e7483aab70f099d358a67658d21f5f70da8b2698cd902c938fa9eabac06eb510"
+  },
+  {
+    "path": "workspace-artifacts/bf9a-ta-luna-p4-resum/.context/audit-fleet/luna-ops-prompt.md",
+    "bytes": 952,
+    "sha256": "2a501d150238d0ef9791d5e8fad260698ee6a6f6f330c36b23aabe4569d1a86d"
+  },
+  {
+    "path": "workspace-artifacts/bf9a-ta-luna-p4-resum/.context/audit-fleet/luna-p4-successor-handoff.md",
+    "bytes": 2188,
+    "sha256": "28303cda83f05d71009d0e13b13c2d630fedf73a6a63f91f746c7fdb898295de"
+  },
+  {
+    "path": "workspace-artifacts/bf9a-ta-luna-p4-resum/.context/audit-fleet/luna-p5-handoff.md",
+    "bytes": 2294,
+    "sha256": "8a4a261792b1ef6b59849dbe53a43ebb27f0002c47239ca2abfc786d301d69a4"
+  },
+  {
+    "path": "workspace-artifacts/bf9a-ta-luna-p4-resum/.context/audit-fleet/luna-store-handoff.md",
+    "bytes": 2011,
+    "sha256": "ce07e1690954594e9810432c731c461cd33a82a412bfd57d2bcc70f7a7ab5697"
+  },
+  {
+    "path": "workspace-artifacts/bf9a-ta-luna-p4-resum/.context/audit-fleet/luna-store-prompt.md",
+    "bytes": 865,
+    "sha256": "5507230a34110402a0118d1ce90f03861bcaf9ee8611c2c4ba3cfcf14f86048a"
+  },
+  {
+    "path": "workspace-artifacts/bf9a-ta-luna-p4-resum/.context/audit-fleet/sol-review-prompt.md",
+    "bytes": 615,
+    "sha256": "11af26f67719b5579abbfb7bb7274fc95d260447f14ba404a847ceef02c4d8c6"
+  },
+  {
+    "path": "workspace-artifacts/bf9a-ta-luna-p4-resum/.context/audit-fleet/sol-review.md",
+    "bytes": 2982,
+    "sha256": "ec750298059330fd9f9ae20244cc7d13a9a5a987088040e9795642ec67d0d288"
+  },
+  {
+    "path": "workspace-artifacts/bf9a-ta-luna-p4-resum/.context/handoffs/fleet/terra-summary.md",
+    "bytes": 2161,
+    "sha256": "4aeafe7e8da5f65bb5e214d63a467134483f22a55da353ae0f687ad641e57984"
+  },
+  {
+    "path": "workspace-artifacts/bf9a-ta-luna-p4-resum/.lavish/audit-fix-plan-2026-09-06.html",
+    "bytes": 48611,
+    "sha256": "0284e8baf279f42d6d1079d8f8c424f0e3de089fe8df38bc00a29bdd91d248a7"
+  },
+  {
+    "path": "workspace-artifacts/bf9a-ta-luna-p4-resum/.lavish/audit-source.md",
+    "bytes": 7384,
+    "sha256": "ea2e5ad37c203c11569d9e88beb5cc9aecf764e05591ed5c73a168b445aa14d1"
+  },
+  {
+    "path": "workspace-artifacts/bf9a-ta-luna-p4-resum/.lavish/portfolio-boundary.md",
+    "bytes": 2938,
+    "sha256": "42a713d940cd22a85465f3fed7ff0c6e2ec261c83f413a1c80c3d1df602d4359"
+  },
+  {
+    "path": "workspace-artifacts/bf9a-ta-luna-p4-resum/.lavish/temporal-agent-eval-plan.html",
+    "bytes": 14610,
+    "sha256": "2a66c9508faac910f0800e9a36e8ac67f6e207bcc4d1c28872ea5958c0189b14"
+  },
+  {
+    "path": "workspace-artifacts/bf9a-ta-luna-p4-resum/.lavish/temporal-agent-evaluation-architecture.html",
+    "bytes": 11400,
+    "sha256": "aef934a08f884ae420ee434ed2e09c5f74527f46c3ea752ae758b9bc41729d42"
+  },
+  {
+    "path": "workspace-artifacts/bf9a-ta-luna-p4-resum/.tradingagents/com.tradingagents.cloud-media-sync.plist",
+    "bytes": 1069,
+    "sha256": "49bbcfd1a9e3a6afeb54552705e616a32f5e59c5087dee5e46ebc23b472a1711"
+  },
+  {
+    "path": "workspace-artifacts/bf9a-ta-luna-p4-resum/.tradingagents/com.tradingagents.daily-discovery.plist",
+    "bytes": 1228,
+    "sha256": "ed98d259d81b027ab97ae57456bff28d78d3e3640b5487252b1966f62cf75493"
+  },
+  {
+    "path": "workspace-artifacts/bf9a-ta-luna-p4-resum/.tradingagents/com.tradingagents.media-poller.plist",
+    "bytes": 990,
+    "sha256": "70b59f5b53268fbbe40b8ee9b0bc212da3124ff9512447bebffabdf6397c2968"
+  },
+  {
+    "path": "workspace-artifacts/bf9a-ta-luna-p4-resum/.tradingagents/com.tradingagents.portfolio-day.plist",
+    "bytes": 898,
+    "sha256": "3c5e9e959d94e5ab22c815f6f0358947a1812d3178c73ce3eca4b55066e26803"
+  },
+  {
+    "path": "workspace-artifacts/bf9a-ta-luna-p4-resum/.tradingagents/com.tradingagents.temporal-reindex.plist",
+    "bytes": 1043,
+    "sha256": "de0e0cddf1dcd3155fcb2238a082c26a1804ed88d566834c681740850d2a13af"
+  },
+  {
+    "path": "workspace-artifacts/bf9a-ta-luna-p4-resum/.tradingagents/com.tradingagents.x-first-cycle-once.plist",
+    "bytes": 1294,
+    "sha256": "e0bcbf71f107b9ee62c5968c7be478b3826e715f36d13e6dc2307d466c6eb351"
+  },
+  {
+    "path": "workspace-artifacts/bf9a-ta-luna-p4-resum/.tradingagents/plan-a-comparisons-2026-08-24.txt",
+    "bytes": 4908,
+    "sha256": "d79295031477ce6fa9470acb3ae5cfe74f664bcca2b26d0494994999320d154f"
+  },
+  {
+    "path": "workspace-artifacts/bf9a-ta-luna-p4-resum/.tradingagents/plan-a-runs.jsonl",
+    "bytes": 8168,
+    "sha256": "a91de4e67175b553238da8c7f5b6190b5ff9e287d546571c22c143834dbf52dd"
+  },
+  {
+    "path": "workspace-artifacts/bf9a-ta-luna-p4-resum/.tradingagents/portfolio-backfill.log.1",
+    "bytes": 3479,
+    "sha256": "0501e0a6a08930b767ceaec3b8c194fcc9e98048d5323c2be304e371ddf3aedf"
+  },
+  {
+    "path": "workspace-artifacts/c983-ta-sol-review/.context/audit-fleet/lead-handoff.md",
+    "bytes": 5066,
+    "sha256": "396bdb58c951bfab4c14b279357b2eeb5f0197770a056b87a3affb6d29eb0639"
+  },
+  {
+    "path": "workspace-artifacts/c983-ta-sol-review/.context/audit-fleet/luna-ops-handoff.md",
+    "bytes": 2639,
+    "sha256": "e7483aab70f099d358a67658d21f5f70da8b2698cd902c938fa9eabac06eb510"
+  },
+  {
+    "path": "workspace-artifacts/c983-ta-sol-review/.context/audit-fleet/luna-ops-prompt.md",
+    "bytes": 952,
+    "sha256": "2a501d150238d0ef9791d5e8fad260698ee6a6f6f330c36b23aabe4569d1a86d"
+  },
+  {
+    "path": "workspace-artifacts/c983-ta-sol-review/.context/audit-fleet/luna-store-handoff.md",
+    "bytes": 2011,
+    "sha256": "ce07e1690954594e9810432c731c461cd33a82a412bfd57d2bcc70f7a7ab5697"
+  },
+  {
+    "path": "workspace-artifacts/c983-ta-sol-review/.context/audit-fleet/luna-store-prompt.md",
+    "bytes": 865,
+    "sha256": "5507230a34110402a0118d1ce90f03861bcaf9ee8611c2c4ba3cfcf14f86048a"
+  },
+  {
+    "path": "workspace-artifacts/c983-ta-sol-review/.context/audit-fleet/sol-review-prompt.md",
+    "bytes": 615,
+    "sha256": "11af26f67719b5579abbfb7bb7274fc95d260447f14ba404a847ceef02c4d8c6"
+  },
+  {
+    "path": "workspace-artifacts/c983-ta-sol-review/.context/audit-fleet/sol-review.md",
+    "bytes": 2982,
+    "sha256": "ec750298059330fd9f9ae20244cc7d13a9a5a987088040e9795642ec67d0d288"
+  },
+  {
+    "path": "workspace-artifacts/c983-ta-sol-review/.context/handoffs/fleet/terra-summary.md",
+    "bytes": 2161,
+    "sha256": "4aeafe7e8da5f65bb5e214d63a467134483f22a55da353ae0f687ad641e57984"
+  },
+  {
+    "path": "workspace-artifacts/c983-ta-sol-review/.lavish/audit-fix-plan-2026-09-06.html",
+    "bytes": 48611,
+    "sha256": "0284e8baf279f42d6d1079d8f8c424f0e3de089fe8df38bc00a29bdd91d248a7"
+  },
+  {
+    "path": "workspace-artifacts/c983-ta-sol-review/.lavish/audit-source.md",
+    "bytes": 7384,
+    "sha256": "ea2e5ad37c203c11569d9e88beb5cc9aecf764e05591ed5c73a168b445aa14d1"
+  },
+  {
+    "path": "workspace-artifacts/c983-ta-sol-review/.lavish/portfolio-boundary.md",
+    "bytes": 2938,
+    "sha256": "42a713d940cd22a85465f3fed7ff0c6e2ec261c83f413a1c80c3d1df602d4359"
+  },
+  {
+    "path": "workspace-artifacts/c983-ta-sol-review/.lavish/temporal-agent-eval-plan.html",
+    "bytes": 14610,
+    "sha256": "2a66c9508faac910f0800e9a36e8ac67f6e207bcc4d1c28872ea5958c0189b14"
+  },
+  {
+    "path": "workspace-artifacts/c983-ta-sol-review/.lavish/temporal-agent-evaluation-architecture.html",
+    "bytes": 11400,
+    "sha256": "aef934a08f884ae420ee434ed2e09c5f74527f46c3ea752ae758b9bc41729d42"
+  },
+  {
+    "path": "workspace-artifacts/c983-ta-sol-review/.tradingagents/com.tradingagents.cloud-media-sync.plist",
+    "bytes": 1069,
+    "sha256": "49bbcfd1a9e3a6afeb54552705e616a32f5e59c5087dee5e46ebc23b472a1711"
+  },
+  {
+    "path": "workspace-artifacts/c983-ta-sol-review/.tradingagents/com.tradingagents.daily-discovery.plist",
+    "bytes": 1228,
+    "sha256": "ed98d259d81b027ab97ae57456bff28d78d3e3640b5487252b1966f62cf75493"
+  },
+  {
+    "path": "workspace-artifacts/c983-ta-sol-review/.tradingagents/com.tradingagents.media-poller.plist",
+    "bytes": 990,
+    "sha256": "70b59f5b53268fbbe40b8ee9b0bc212da3124ff9512447bebffabdf6397c2968"
+  },
+  {
+    "path": "workspace-artifacts/c983-ta-sol-review/.tradingagents/com.tradingagents.portfolio-day.plist",
+    "bytes": 898,
+    "sha256": "3c5e9e959d94e5ab22c815f6f0358947a1812d3178c73ce3eca4b55066e26803"
+  },
+  {
+    "path": "workspace-artifacts/c983-ta-sol-review/.tradingagents/com.tradingagents.temporal-reindex.plist",
+    "bytes": 1043,
+    "sha256": "de0e0cddf1dcd3155fcb2238a082c26a1804ed88d566834c681740850d2a13af"
+  },
+  {
+    "path": "workspace-artifacts/c983-ta-sol-review/.tradingagents/com.tradingagents.x-first-cycle-once.plist",
+    "bytes": 1294,
+    "sha256": "e0bcbf71f107b9ee62c5968c7be478b3826e715f36d13e6dc2307d466c6eb351"
+  },
+  {
+    "path": "workspace-artifacts/c983-ta-sol-review/.tradingagents/plan-a-comparisons-2026-08-24.txt",
+    "bytes": 4908,
+    "sha256": "d79295031477ce6fa9470acb3ae5cfe74f664bcca2b26d0494994999320d154f"
+  },
+  {
+    "path": "workspace-artifacts/c983-ta-sol-review/.tradingagents/plan-a-runs.jsonl",
+    "bytes": 8168,
+    "sha256": "a91de4e67175b553238da8c7f5b6190b5ff9e287d546571c22c143834dbf52dd"
+  },
+  {
+    "path": "workspace-artifacts/c983-ta-sol-review/.tradingagents/portfolio-backfill.log.1",
+    "bytes": 3479,
+    "sha256": "0501e0a6a08930b767ceaec3b8c194fcc9e98048d5323c2be304e371ddf3aedf"
+  },
+  {
+    "path": "workspace-artifacts/canonical/.context/handoffs/fleet/audit-report.md",
+    "bytes": 12731,
+    "sha256": "c710bf394b32890dd0ae4333a994518091dfe45d0c286c666a29740584560ffc"
+  },
+  {
+    "path": "workspace-artifacts/canonical/.context/handoffs/fleet/round2-audit.md",
+    "bytes": 12545,
+    "sha256": "50225f62ed23b08684ecb031f14be32ae02e5cfa7aa035d22fd454298374aded"
+  },
+  {
+    "path": "workspace-artifacts/canonical/.context/handoffs/fleet/round2-sol-prompt.md",
+    "bytes": 1324,
+    "sha256": "337c351bd5b5c0d9ddae6b24172c434fc424a4155f137ebe2dbf063e3d67f340"
+  },
+  {
+    "path": "workspace-artifacts/canonical/.context/handoffs/fleet/round2-terra-prompt.md",
+    "bytes": 4190,
+    "sha256": "287b59411e43b0fbcd436a39266c01a3562652ab59d43aa3ee32e335a1a823af"
+  },
+  {
+    "path": "workspace-artifacts/canonical/.context/handoffs/fleet/sol-audit-prompt.md",
+    "bytes": 1885,
+    "sha256": "113978dc26439ce641c8e17c4ecf2ba81bc2a2136c33bd88db5c081c37ffa2ef"
+  },
+  {
+    "path": "workspace-artifacts/canonical/.context/handoffs/fleet/system-map.md",
+    "bytes": 5044,
+    "sha256": "51afa0a8ebbaeae962dfddf3f74ab73f1afa3e5597ac2a086c6615014f77e495"
+  },
+  {
+    "path": "workspace-artifacts/canonical/.context/handoffs/fleet/taste-canon.md",
+    "bytes": 9871,
+    "sha256": "ad542daa160c2c040d36084be0fee4c3ff5d86d079eb9b76e3d7b614dc7a713d"
+  },
+  {
+    "path": "workspace-artifacts/canonical/.context/handoffs/fleet/terra-manager-prompt.md",
+    "bytes": 2625,
+    "sha256": "b9c79d0b4b46edfaeb7b7644431941d22f803676cd6c61db57c7faf4bee60d5e"
+  },
+  {
+    "path": "workspace-artifacts/distribution/.context/handoffs/fleet/terra-summary.md",
+    "bytes": 2161,
+    "sha256": "4aeafe7e8da5f65bb5e214d63a467134483f22a55da353ae0f687ad641e57984"
+  },
+  {
+    "path": "workspace-artifacts/distribution/.lavish/temporal-agent-eval-plan.html",
+    "bytes": 14610,
+    "sha256": "2a66c9508faac910f0800e9a36e8ac67f6e207bcc4d1c28872ea5958c0189b14"
+  },
+  {
+    "path": "workspace-artifacts/distribution/.lavish/temporal-agent-evaluation-architecture.html",
+    "bytes": 11400,
+    "sha256": "aef934a08f884ae420ee434ed2e09c5f74527f46c3ea752ae758b9bc41729d42"
+  },
+  {
+    "path": "workspace-artifacts/distribution/.tradingagents/com.tradingagents.cloud-media-sync.plist",
+    "bytes": 1069,
+    "sha256": "49bbcfd1a9e3a6afeb54552705e616a32f5e59c5087dee5e46ebc23b472a1711"
+  },
+  {
+    "path": "workspace-artifacts/distribution/.tradingagents/com.tradingagents.daily-discovery.plist",
+    "bytes": 1228,
+    "sha256": "ed98d259d81b027ab97ae57456bff28d78d3e3640b5487252b1966f62cf75493"
+  },
+  {
+    "path": "workspace-artifacts/distribution/.tradingagents/com.tradingagents.media-poller.plist",
+    "bytes": 990,
+    "sha256": "70b59f5b53268fbbe40b8ee9b0bc212da3124ff9512447bebffabdf6397c2968"
+  },
+  {
+    "path": "workspace-artifacts/distribution/.tradingagents/com.tradingagents.portfolio-day.plist",
+    "bytes": 898,
+    "sha256": "3c5e9e959d94e5ab22c815f6f0358947a1812d3178c73ce3eca4b55066e26803"
+  },
+  {
+    "path": "workspace-artifacts/distribution/.tradingagents/com.tradingagents.temporal-reindex.plist",
+    "bytes": 1043,
+    "sha256": "de0e0cddf1dcd3155fcb2238a082c26a1804ed88d566834c681740850d2a13af"
+  },
+  {
+    "path": "workspace-artifacts/distribution/.tradingagents/com.tradingagents.x-first-cycle-once.plist",
+    "bytes": 1294,
+    "sha256": "e0bcbf71f107b9ee62c5968c7be478b3826e715f36d13e6dc2307d466c6eb351"
+  },
+  {
+    "path": "workspace-artifacts/distribution/.tradingagents/plan-a-comparisons-2026-08-24.txt",
+    "bytes": 4908,
+    "sha256": "d79295031477ce6fa9470acb3ae5cfe74f664bcca2b26d0494994999320d154f"
+  },
+  {
+    "path": "workspace-artifacts/distribution/.tradingagents/plan-a-runs.jsonl",
+    "bytes": 8168,
+    "sha256": "a91de4e67175b553238da8c7f5b6190b5ff9e287d546571c22c143834dbf52dd"
+  },
+  {
+    "path": "workspace-artifacts/distribution/.tradingagents/portfolio-backfill.log.1",
+    "bytes": 3479,
+    "sha256": "0501e0a6a08930b767ceaec3b8c194fcc9e98048d5323c2be304e371ddf3aedf"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/attachments/23PKY0/Transcript of Review Audit Transcript.md",
+    "bytes": 135505,
+    "sha256": "27b8f7232e6d8f5dae975030bdd2378617d483d1768cf68a204f13a25812567e"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/attachments/CdnXm5/Transcript of Check Audit Plan.md",
+    "bytes": 22502,
+    "sha256": "b9656259bfd69537aa7a51b7e8a5a378c82294004bc1ac1e51e9c13b7246809c"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/attachments/D32H7i/Transcript of Audit Plan.md",
+    "bytes": 100204,
+    "sha256": "9270010c62c46406b92c2bb501ebca65788ad0696f5a855cdc891fd1633762e2"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/attachments/FATeBV/Screenshot 2026-09-16 at 10.19.19\u202fAM.png",
+    "bytes": 124564,
+    "sha256": "65b717c1f63eb44e6b767481775a846e2f05d9a2a90b3e00a09b2d1ba0d0b722"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/attachments/Z4S4ig/Screenshot 2026-08-26 at 1.37.01\u202fAM.png",
+    "bytes": 67399,
+    "sha256": "315a8d84579e5c3e8b22f6469f91ab5fed523c991121c42a7f5d926b6995532d"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/backup-final-recheck.log",
+    "bytes": 98,
+    "sha256": "3ba9490473d478cbb36996cf3f225d6cc4ae7c9448fbf4b75e664fd8958b61dd"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/baseline-tests.log",
+    "bytes": 99,
+    "sha256": "9bdbda67cd662114c1e71c3930b2a74609e2269273e0ca438acf16a3cb8b066f"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/budget-boundary-tests.log",
+    "bytes": 98,
+    "sha256": "0ffb40a7e62bd6693371ecb7ae3f0f55144cadcc2b7f232fab52e0168e397b14"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/budget-contract.md",
+    "bytes": 1222,
+    "sha256": "85de1da39a7945c74c10cca3ce6bf121836f142cc55b9c1959ad7767219281f1"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/budget-tests.log",
+    "bytes": 99,
+    "sha256": "f8976697c0236dbbba1185cdd95fa001e77b6fb3fcfab4684665d0b2e2dc62e7"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/captain-handoff.md",
+    "bytes": 4795,
+    "sha256": "79e36b3c205602e512023737a74984b9740907a480df12ab092da28bd722f37b"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/cio-boundary-recheck.log",
+    "bytes": 98,
+    "sha256": "d0a6a7dd1b43a93b88e128f8c7dd40d5e4d9e91ff742e7debc4fe7907ddb9bc8"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/cio-boundary-tests.log",
+    "bytes": 1045,
+    "sha256": "d1834a2ae004c6c6feaf32698183e83549e6d3535675834d7026933c3cea8b66"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/cio-ruff.log",
+    "bytes": 3229,
+    "sha256": "03b835a5f6a487fd0185d77ad3b253edd061075a682bdc4d24e12123dadda36a"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/collected-tests.txt",
+    "bytes": 186320,
+    "sha256": "f6417e2804c223b250fbb7f2971053857f16429fea9975586e7587af88313d71"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/combined-consumers-check.log",
+    "bytes": 179,
+    "sha256": "efae956977cb6f3729504e41b71975ecb1f54d2efe061f9e9becf4a9ef6d8339"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/combined-corrections-first.log",
+    "bytes": 1870,
+    "sha256": "173f49f41e5d8d1ea6b5ffd7d5d7a3649bbdc56131e15132cdd95fd6a9efddfc"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/combined-lint-32fd21e.log",
+    "bytes": 21338,
+    "sha256": "1dbca435aebee8c7c21cb9f094d62320207eb1b9769eea131255901eebde6c7b"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/combined-offline-32fd21e.log",
+    "bytes": 22582,
+    "sha256": "65aa87932f4f0fc2ebad7d3e95317a81b6bf6c5bfcf6ba63ca7a9cecc77ef1db"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/combined-without-deploy-350e8e5.log",
+    "bytes": 1011,
+    "sha256": "9db8c3e8b572c2e1cfc48e4006e57c5762f00f36d08884531b71b0a263475b26"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/combined-without-deploy-final.log",
+    "bytes": 6039,
+    "sha256": "d6485da2c54559c33932528cc3373a805cb5162fb7d9ca422b3226838bcf6dc6"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/deploy-failure-isolation.log",
+    "bytes": 1643,
+    "sha256": "9fd6c5e0b9c6a11f27f45d765659aa8b1a63d3afdd0214ad47a6b48a92bd2c37"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/deploy-integrated-check.log",
+    "bytes": 192,
+    "sha256": "55000842d34f0f7bf8a673e0d464c57aad82627d83566ebf94f2e6a5ec54d851"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/deploy-isolated-final.log",
+    "bytes": 6604,
+    "sha256": "3ad05d1b49c13e842a0a51063abbffffe253c8762a0a9500cce13b3d98121b4f"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/env-check/result.json",
+    "bytes": 86,
+    "sha256": "41c76b14bcb796a3a66079962a7ac8951593b59a75413c113e4fc0a40cda0cc4"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/env-check/terminal-receipt.json",
+    "bytes": 203,
+    "sha256": "368af5a1e5869fcc69e996340a0ef2d9d6fabd34b1157662e57f2ca60d68f55d"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/explanation-draft.md",
+    "bytes": 5665,
+    "sha256": "24f1d2177aaf6c0625081cb62793f488b1f460932edad07f2354e72b7f0315e8"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/final-consumer-recheck.log",
+    "bytes": 99,
+    "sha256": "11845ac139119fd594d35de7185da85734414b5fcf84aa94c361a275e5878b6d"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/final-next-open-consumers.log",
+    "bytes": 1132,
+    "sha256": "d922caf8c2641cdafa4f58dd4f70ebd02d8abcd2d24b40432056af9f1ffcd28c"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/frozen-and-forward-replay.log",
+    "bytes": 55805,
+    "sha256": "eabc0a0eefd54144a8bb4c2804f7b910612d970322cb9c7679950c177e587b1b"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/frozen-missing-outcome-check.log",
+    "bytes": 99,
+    "sha256": "8e680abe9c5ccff0f37c64853b2ea57fb98c5b22876a1746ce3fe043adaeeeb5"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/full-portfolio-proof.log",
+    "bytes": 9306,
+    "sha256": "6f2670a60ed8fa514c783500e6001cd4ab9cea84da2a4653a4a1d88236d8b72e"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/guard-check.py",
+    "bytes": 1997,
+    "sha256": "58ff13bf31197cda7e2eb909ee4760ae5139eeea8e7084c934a8669614dad544"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/integrated-broad-check.log",
+    "bytes": 7816,
+    "sha256": "ddfe680c40ed098597f90575c0b27082dcb0cd11d17aa2161ab882c29d5b44f9"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/integrated-broad-final.log",
+    "bytes": 2274,
+    "sha256": "bc2a13322973b04884ae5c1af51a6382e8f9cb389a629c70b0011e7a543e9669"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/integrated-ruff.log",
+    "bytes": 619,
+    "sha256": "51cafd829ec790287080cd424421d7b95c498899c65e93c3d2853f183a525a6a"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/integration-candidate-check.log",
+    "bytes": 99,
+    "sha256": "270bd00a80502e4f2165dcdaa375c63ee4c1fb33b0662408e2febb9a695087a4"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/integration-handoff.md",
+    "bytes": 1970,
+    "sha256": "fca6f8ef62ab7fa88fb2351827671f7089617c35479c1c36e101bb6eb4986536"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/last-fallback.json",
+    "bytes": 75,
+    "sha256": "8df5ae54a12ed49606b8d7827c2bc570c44a957c630198c5424a052a77ada43f"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/lead-handoff.md",
+    "bytes": 11182,
+    "sha256": "79fa889ff54ff14f39cb4690a16d0e20ad54c503be16e71ab257dc614ed3d585"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/lead-prompt.md",
+    "bytes": 5417,
+    "sha256": "187978fb7257d5dbffd94f816b5731b8dfba9443b681dc869136b369ceb4a1e0"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/lead-spawn.json",
+    "bytes": 8114,
+    "sha256": "c3193cc92a943f33d2fba3766d63a7fed8593b8fee845098143693f19105505e"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/luna-ops-handoff.md",
+    "bytes": 2639,
+    "sha256": "e7483aab70f099d358a67658d21f5f70da8b2698cd902c938fa9eabac06eb510"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/luna-ops-prompt.md",
+    "bytes": 952,
+    "sha256": "2a501d150238d0ef9791d5e8fad260698ee6a6f6f330c36b23aabe4569d1a86d"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/luna-ops-resume.md",
+    "bytes": 1304,
+    "sha256": "2967f14d1537d328447cec8530abb07e377b5679dc0a98c0c3b5be48c71994f2"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/luna-p4-resume.md",
+    "bytes": 1373,
+    "sha256": "b1e90e89c2865f39b7df1b24a9b9f609b86cce1ee637cd7a99a2e568427f651b"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/luna-store-handoff.md",
+    "bytes": 2011,
+    "sha256": "ce07e1690954594e9810432c731c461cd33a82a412bfd57d2bcc70f7a7ab5697"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/luna-store-prompt.md",
+    "bytes": 865,
+    "sha256": "5507230a34110402a0118d1ce90f03861bcaf9ee8611c2c4ba3cfcf14f86048a"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/next-open-real-boundary.log",
+    "bytes": 99,
+    "sha256": "91a8fe45b7412f10ccddae581a0dbf819b9c8e0f8047771ac55422f29254d094"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/ops-final-proof.log",
+    "bytes": 99,
+    "sha256": "d045f185cc76572ca42f46d3ce973bfc0d7b48595ffa103247ab81cae243636b"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/ops-lint.log",
+    "bytes": 1164,
+    "sha256": "58e869175f0d15b3a4a1eae5d946483da4255be225c806b1fabba7b76f4dd612"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/ops-shared-prompt.md",
+    "bytes": 2334,
+    "sha256": "be87d10228c271bf743cd783bb6cb3ae44eb4caffb213ad4fee0e257cf89eb58"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/ops-targeted-retry.log",
+    "bytes": 2883,
+    "sha256": "054cc62abce463897264fe02287af4c531e51553c7a03beeb66acb6c2c92a811"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/p4-resume-spawn.json",
+    "bytes": 4347,
+    "sha256": "21f009ad5dd9c890b5d77c5d1819a12235da966185fda31854fb4cd448905049"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/p4-resume-spawn.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/p4-review-tests.log",
+    "bytes": 99,
+    "sha256": "6ba89274592c5bc490a6c69f36ba0515c21f8d5d6f6be91710ce41af7282f38c"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/p4-ruff.log",
+    "bytes": 4214,
+    "sha256": "7e45937e408e9cdf92b4f51d4c64ec18f5acd0aacbf06e5ddd33cf42cebcdde2"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/program.json",
+    "bytes": 2179,
+    "sha256": "8a90a11fdd11c2fff30fa3b3d3bc61ec6b19fda75252d0483b0e95afe8d96d20"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/resume-20260907.md",
+    "bytes": 2911,
+    "sha256": "0901cce74084d0e37028f4b581fd4698d0574b6f31da3246c4258f1fd4627bcd"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/root-portfolio-fixture.py",
+    "bytes": 4144,
+    "sha256": "f1c11863fc15044f4c7dea8acbc9c5c782bd0b63db9f2e4fb0be0edf09488498"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/roster.json",
+    "bytes": 1086,
+    "sha256": "8e04aa49f0a7379f7cc83a8765bc57f9f5ab63e9cd94721acf1c1579cd8d56c6"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/round2-integration.log",
+    "bytes": 100,
+    "sha256": "23b5ec3e27a95c3b356d0df9160c605f65b40eea6615d132aa008adc93bad6ed"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/sol-execution-spawn.json",
+    "bytes": 222,
+    "sha256": "fe1f841ec0788d6a389bda6415ca2a66ed9d139f8f2ba1e937bb90a8817ad87a"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/sol-execution.md",
+    "bytes": 3395,
+    "sha256": "411a69e5b86715efe206a892aa3af706e545f028d13dec044094735768e9fab2"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/sol-review-prompt.md",
+    "bytes": 615,
+    "sha256": "11af26f67719b5579abbfb7bb7274fc95d260447f14ba404a847ceef02c4d8c6"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/sol-review.md",
+    "bytes": 2982,
+    "sha256": "ec750298059330fd9f9ae20244cc7d13a9a5a987088040e9795642ec67d0d288"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/spawn_execution.py",
+    "bytes": 1942,
+    "sha256": "4a064af074df52d1a087e0c76b275241a55421da0f94753a2ff49743fc4e53a2"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/spawn_targeted.py",
+    "bytes": 2256,
+    "sha256": "d4b3df7acb41ccb0b1e6c525f52f6757244922cd8d065cbeeffeb53b55812f44"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/test-isolation-recheck.log",
+    "bytes": 100,
+    "sha256": "62aa474b0f400c9c8a99720c111342884898419f8b84aadf2ba6cc71d3bd014b"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/wake-probe.md",
+    "bytes": 280,
+    "sha256": "b78bed97660a8c7081e662a80bd87fa47f0542c0d279da52db62b397990408ea"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/wake.stderr.log",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/wake.stdout.log",
+    "bytes": 2413,
+    "sha256": "e17ec844a229097af65ace4265db2da78fd204aba4b7cff02f6af316fd5bbbc7"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/audit-fleet/wake_if_stalled.py",
+    "bytes": 2375,
+    "sha256": "48506b82d784febdc399dcb78d1f2991e0d488af33e218e257e8d4061b2e7f8c"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/disable-tradingagents/cloud-after.json",
+    "bytes": 387,
+    "sha256": "0caad5cf2dcfdd64ef02c8e69d332c2e87c225ced406da9a887ade84f335ca29"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/disable-tradingagents/cloud-before.json",
+    "bytes": 529,
+    "sha256": "00a38b5cdaeca1ab14e1c17be5de6c48aca417115a9d1d80689b76b41720fff7"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/disable-tradingagents/cron-inventory.json",
+    "bytes": 29,
+    "sha256": "cfa6ede5745ca33c3f0aee1f663fbdb0752672d4c10ea8f56337e2803bd04d4d"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/disable-tradingagents/launchd-inventory.json",
+    "bytes": 245,
+    "sha256": "493192acff403bd333ada9d656c827d5cd011b2f5043f42e7ef2c5c0bc2eaeb6"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/disable-tradingagents/local-disable-result.json",
+    "bytes": 311,
+    "sha256": "cedc0151493c15e1a426a834b375d3f5ae105f04eaa2aa5c2a7aae34f0e15ace"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/disable-tradingagents/process-inventory.json",
+    "bytes": 113,
+    "sha256": "f23e4c1f52dd8a6c4aa871a2ed3c26303c0da0a111f707c961c464bdf90254f0"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/disable-tradingagents/result.json",
+    "bytes": 696,
+    "sha256": "b411084e13be90ebb53f3815ec57ac237c7c45f3b4337c284117c3ec047c5121"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/generate-audit-review.py",
+    "bytes": 11812,
+    "sha256": "4e00450e40248ac0042191cc2055b6e6244168c65abc6c792ce322f36d03b11d"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/handoffs/fleet/sol-audit-prompt.md",
+    "bytes": 1885,
+    "sha256": "113978dc26439ce641c8e17c4ecf2ba81bc2a2136c33bd88db5c081c37ffa2ef"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/handoffs/fleet/system-map.md",
+    "bytes": 5044,
+    "sha256": "51afa0a8ebbaeae962dfddf3f74ab73f1afa3e5597ac2a086c6615014f77e495"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/handoffs/fleet/taste-canon.md",
+    "bytes": 9871,
+    "sha256": "ad542daa160c2c040d36084be0fee4c3ff5d86d079eb9b76e3d7b614dc7a713d"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/handoffs/fleet/terra-manager-prompt.md",
+    "bytes": 2625,
+    "sha256": "b9c79d0b4b46edfaeb7b7644431941d22f803676cd6c61db57c7faf4bee60d5e"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/handoffs/fleet/terra-summary.md",
+    "bytes": 2161,
+    "sha256": "4aeafe7e8da5f65bb5e214d63a467134483f22a55da353ae0f687ad641e57984"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/temporal-demo/temporal.sqlite3",
+    "bytes": 126976,
+    "sha256": "5e1e1cd22f752007c0c363016d343dbec280cf7a5d78903a27d4126dcf580d33"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/temporal-forward/artifacts/25/b91c8957354ecb80f5d1a5c2359b95fec27a8823a33a89ec9859920ef6f68f",
+    "bytes": 290,
+    "sha256": "25b91c8957354ecb80f5d1a5c2359b95fec27a8823a33a89ec9859920ef6f68f"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/temporal-forward/artifacts/43/d0c1afe77c80f7ca85050e95cdc423715ec275da615447375f0cebacfba2f4",
+    "bytes": 107,
+    "sha256": "43d0c1afe77c80f7ca85050e95cdc423715ec275da615447375f0cebacfba2f4"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/temporal-forward/artifacts/a6/27125c9be7fa48ab5fb2da4ddffdc551c6657a326ef66ba2cd67db6ea5a39d",
+    "bytes": 7300,
+    "sha256": "a627125c9be7fa48ab5fb2da4ddffdc551c6657a326ef66ba2cd67db6ea5a39d"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/temporal-forward/artifacts/a6/c4d27799116e8be4b9129eac63cf21e8f4b310744a4ed183180ffe2e516ce3",
+    "bytes": 109,
+    "sha256": "a6c4d27799116e8be4b9129eac63cf21e8f4b310744a4ed183180ffe2e516ce3"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/temporal-forward/artifacts/cd/bbdc2a4e44f3be741c30057a3e9a98ece3cdc5f433b69b715bb0ea00962d43",
+    "bytes": 5412,
+    "sha256": "cdbbdc2a4e44f3be741c30057a3e9a98ece3cdc5f433b69b715bb0ea00962d43"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/temporal-forward/temporal.sqlite3",
+    "bytes": 233472,
+    "sha256": "9f9b4f8f2f9c14518272453b88506234eb425338c3674c0df56fe9535ac828f0"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/temporal-gdelt/temporal.sqlite3",
+    "bytes": 126976,
+    "sha256": "5e1e1cd22f752007c0c363016d343dbec280cf7a5d78903a27d4126dcf580d33"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/temporal-graph/artifacts/6d/e78917a8fdc4240193d942930d4fe28890c1d5be92ad8243f15e5180ec0333",
+    "bytes": 458,
+    "sha256": "6de78917a8fdc4240193d942930d4fe28890c1d5be92ad8243f15e5180ec0333"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/temporal-graph/artifacts/77/eebb57af0dfadadf4aa482a2b8bee2c2ccd2e9e5c83b5705f19a71deecbcf5",
+    "bytes": 7041,
+    "sha256": "77eebb57af0dfadadf4aa482a2b8bee2c2ccd2e9e5c83b5705f19a71deecbcf5"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/temporal-graph/artifacts/7c/629892e0b8b3849a84d25386d719b10af7e3eeb994ed3966650400288e3525",
+    "bytes": 87,
+    "sha256": "7c629892e0b8b3849a84d25386d719b10af7e3eeb994ed3966650400288e3525"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/temporal-graph/artifacts/bc/9d724846a1e69aeb242b929bd22fe0a7def538d11f188192e9761dadfb8613",
+    "bytes": 5673,
+    "sha256": "bc9d724846a1e69aeb242b929bd22fe0a7def538d11f188192e9761dadfb8613"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/temporal-graph/artifacts/e4/59cde843a1ba6b771a3c73b459c96f2f97d16264d2ad604576dbdb80574c59",
+    "bytes": 573,
+    "sha256": "e459cde843a1ba6b771a3c73b459c96f2f97d16264d2ad604576dbdb80574c59"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/temporal-graph/results/NVDA/TradingAgentsStrategy_logs/full_states_log_2026-08-19.json",
+    "bytes": 1072,
+    "sha256": "82cf7efcecb5e5b2197c361e30c98fded71eec6e49010cf60d13a6ef77931135"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/temporal-graph/temporal.sqlite3",
+    "bytes": 233472,
+    "sha256": "29eb848a4da21249e09d553ab25c3eb3d08e6f3557bcfcc994a5511a0ad6bd12"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/temporal-wayback/artifacts/45/46b1b6e632d02d1ea5d073fd9deae92e0ef0751f48b3543a2258c5e06e2d33",
+    "bytes": 35393,
+    "sha256": "4546b1b6e632d02d1ea5d073fd9deae92e0ef0751f48b3543a2258c5e06e2d33"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/temporal-wayback/artifacts/74/76b1666597b05695e1f21cd578dc90c01347599392207d8a7d117b65aca94e",
+    "bytes": 64,
+    "sha256": "7476b1666597b05695e1f21cd578dc90c01347599392207d8a7d117b65aca94e"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/temporal-wayback/artifacts/9b/e35aebc32ae497f00c998383e71ded6842c3363c7ab5843ebe9ce7e4f9114b",
+    "bytes": 829387,
+    "sha256": "9be35aebc32ae497f00c998383e71ded6842c3363c7ab5843ebe9ce7e4f9114b"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/temporal-wayback/results/NVDA/TradingAgentsStrategy_logs/full_states_log_2024-01-02.json",
+    "bytes": 982,
+    "sha256": "5692028c81084cf3d67eb0776db6e56bab94336a4768d15c300a81adfe00f25c"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/temporal-wayback/temporal.sqlite3",
+    "bytes": 282624,
+    "sha256": "214ac570202ca8594425a74e34efb0ad551bd8fe9eb07d975a1d827d8bf63d97"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/terra-manager-brief.md",
+    "bytes": 4185,
+    "sha256": "a93f28c9a22388d17210c720e800e8354ba83ac8bfe9eaa709459b23ba95dc12"
+  },
+  {
+    "path": "workspace-artifacts/london/.context/todos.md",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "workspace-artifacts/london/.lavish/audit-fix-plan-2026-09-06.html",
+    "bytes": 48611,
+    "sha256": "0284e8baf279f42d6d1079d8f8c424f0e3de089fe8df38bc00a29bdd91d248a7"
+  },
+  {
+    "path": "workspace-artifacts/london/.lavish/audit-source.md",
+    "bytes": 7384,
+    "sha256": "ea2e5ad37c203c11569d9e88beb5cc9aecf764e05591ed5c73a168b445aa14d1"
+  },
+  {
+    "path": "workspace-artifacts/london/.lavish/portfolio-boundary.md",
+    "bytes": 2938,
+    "sha256": "42a713d940cd22a85465f3fed7ff0c6e2ec261c83f413a1c80c3d1df602d4359"
+  },
+  {
+    "path": "workspace-artifacts/london/.lavish/temporal-agent-eval-plan.html",
+    "bytes": 14610,
+    "sha256": "2a66c9508faac910f0800e9a36e8ac67f6e207bcc4d1c28872ea5958c0189b14"
+  },
+  {
+    "path": "workspace-artifacts/london/.lavish/temporal-agent-evaluation-architecture.html",
+    "bytes": 11400,
+    "sha256": "aef934a08f884ae420ee434ed2e09c5f74527f46c3ea752ae758b9bc41729d42"
+  },
+  {
+    "path": "workspace-artifacts/london/.tradingagents/cloud-backfill-daily.log",
+    "bytes": 3540,
+    "sha256": "4cbf95c97531627db6f71ee357cb0de81b3624a34622c1683a76ad0044445ae2"
+  },
+  {
+    "path": "workspace-artifacts/london/.tradingagents/cloud-backfill-retry.log",
+    "bytes": 15,
+    "sha256": "ed9c25996224e994b23a6681b4fa359c4224ae02bbf8fa3835e6d1c147257e3a"
+  },
+  {
+    "path": "workspace-artifacts/london/.tradingagents/cloud-backfill.log",
+    "bytes": 652,
+    "sha256": "8be7404cc15be92c2ea142a2317da849507093363a0eeab628c09e882c67088b"
+  },
+  {
+    "path": "workspace-artifacts/london/.tradingagents/cloud-media-sync.error.log",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "workspace-artifacts/london/.tradingagents/cloud-media-sync.log",
+    "bytes": 492,
+    "sha256": "65a360728e5abd6cdb65bf4c130f1b8fb414821dc1af54dbb54442f16e47910c"
+  },
+  {
+    "path": "workspace-artifacts/london/.tradingagents/collector-deploy.log",
+    "bytes": 7414,
+    "sha256": "1708bcc3c3533694caf58b49f2cf8f9761d8cc1394a9c1d74213de570eb13242"
+  },
+  {
+    "path": "workspace-artifacts/london/.tradingagents/com.tradingagents.cloud-media-sync.plist",
+    "bytes": 1069,
+    "sha256": "49bbcfd1a9e3a6afeb54552705e616a32f5e59c5087dee5e46ebc23b472a1711"
+  },
+  {
+    "path": "workspace-artifacts/london/.tradingagents/com.tradingagents.daily-discovery.plist",
+    "bytes": 1228,
+    "sha256": "ed98d259d81b027ab97ae57456bff28d78d3e3640b5487252b1966f62cf75493"
+  },
+  {
+    "path": "workspace-artifacts/london/.tradingagents/com.tradingagents.media-poller.plist",
+    "bytes": 990,
+    "sha256": "70b59f5b53268fbbe40b8ee9b0bc212da3124ff9512447bebffabdf6397c2968"
+  },
+  {
+    "path": "workspace-artifacts/london/.tradingagents/com.tradingagents.portfolio-day.plist",
+    "bytes": 898,
+    "sha256": "3c5e9e959d94e5ab22c815f6f0358947a1812d3178c73ce3eca4b55066e26803"
+  },
+  {
+    "path": "workspace-artifacts/london/.tradingagents/com.tradingagents.temporal-reindex.plist",
+    "bytes": 1043,
+    "sha256": "de0e0cddf1dcd3155fcb2238a082c26a1804ed88d566834c681740850d2a13af"
+  },
+  {
+    "path": "workspace-artifacts/london/.tradingagents/com.tradingagents.x-first-cycle-once.plist",
+    "bytes": 1294,
+    "sha256": "e0bcbf71f107b9ee62c5968c7be478b3826e715f36d13e6dc2307d466c6eb351"
+  },
+  {
+    "path": "workspace-artifacts/london/.tradingagents/daily-discovery.error.log",
+    "bytes": 4082,
+    "sha256": "f12a80c236938794fe7e70ef913a61702bb3f58cafead3f901f9aa7e3ffbde36"
+  },
+  {
+    "path": "workspace-artifacts/london/.tradingagents/daily-discovery.log",
+    "bytes": 419,
+    "sha256": "fb791019f1b69219f617f4aac253fdf24f820f40c54c9214164b9d58770c702e"
+  },
+  {
+    "path": "workspace-artifacts/london/.tradingagents/media-poller.error.log",
+    "bytes": 509969,
+    "sha256": "5dc9cd0bb24d8a191c97ea6da510dc3b38db252f64abf863e51b2c805200e958"
+  },
+  {
+    "path": "workspace-artifacts/london/.tradingagents/media-poller.log",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "workspace-artifacts/london/.tradingagents/plan-a-comparisons-2026-08-24.txt",
+    "bytes": 4908,
+    "sha256": "d79295031477ce6fa9470acb3ae5cfe74f664bcca2b26d0494994999320d154f"
+  },
+  {
+    "path": "workspace-artifacts/london/.tradingagents/plan-a-experiment.log",
+    "bytes": 26359,
+    "sha256": "b8321bbeb7b56efcd2a1dcce2a3e6040b635a9afb4263f9a71d6ffc09e60ccb0"
+  },
+  {
+    "path": "workspace-artifacts/london/.tradingagents/plan-a-round2.log",
+    "bytes": 4569,
+    "sha256": "54fdf50064f1f6465de54d1701d4c4f51305bbc4386a327f065e8bad2ef2f6bd"
+  },
+  {
+    "path": "workspace-artifacts/london/.tradingagents/plan-a-runs.jsonl",
+    "bytes": 8168,
+    "sha256": "a91de4e67175b553238da8c7f5b6190b5ff9e287d546571c22c143834dbf52dd"
+  },
+  {
+    "path": "workspace-artifacts/london/.tradingagents/portfolio-backfill.log",
+    "bytes": 400,
+    "sha256": "8ca1c998f93de5d260aef292abf7a7882dc1b5243840dd745d4ba4cf4cf38bd5"
+  },
+  {
+    "path": "workspace-artifacts/london/.tradingagents/portfolio-backfill.log.1",
+    "bytes": 3479,
+    "sha256": "0501e0a6a08930b767ceaec3b8c194fcc9e98048d5323c2be304e371ddf3aedf"
+  },
+  {
+    "path": "workspace-artifacts/london/.tradingagents/portfolio-day-manual.log",
+    "bytes": 60767,
+    "sha256": "407fe50feff7a3a642c2fcf18d3bca119c51cf8862cad6f18d830f7f5ac4da2d"
+  },
+  {
+    "path": "workspace-artifacts/london/.tradingagents/portfolio-day-manual2.log",
+    "bytes": 15434,
+    "sha256": "252e80400f870b951ef96e4b6052bd0bbfabbed4af93090538ad47548f1ea345"
+  },
+  {
+    "path": "workspace-artifacts/london/.tradingagents/portfolio-day.error.log",
+    "bytes": 17250,
+    "sha256": "b84977f5421d42066584ba95f20fdc4b70af983d0342753a9a62cf9da0342678"
+  },
+  {
+    "path": "workspace-artifacts/london/.tradingagents/portfolio-day.log",
+    "bytes": 346,
+    "sha256": "06aa2cca36e1767c2838f1b4c29a7bad7804c6d505462aa10a77cae94331365e"
+  },
+  {
+    "path": "workspace-artifacts/london/.tradingagents/temporal-capture.error.log",
+    "bytes": 71040,
+    "sha256": "27a4e70774a7c3adad464821388411d62047ae3c86fd7e0a634a8dd0010fc7b9"
+  },
+  {
+    "path": "workspace-artifacts/london/.tradingagents/temporal-capture.log",
+    "bytes": 768,
+    "sha256": "4fa6ffced4d01f5beb47c63410a174486973b208abe8113ac24a072c1593c6bb"
+  },
+  {
+    "path": "workspace-artifacts/london/.tradingagents/temporal-reindex.error.log",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "workspace-artifacts/london/.tradingagents/temporal-reindex.log",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "workspace-artifacts/london/.tradingagents/x-first-cycle.error.log",
+    "bytes": 4951,
+    "sha256": "6b728fe4bc0bc7eda5b5be381907f3f24f7ddf40918ec0796148b1bd9f480641"
+  },
+  {
+    "path": "workspace-artifacts/london/.tradingagents/x-first-cycle.log",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "workspace-artifacts/london/.tradingagents/x-validation.error.log",
+    "bytes": 20860,
+    "sha256": "c3d44fd55c72ec74c74ef49c9cde79bf3724f03c17bdcaec308af1c2f8a44563"
+  },
+  {
+    "path": "workspace-artifacts/london/.tradingagents/x-validation.log",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+]

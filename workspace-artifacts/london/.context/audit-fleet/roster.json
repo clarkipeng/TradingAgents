@@ -1,0 +1,41 @@
+[
+  {
+    "workspace": "67b7d7e7-6cc7-4280-8c0b-ea3da8b3d2d4",
+    "name": "ta-luna-store",
+    "branch": "cdt/67b7-ta-luna-store",
+    "sessions": [
+      {
+        "id": "1ad9882e-57b3-42ba-a696-89312c054456",
+        "parent": "df867712-0bb8-43b5-87cd-92bb3f3127d5",
+        "status": "running",
+        "process": "8a2ef1da-af6a-49c1-91e9-ee73f174ffbb"
+      }
+    ]
+  },
+  {
+    "workspace": "a87f14d2-fc09-4d46-a62c-c82b5afaf885",
+    "name": "ta-luna-ops",
+    "branch": "cdt/a87f-ta-luna-ops",
+    "sessions": [
+      {
+        "id": "5f3e9cc0-43b9-47c1-beed-f7034fd445c5",
+        "parent": "df867712-0bb8-43b5-87cd-92bb3f3127d5",
+        "status": "running",
+        "process": "26279c63-f77b-45a2-80f0-90d7e8da1660"
+      }
+    ]
+  },
+  {
+    "workspace": "822403cb-f787-4151-84e6-ccfc15084873",
+    "name": "ta-audit-lead",
+    "branch": "cdt/8224-ta-audit-lead",
+    "sessions": [
+      {
+        "id": "df867712-0bb8-43b5-87cd-92bb3f3127d5",
+        "parent": null,
+        "status": "running",
+        "process": "86847752-5527-4e41-b7c5-509d45f459a7"
+      }
+    ]
+  }
+]

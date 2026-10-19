@@ -1,0 +1,4 @@
+The P4/P5 child delivery is reconciled. Its clean source `fc3040f` remains
+preserved but is intentionally not integrated because the handoff identifies
+cache-basis, coverage, legacy-metadata, and token-accounting defects. No
+uncommitted work or remaining assigned scope is present. Close cleanly.

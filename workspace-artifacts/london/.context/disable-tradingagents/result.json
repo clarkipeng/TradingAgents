@@ -1,0 +1,21 @@
+{
+  "checked_at": "2026-09-15 02:35 UTC",
+  "local_wakeup_loaded": false,
+  "local_wakeup_disabled_override": true,
+  "startup_plist_present": false,
+  "local_runtime_processes_found": false,
+  "active_coding_workers": 0,
+  "repowire_matching_schedules": 0,
+  "user_cron_matches": 0,
+  "cloud_status": "disabled_verified",
+  "cloud_stop_performed": true,
+  "last_cloud_check": "2026-09-16T02:28:05.554080+00:00",
+  "alert_source": "integrations/google_alert_webhook/Code.gs:query_slot_coverage_incomplete",
+  "login_attempt": "authenticated_interactively",
+  "cloud_machine_count": 0,
+  "cloud_process_groups_scaled_to_zero": [
+    "app",
+    "trader"
+  ],
+  "original_volumes_preserved": true
+}

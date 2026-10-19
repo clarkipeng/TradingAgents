@@ -1,0 +1,2147 @@
+[
+  {
+    "ref": "refs/codex/turn-diffs/checkpoints/4014d2007b919fd633865930835f8f83ab1db3b7cdfb320ccfa88726c976ada7/572f0d8f92cef273c01e038766d7903c99d2ccdffbff4f44ef55646b9bcb7f61/1782783146716/fe38a42c-33a4-4cfa-8dde-e3af1d9768fe",
+    "commit": "923b5fa6d1be76d79b0f6de4e30123ac83a31739",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-archive-heads/32f09c1a-7d30-46fa-96d8-0708694c7af0",
+    "commit": "36c56b56596844ec29786b84ba63c973c540f339",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/conductor-archive-32f09c1a-7d30-46fa-96d8-0708694c7af0",
+    "commit": "9dd86bd97324ae3de176e86569aeb570d9dbca56",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-0699f576-ddfb-4b30-99b7-a4468d1472f2-end",
+    "commit": "9f175ecb81bd2702bc5987c3f9d3c2aa8df5a219",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-0699f576-ddfb-4b30-99b7-a4468d1472f2-start",
+    "commit": "4ae84c7485d49dbcab569869971faa9e3556686c",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-0e27fa55-ad6d-40ca-8186-3f26dc90e176-end",
+    "commit": "20baf38da4caace7382e1111fe8afa7ca63dea74",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-0e27fa55-ad6d-40ca-8186-3f26dc90e176-start",
+    "commit": "47698647efce6d18ea0653e8a80a8ee9ae421f8c",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-0ea5f99e-382e-4294-9e52-fc0c28f44027-end",
+    "commit": "20ffe0e2c8d3402ea9abc4397edf79b310102111",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-0ea5f99e-382e-4294-9e52-fc0c28f44027-start",
+    "commit": "ccfabc1a26473ff5853063fac506fb30da2c47cd",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-12f86ea1-4215-4988-99f9-5a1ca778ca38-end",
+    "commit": "ee2b077f794cf7bd778e9a219ee78b6c156d2e89",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-12f86ea1-4215-4988-99f9-5a1ca778ca38-start",
+    "commit": "25726831070aead993f1d2b57ad915fd1db2b525",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-15cf201c-6941-4829-ab6e-6fc8c2437843-end",
+    "commit": "206a5db8dcfee6bf99131653a2b3fdae581c7f50",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-15cf201c-6941-4829-ab6e-6fc8c2437843-start",
+    "commit": "b67874a82300d8d84fb59f5bd4ba561a59821ddf",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-1a8c4bb7-b0df-4ff4-b7d9-34df6ca08fd2-end",
+    "commit": "81293b07eb3e3aff4703818813ba6e87b1f91aa9",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-1a8c4bb7-b0df-4ff4-b7d9-34df6ca08fd2-start",
+    "commit": "ed52c6d3fa3006ab5491f88c44c681f22ad3e00d",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-1d9e1d7e-187d-4ed2-9046-32ef05a9024b-end",
+    "commit": "d3bd0008043fe3e845ec04d5c97a86b13002f18a",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-1d9e1d7e-187d-4ed2-9046-32ef05a9024b-start",
+    "commit": "3b64be57299c7b09cfffe83cade980b3e928bd7b",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-1e3023eb-9161-423f-8234-5028bc688e9b-end",
+    "commit": "ddfed3cb253cb7d19eff4e192885c79f2e41bb4b",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-1e3023eb-9161-423f-8234-5028bc688e9b-start",
+    "commit": "8f9a00d35120739c2a41e05691ba59d643660ae1",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-29e5f41e-566a-4c13-ae24-fc11e8658b12-end",
+    "commit": "69ab20494bdbbe227df6eabe30fe3bed38eef293",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-29e5f41e-566a-4c13-ae24-fc11e8658b12-start",
+    "commit": "086c426f103fe3fd1587b89671b5b74e9921801b",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-2ca061ff-df10-4d74-80f1-eef8e54ec635-end",
+    "commit": "cdb0ab36a439682f8c7bb5410581d01835f53269",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-2ca061ff-df10-4d74-80f1-eef8e54ec635-start",
+    "commit": "7694ab5cd5f9ad3e2306904d7a30583584ae2033",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-2d2d6601-df70-49f5-99d0-06d7c31668cb-end",
+    "commit": "4fee51c96ffbf34bbe8f428107e98b144d21dadf",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-2d2d6601-df70-49f5-99d0-06d7c31668cb-start",
+    "commit": "86758e63f770d4553c42bb0e7e17cd40829000e0",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-3520078b-b8af-477a-95d5-fb111bd04eb8-end",
+    "commit": "feb98cc3945e8a8349cc51dc5caaeb7bd4091a3f",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-3520078b-b8af-477a-95d5-fb111bd04eb8-start",
+    "commit": "ca6006dcb10622cdbebcd2d4c66a113b3de9523f",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-3692fea2-b78b-4122-97ea-340384e52b7f-end",
+    "commit": "b97b574f6103d2e7a35cdf10b8785b6da1b02320",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-3692fea2-b78b-4122-97ea-340384e52b7f-start",
+    "commit": "50656ce32be6e0f232e6dfa37df7c8f8843e45a8",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-36cdd818-bccf-4045-97df-403d13dec62b-end",
+    "commit": "96d55f49721fc670bdd0e25168ed965af99e9db0",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-36cdd818-bccf-4045-97df-403d13dec62b-start",
+    "commit": "ae747a126e2cadc943bc09ff3abedf5b5b7999d1",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-370ec536-be56-423d-b4bd-ab0025929744-end",
+    "commit": "c7db36d33d692fdc3e7ec2b705958e9fee8b41bb",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-370ec536-be56-423d-b4bd-ab0025929744-start",
+    "commit": "f894e10069625568d5d707b8963f2b1d00f1a5b7",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-3f1bced8-2381-42d0-9f22-ba7181d7bfea-end",
+    "commit": "01af61e90cf6facc32e5e7277e2928edcd1eb92f",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-3f1bced8-2381-42d0-9f22-ba7181d7bfea-start",
+    "commit": "62dcd6b13020f30f8cf4491b876daa4a2318fda8",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-40351186-64b4-4324-8ecd-c2c7bf896db7-end",
+    "commit": "7a9cba8978f3ae11887342e09ac50ea0ea677bbf",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-40351186-64b4-4324-8ecd-c2c7bf896db7-start",
+    "commit": "13bd63b4a2157f9b8774b140d0ddf54d7d43440d",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-42e3601c-ac60-48e7-a5b0-9d4186f92677-end",
+    "commit": "1d049b5969d4b97f0d171ed0aceb7abc4596df01",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-42e3601c-ac60-48e7-a5b0-9d4186f92677-start",
+    "commit": "ed81da1f62874371fdc573b67d8d6ed0dfd43e2e",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-469be013-7930-4380-9dce-e567bae08e17-end",
+    "commit": "f28853665dbe8442b912afa11bd4d52ba5568fd2",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-469be013-7930-4380-9dce-e567bae08e17-start",
+    "commit": "c725403a023b86858d4a0cfb1b547593cfbb57ea",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-4a044264-a328-4dab-a41e-4f29d79a9762-end",
+    "commit": "c560682a2c5a2a4e6f162bb58ca56f595507eef0",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-4a044264-a328-4dab-a41e-4f29d79a9762-start",
+    "commit": "fc38d138bdf06f3bbdd83b100954f841917b5f61",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-4d0400be-1d0e-4738-823c-353097c9e9b3-end",
+    "commit": "4d94cb3f31f4d502efc69a00191cb76a76acc8ac",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-4d0400be-1d0e-4738-823c-353097c9e9b3-start",
+    "commit": "6bf0480dea9a8d885fdeb7a0d98dfb4d9cc16282",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-548d58de-ea23-4c6a-b342-a33f6b8a87f1-end",
+    "commit": "b4853b8b6015d6de129a9650cd0f37868721d1d1",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-548d58de-ea23-4c6a-b342-a33f6b8a87f1-start",
+    "commit": "2b5e262ce3db58ad423a23771c722037fe1e7aee",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-5654732d-85c4-4670-b8c0-4431e14299eb-end",
+    "commit": "62319460ce108e445ab7adb4df83577863f1aad8",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-5654732d-85c4-4670-b8c0-4431e14299eb-start",
+    "commit": "2a48ce5feec9a232ea57efe6bd78fad9aff4f04c",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-5c022d39-d9dd-47d1-9aca-80101019b056-end",
+    "commit": "e08e933984c0b91dbfcc4d23b044d268790d0e54",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-5c022d39-d9dd-47d1-9aca-80101019b056-start",
+    "commit": "8733a4175f843cc133146a73376712eef281a36f",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-61f6f00a-53f2-4c7d-9a5f-a1aeed7cd26b-end",
+    "commit": "9c7b11c0bba84c2d614e77846909146616c45b2d",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-61f6f00a-53f2-4c7d-9a5f-a1aeed7cd26b-start",
+    "commit": "1023369b398dc5b010c95cd22b3e8624b5509ed4",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-64bad79e-fc5f-4162-9687-40da1906eca6-end",
+    "commit": "6cba975b07792b6ded224305da1070bc0b71e192",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-64bad79e-fc5f-4162-9687-40da1906eca6-start",
+    "commit": "183be7b8d3fd8456dc532deca299722876d9a1e4",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-6ef87db8-8dde-4b6e-88cc-99127a2ac2fb-end",
+    "commit": "3a5df5044b43e5b8ac60b94405bcb6e5ba8b7b4c",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-6ef87db8-8dde-4b6e-88cc-99127a2ac2fb-start",
+    "commit": "976e7462167bde08c35cf63f96977604f77160ff",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-6fa01c7b-ce6c-43cc-9a4f-9360208dbe69-end",
+    "commit": "46f2ab1c30fc18276435d14f36f7a6fbf4e6fd1e",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-6fa01c7b-ce6c-43cc-9a4f-9360208dbe69-start",
+    "commit": "5ee94b26e43e47b0f738290e098c05ba4eba2a7a",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-707992f8-980c-47ee-ad26-7d0302f56b3d-end",
+    "commit": "90acba7d3ab001bd409371f6bcc472c818e0ddba",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-707992f8-980c-47ee-ad26-7d0302f56b3d-start",
+    "commit": "8e83b8e1fde047637d31d71fa6ade01dfce1240e",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-75234967-7728-43f1-b721-ad386ff06c52-end",
+    "commit": "8f0295bacc3e2ab03102819a9537833b4fc4865b",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-75234967-7728-43f1-b721-ad386ff06c52-start",
+    "commit": "c941913c644d93cb044720f62f2cb06594b2a958",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-7604a151-0730-48e7-9eaf-dd3a2680dec6-end",
+    "commit": "f84caddd8543113fba1b253bfb9295e7056c190c",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-7604a151-0730-48e7-9eaf-dd3a2680dec6-start",
+    "commit": "8bf7dae9f6deeb9d9f3e44cdece73b02fb256dd4",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-7b722e3f-25f2-4e24-a8be-f458ff83e77e-end",
+    "commit": "5765ae46836e4437c7d8bb58c5ae1044d896daa7",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-7b722e3f-25f2-4e24-a8be-f458ff83e77e-start",
+    "commit": "19661b55de8ef80d39ba1a0f1cc128d72329b2fa",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-7ea07e88-c5b5-4a89-983e-a36189607bd1-end",
+    "commit": "366afbeb9570cf45fef83f3fe04c745650040a16",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-7ea07e88-c5b5-4a89-983e-a36189607bd1-start",
+    "commit": "f73fa59e6d21dc2d2648e0a99d324cd5aa2a5a46",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-81798499-259c-4937-9062-7d22ee69d984-end",
+    "commit": "beec8ceba81421cf2242c44e90053e58c17b1c49",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-81798499-259c-4937-9062-7d22ee69d984-start",
+    "commit": "4c9c573f029e83d289f7e251e8dcab4b4659f00a",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-84328304-3e23-426a-b0d6-6a8983a12540-end",
+    "commit": "0371dfd608100d8b1e3fb08784c06f231f7dcd26",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-84328304-3e23-426a-b0d6-6a8983a12540-start",
+    "commit": "0e2722789e48398269348d427096478944b4f1ee",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-888d8779-5dfe-4675-80fc-86ad10695ce2-end",
+    "commit": "7ce5f75aa48c294791c57f2f3aa8184d70968608",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-888d8779-5dfe-4675-80fc-86ad10695ce2-start",
+    "commit": "ff451d57b7ab7c396c6a03f90bdaa1252c2cef35",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-892097b8-eabf-417e-b53e-8bea4046d9bd-end",
+    "commit": "a3d980d22cff4a62a606816e635b8906328a0951",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-892097b8-eabf-417e-b53e-8bea4046d9bd-start",
+    "commit": "6222f4ccb998a3647df2f0a0909abf32e57161bd",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-8d443706-f9c3-413e-92cb-d1ecf27aad91-end",
+    "commit": "b6e5636698512bb1d60785c9f22fef5be0640d41",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-8d443706-f9c3-413e-92cb-d1ecf27aad91-start",
+    "commit": "38487f6a79583f96f116cc649a5e4ffdfe151d6b",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-90901118-b87a-4f65-b59a-d888016ce4d1-end",
+    "commit": "ccd00a176593d15b2e187dc7053072975a576526",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-90901118-b87a-4f65-b59a-d888016ce4d1-start",
+    "commit": "7d1cd325a0204d0ab26c38d591563aae9760dc5a",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-958cceff-c117-4bdd-948f-3124e84f3d0c-end",
+    "commit": "a57c6e8edf2ceaae81a9c3f22bcceeed351eaa65",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-958cceff-c117-4bdd-948f-3124e84f3d0c-start",
+    "commit": "a8addd7c259d472640cffd36a58bc06c2bf4abed",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-9e21d877-fa82-4aac-8707-56c53144dced-end",
+    "commit": "28354102e20f017ae77dfbae713a0133b530fd01",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-9e21d877-fa82-4aac-8707-56c53144dced-start",
+    "commit": "5e4e54c08ded2fda03c994f427fe153165cf3642",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-bca5b9c2-7453-42fb-ae5d-a70d511d8e40-end",
+    "commit": "c5af9d940b09ec3711b91b21af60f4cd5c066c99",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-bca5b9c2-7453-42fb-ae5d-a70d511d8e40-start",
+    "commit": "a7938b3d89932c77f8ce02e1a2e55be3f5595d8f",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-c2487102-49cb-4ead-b376-d9de1d7b7049-end",
+    "commit": "89e3e2be04af680be8f2ee6e1877bf37f7bec5e9",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-c2487102-49cb-4ead-b376-d9de1d7b7049-start",
+    "commit": "dbb142200918fbd1e54b12c39fa76c983b7f17e1",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-c3164a2a-aee5-4e78-bc70-3e6672a972ae-end",
+    "commit": "bc4bacc5459ee7b83c512866ff27c114c3312a19",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-c3164a2a-aee5-4e78-bc70-3e6672a972ae-start",
+    "commit": "ed7af9a47a9b8dd79246fa0b4c9d68f634acb1d3",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-cf48e7aa-b159-40ee-b69e-5d0b0168aa2e-end",
+    "commit": "616e7f405d69653c43908fea0e76ee723335f4f2",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-cf48e7aa-b159-40ee-b69e-5d0b0168aa2e-start",
+    "commit": "df69c387c85404ce6767d4556a6bd5b775f06a9a",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-d5bba230-9d8f-4107-92a0-0c761a39b58f-end",
+    "commit": "8724516be511c3b82453a00c367bf3b3cbe00f9f",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-d5bba230-9d8f-4107-92a0-0c761a39b58f-start",
+    "commit": "0bebba82965c086df1f7ba2ed86312c88ada19ee",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-ded473c1-964d-4ca2-886e-c088a142f22f-end",
+    "commit": "2bc80b7313d9a06634acec187f3d7d62d72f9b66",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-ded473c1-964d-4ca2-886e-c088a142f22f-start",
+    "commit": "a5388b31827026e30132fb2f91b1f8bfdcdfb229",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-dee5c5e3-0444-441f-a169-ee22538d6a55-end",
+    "commit": "effd9c5f6bfc0c610edbd103c8a4695764d6fba2",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-dee5c5e3-0444-441f-a169-ee22538d6a55-start",
+    "commit": "d0c2a0bab5fad61973cdeaf9d56417a4cee85766",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-df3934d8-18c4-4068-8bb4-a0471ab5e86c-end",
+    "commit": "78138bd989c3bd859fd0201bde2f2d5b7e759cd4",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-df3934d8-18c4-4068-8bb4-a0471ab5e86c-start",
+    "commit": "22c2b7863e7c0398a4b0129ab0a7cd1ea4da6c6a",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-e42bdf3f-d051-44de-8c63-dc348d2810c2-end",
+    "commit": "794c5c5dd08e5123d63ffd2260007dc2bd21b0d8",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-e42bdf3f-d051-44de-8c63-dc348d2810c2-start",
+    "commit": "5c15f6090e19705b0a5f4c4d147fe80388522cdf",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-eb9b90bb-2914-4e62-bfe6-0567797cfcaa-end",
+    "commit": "52293ea86119fbc41e5cfd8a6954b8a20fa21fa0",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-eb9b90bb-2914-4e62-bfe6-0567797cfcaa-start",
+    "commit": "86ba5f5116b568cdea80300b678d37ad37635df4",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-ecc673b5-9e5f-4bb7-af1f-2134cc0f3d3b-end",
+    "commit": "cb9045b9b49af8e2a2c0585c538853cd88700fc9",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-ecc673b5-9e5f-4bb7-af1f-2134cc0f3d3b-start",
+    "commit": "b85e0f66df11b64696ed77ba1e31ea40c0749c4b",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-f1f67d8b-d7a2-4c59-87e7-e92eec51a13b-end",
+    "commit": "c642b708f0a72f7e41a36414215489699cd2e202",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-f1f67d8b-d7a2-4c59-87e7-e92eec51a13b-start",
+    "commit": "7c4f2f779ae526dfd3ebfa23d76a654972a94183",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-f2055784-55a2-4d3a-ac8b-f6d2490186a1-end",
+    "commit": "a4af4a7068ed399514047b6554f60ae0c541aaf7",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-f2055784-55a2-4d3a-ac8b-f6d2490186a1-start",
+    "commit": "888ff79560b220742821fbb8b24da908b6f9071f",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-ff347702-5f8c-4240-9976-e95bcfbb46c9-end",
+    "commit": "45bbff2f08df7b2008f2fb683eecc4e3dd655793",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-6d70b20e-e47a-49a9-a661-2768c197083f-turn-ff347702-5f8c-4240-9976-e95bcfbb46c9-start",
+    "commit": "b98a4653f6745992696526c80d7a038c50b67288",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-702d865c-6bfa-4a13-a5b3-682385f52511-turn-133021b5-9ee3-423f-955f-2f56c0707931-end",
+    "commit": "b497b5d697ccfa5e6798f821ee0151226d1ec3c3",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-702d865c-6bfa-4a13-a5b3-682385f52511-turn-133021b5-9ee3-423f-955f-2f56c0707931-start",
+    "commit": "e8a7e141fd40ce96820fea286ecbff4e5d0a9739",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-702d865c-6bfa-4a13-a5b3-682385f52511-turn-13d8d0ae-3612-44ae-b9f0-e8b9e0658a0f-end",
+    "commit": "b8931cc2fea813309c270a1553561c143096e093",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-702d865c-6bfa-4a13-a5b3-682385f52511-turn-13d8d0ae-3612-44ae-b9f0-e8b9e0658a0f-start",
+    "commit": "eac3fcd33939a63a2e1bda74976deed87937f7ab",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-702d865c-6bfa-4a13-a5b3-682385f52511-turn-277b38ca-bb30-44be-8769-32ee10b2a4ad-end",
+    "commit": "d63f48042464326ad2461c11d0705678e6ae6414",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-702d865c-6bfa-4a13-a5b3-682385f52511-turn-277b38ca-bb30-44be-8769-32ee10b2a4ad-start",
+    "commit": "5f3202921af88a53fe657182a42a521b762fff41",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-702d865c-6bfa-4a13-a5b3-682385f52511-turn-44813b8e-aad5-4d93-9259-ad33a10fcde2-end",
+    "commit": "345887c63907547fc334dfe68273b0f7d1a6af74",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-702d865c-6bfa-4a13-a5b3-682385f52511-turn-44813b8e-aad5-4d93-9259-ad33a10fcde2-start",
+    "commit": "e293af11abe95c49f35e385f2f0bce4bb2d06a39",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-702d865c-6bfa-4a13-a5b3-682385f52511-turn-a078c76e-4dc0-46cc-961c-2217e321c3e0-end",
+    "commit": "eac9762bff2e8699421e03a2d4f5bda768d50fa0",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-702d865c-6bfa-4a13-a5b3-682385f52511-turn-a078c76e-4dc0-46cc-961c-2217e321c3e0-start",
+    "commit": "e39257a7dd44a31f16a0c876ca053f43a8287cc6",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-702d865c-6bfa-4a13-a5b3-682385f52511-turn-a2a26d9a-1698-48f6-a43e-e0a81e0f08d1-end",
+    "commit": "9cd7fc849c6b921151e28083cb2aafe95c071ab6",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-702d865c-6bfa-4a13-a5b3-682385f52511-turn-a2a26d9a-1698-48f6-a43e-e0a81e0f08d1-start",
+    "commit": "2a57664e9059e047d29cfaaf1d18c28c047b80bd",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-702d865c-6bfa-4a13-a5b3-682385f52511-turn-a4c1d04f-e91f-4298-ad38-2af144dcf2b5-end",
+    "commit": "d3a68e36aac04e571ba71c1163435e4a7b9b0e39",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-702d865c-6bfa-4a13-a5b3-682385f52511-turn-a4c1d04f-e91f-4298-ad38-2af144dcf2b5-start",
+    "commit": "37da99286983bf9d9f16efafe1a957f4b775564c",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-702d865c-6bfa-4a13-a5b3-682385f52511-turn-c9559712-4e11-47b0-96be-dedf60cfb721-end",
+    "commit": "d5bcca21ee4b103666aa6aa46dcf15ec34cb29fe",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-702d865c-6bfa-4a13-a5b3-682385f52511-turn-c9559712-4e11-47b0-96be-dedf60cfb721-start",
+    "commit": "b0b0051a416019dbb8fba8944debfecc59885053",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-702d865c-6bfa-4a13-a5b3-682385f52511-turn-d5831058-6e1e-4294-8f51-c76ef855d373-end",
+    "commit": "62c3e11c07e1bc15497adc5555ddff2e330eceba",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-702d865c-6bfa-4a13-a5b3-682385f52511-turn-d5831058-6e1e-4294-8f51-c76ef855d373-start",
+    "commit": "e68ed290670092b8e7df6f712021e5b5a85349bd",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-702d865c-6bfa-4a13-a5b3-682385f52511-turn-dcd49e4a-e6cd-4d64-8733-b48a17ea0610-end",
+    "commit": "1ae856af77eceef0ec102cd35054b922138e71f8",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-702d865c-6bfa-4a13-a5b3-682385f52511-turn-dcd49e4a-e6cd-4d64-8733-b48a17ea0610-start",
+    "commit": "e43e766b01c9eb7405735a72a5c0ae35e23276f0",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-702d865c-6bfa-4a13-a5b3-682385f52511-turn-e086e88e-93f7-45db-8afb-dacf0d8e369a-start",
+    "commit": "a54731e333bb71618c400f72b40e2ee7e983a03a",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-702d865c-6bfa-4a13-a5b3-682385f52511-turn-f29ad007-d89f-4788-983c-a39fa43bcf29-end",
+    "commit": "b2a635969e1a026c79ab97993a0c8df80bdaabf8",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-702d865c-6bfa-4a13-a5b3-682385f52511-turn-f29ad007-d89f-4788-983c-a39fa43bcf29-start",
+    "commit": "c1d042abfe25f26a6bf25dcf28b2b83dec0d9416",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-803765d4-92fb-4997-a027-ada45d2722b3-turn-00bb65a5-7716-4cf9-96dc-57989fa2cdb2-end",
+    "commit": "d141e55190e524fabe5e4bcc7f90b9ef7c60aafa",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-803765d4-92fb-4997-a027-ada45d2722b3-turn-00bb65a5-7716-4cf9-96dc-57989fa2cdb2-start",
+    "commit": "b0cfff16fdae85cd10c5cbea118e8f823dac0535",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-803765d4-92fb-4997-a027-ada45d2722b3-turn-00d0c567-07d9-4d02-84bd-04955c376891-end",
+    "commit": "d24b913aab2fb5813f8261ede2094f1e7d7059be",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-803765d4-92fb-4997-a027-ada45d2722b3-turn-00d0c567-07d9-4d02-84bd-04955c376891-start",
+    "commit": "0e147e6ea00fd75705f8cb1a278f765c10bf34fd",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-803765d4-92fb-4997-a027-ada45d2722b3-turn-0328ced6-d371-4272-a183-78e93d63e4fd-end",
+    "commit": "f9425ab3fe3e5d9253c8c075ece60aa1a48e9928",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-803765d4-92fb-4997-a027-ada45d2722b3-turn-0328ced6-d371-4272-a183-78e93d63e4fd-start",
+    "commit": "b045e013547dddaf253246e6d90f95a3a14b3e14",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-803765d4-92fb-4997-a027-ada45d2722b3-turn-2d4e897c-db9e-4a86-8d88-74108fc59fd1-end",
+    "commit": "1148b9d79feb31112bf5564030762b38f8bf43b3",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-803765d4-92fb-4997-a027-ada45d2722b3-turn-2d4e897c-db9e-4a86-8d88-74108fc59fd1-start",
+    "commit": "7ac26fa1e46ec2c5d9289cedd0ad6241489a6ce4",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-803765d4-92fb-4997-a027-ada45d2722b3-turn-2e768bea-3f1b-4ed3-a477-f89a2ea47c20-end",
+    "commit": "a0579dac9f6f614d1980493c9d5d1bc4ab7e1604",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-803765d4-92fb-4997-a027-ada45d2722b3-turn-2e768bea-3f1b-4ed3-a477-f89a2ea47c20-start",
+    "commit": "aba12a35b27397b0a251410484695103f8fd39af",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-803765d4-92fb-4997-a027-ada45d2722b3-turn-38f46da9-1b11-49e8-9a93-184657ca1adf-end",
+    "commit": "ae44b1be19854049ccd193d9848f71c792a16806",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-803765d4-92fb-4997-a027-ada45d2722b3-turn-38f46da9-1b11-49e8-9a93-184657ca1adf-start",
+    "commit": "e15fe17e58849b86aa2f3e488c9c3e70589bf3f6",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-803765d4-92fb-4997-a027-ada45d2722b3-turn-3cf26463-0b8a-46c8-ba99-f7c722fb8c47-end",
+    "commit": "e5da4f263bd89d70ced6d78233ea1de904960a9b",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-803765d4-92fb-4997-a027-ada45d2722b3-turn-3cf26463-0b8a-46c8-ba99-f7c722fb8c47-start",
+    "commit": "032764368614d65bf858fe812e96894f3b24fc94",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-803765d4-92fb-4997-a027-ada45d2722b3-turn-6918014b-6ad4-47bd-b65a-3d2b61abd271-end",
+    "commit": "4613cda576195c8750b91316f73f572991d01041",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-803765d4-92fb-4997-a027-ada45d2722b3-turn-6918014b-6ad4-47bd-b65a-3d2b61abd271-start",
+    "commit": "d68d21ec7149a90dbf221340111aee930af7f010",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-803765d4-92fb-4997-a027-ada45d2722b3-turn-69c10614-ec83-4ab7-a728-0bf6cb1ff1e4-end",
+    "commit": "9999f9071649f1344694d125086e2d6cb9c4d3e3",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-803765d4-92fb-4997-a027-ada45d2722b3-turn-69c10614-ec83-4ab7-a728-0bf6cb1ff1e4-start",
+    "commit": "3bf165f354c9d6a293d4549229dd5f76d3242329",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-803765d4-92fb-4997-a027-ada45d2722b3-turn-81f31aad-38a0-4cc3-8039-e3dddac920a0-end",
+    "commit": "e3a493da5c8e766d26227fad3b97ce4571a138aa",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-803765d4-92fb-4997-a027-ada45d2722b3-turn-81f31aad-38a0-4cc3-8039-e3dddac920a0-start",
+    "commit": "1c8fc5242a381e53c54021e04b862b961454cd33",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-803765d4-92fb-4997-a027-ada45d2722b3-turn-93afce2f-f507-4163-9b3c-06b931f2c26c-end",
+    "commit": "4206b71e70dbbacc03edef3dcab5131a2f662b04",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-803765d4-92fb-4997-a027-ada45d2722b3-turn-93afce2f-f507-4163-9b3c-06b931f2c26c-start",
+    "commit": "82e43aeeb7966d17349f756036cac3069f99b2d5",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-803765d4-92fb-4997-a027-ada45d2722b3-turn-9d0c751e-6faf-46ac-b7af-681904f4a2ad-end",
+    "commit": "7044cc48e198f215b78e6f1267d9a142065c2fdc",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-803765d4-92fb-4997-a027-ada45d2722b3-turn-9d0c751e-6faf-46ac-b7af-681904f4a2ad-start",
+    "commit": "a8a592b8a74a3492fb2d4df8217b82ee14bb1d21",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-803765d4-92fb-4997-a027-ada45d2722b3-turn-a3cdf29b-bf12-4175-ab44-b35c6d497747-end",
+    "commit": "8ba108a55abc98589088bf40ccb68fd2a2a722c9",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-803765d4-92fb-4997-a027-ada45d2722b3-turn-a3cdf29b-bf12-4175-ab44-b35c6d497747-start",
+    "commit": "cfb92193bb9f1401be8067bf1ba54b47f734659b",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-803765d4-92fb-4997-a027-ada45d2722b3-turn-b45b301f-14c0-4723-a197-6df40a7882bc-end",
+    "commit": "e4cd29b3c5cb9279119e5a92ea7269ff0b997b83",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-803765d4-92fb-4997-a027-ada45d2722b3-turn-b45b301f-14c0-4723-a197-6df40a7882bc-start",
+    "commit": "e56f5ba2fafb9b10dcff1ff8194b0eb9f482ab50",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-803765d4-92fb-4997-a027-ada45d2722b3-turn-b8f1eded-a2b4-42b5-bb4b-918691f7288a-end",
+    "commit": "08b88dcaacf7cdd6f0734fcb95842f79f2aad691",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-803765d4-92fb-4997-a027-ada45d2722b3-turn-b8f1eded-a2b4-42b5-bb4b-918691f7288a-start",
+    "commit": "ada2e3ff4667c4d6bf5ab4add3d0c985592de79e",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-803765d4-92fb-4997-a027-ada45d2722b3-turn-c0a41edd-274e-43f9-a106-ba3e9717d5cf-end",
+    "commit": "f856f71c95d6626fdcb9633c287164197a01587b",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-803765d4-92fb-4997-a027-ada45d2722b3-turn-c0a41edd-274e-43f9-a106-ba3e9717d5cf-start",
+    "commit": "e32cadd527db222d30feb3ea59dfe5523e7048ff",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-803765d4-92fb-4997-a027-ada45d2722b3-turn-c3a8ccfc-cd73-4154-bcad-f8d63223a794-end",
+    "commit": "8592d0cc8f4da6b13d763bf7905ce522bedbf996",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-803765d4-92fb-4997-a027-ada45d2722b3-turn-c3a8ccfc-cd73-4154-bcad-f8d63223a794-start",
+    "commit": "d239a3ec35e1a60b73a444571ea9d52d1512ec1e",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-803765d4-92fb-4997-a027-ada45d2722b3-turn-c650deb1-34b8-4789-813b-dd72befc3f6d-end",
+    "commit": "7535c6b532fe45bd24fbe68bf18a59c62bff2960",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-803765d4-92fb-4997-a027-ada45d2722b3-turn-c650deb1-34b8-4789-813b-dd72befc3f6d-start",
+    "commit": "7de5b2e345526279ba476555e177a3d42e9ab40f",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-803765d4-92fb-4997-a027-ada45d2722b3-turn-e7564334-a409-4c07-b8a1-b8056ba4b500-end",
+    "commit": "23b32acc044c4fadb2ef7b3467d136a37a35f822",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-803765d4-92fb-4997-a027-ada45d2722b3-turn-e7564334-a409-4c07-b8a1-b8056ba4b500-start",
+    "commit": "99639f592dd1565ce3ca7055a243445fbe983273",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-803765d4-92fb-4997-a027-ada45d2722b3-turn-ecb3434c-ef62-436b-b54c-27c3ba317648-end",
+    "commit": "0fe1e7942f2cd585cbaf475dd03db5979c9310c1",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-803765d4-92fb-4997-a027-ada45d2722b3-turn-ecb3434c-ef62-436b-b54c-27c3ba317648-start",
+    "commit": "f3fd2e32cab41335b997fc0c11ca5630d88ef351",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-803765d4-92fb-4997-a027-ada45d2722b3-turn-ed3699ad-ccd1-47b6-a6b5-03624a870294-end",
+    "commit": "1d56f1f03561bddd7c6f3e12a0f9308623f5a1a4",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-803765d4-92fb-4997-a027-ada45d2722b3-turn-ed3699ad-ccd1-47b6-a6b5-03624a870294-start",
+    "commit": "747fa3d01cd51d527805779142aeaf64992025d8",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-80f80f3d-99b6-40e9-8375-71074a67dadc-turn-04302bba-e2cc-4be6-b15d-5cbb85550d91-end",
+    "commit": "f0cf290ca7ce8930a339d0caf9d025cafc8e22da",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-80f80f3d-99b6-40e9-8375-71074a67dadc-turn-04302bba-e2cc-4be6-b15d-5cbb85550d91-start",
+    "commit": "93d36f7ec0b4aa12eb63981013efecc38031a74b",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-80f80f3d-99b6-40e9-8375-71074a67dadc-turn-0c2234ca-1144-44c9-a148-6c3bf9b6baad-end",
+    "commit": "c6b20908c072197a3271409d3d6a1762f69dd2d8",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-80f80f3d-99b6-40e9-8375-71074a67dadc-turn-0c2234ca-1144-44c9-a148-6c3bf9b6baad-start",
+    "commit": "09a07d7f090497ac50ef751d2daf444584b96b51",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-80f80f3d-99b6-40e9-8375-71074a67dadc-turn-22d6ce03-3826-4a16-a29f-c4b038b305dd-end",
+    "commit": "af624c8f03e96e1108821c3ff7bdb0a8154a893c",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-80f80f3d-99b6-40e9-8375-71074a67dadc-turn-22d6ce03-3826-4a16-a29f-c4b038b305dd-start",
+    "commit": "7706b6fb9ea6f2bef877678a320a18322318eb17",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-80f80f3d-99b6-40e9-8375-71074a67dadc-turn-300c99c7-a204-4299-a05c-1dda04b5e6d3-end",
+    "commit": "9ebb5c35b026177b348512de215b2a5205c11a8e",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-80f80f3d-99b6-40e9-8375-71074a67dadc-turn-300c99c7-a204-4299-a05c-1dda04b5e6d3-start",
+    "commit": "d29749a7c9257d52cad2c9b41632674955eb3320",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-80f80f3d-99b6-40e9-8375-71074a67dadc-turn-413d5584-bf14-428f-b302-2d3d523c9456-end",
+    "commit": "6fb7d9bde65e402f723ca6a26bf44a561d8c32c6",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-80f80f3d-99b6-40e9-8375-71074a67dadc-turn-413d5584-bf14-428f-b302-2d3d523c9456-start",
+    "commit": "5a0c48585abbeb3e521b47f448b99668fedcc8c8",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-80f80f3d-99b6-40e9-8375-71074a67dadc-turn-43c9b252-0397-433c-83fe-91dedbdd7976-end",
+    "commit": "215db53391eda98c378879b8ae4ee209131ea424",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-80f80f3d-99b6-40e9-8375-71074a67dadc-turn-43c9b252-0397-433c-83fe-91dedbdd7976-start",
+    "commit": "a3113f4c6b521fc6c3528b8056725f33a3881169",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-80f80f3d-99b6-40e9-8375-71074a67dadc-turn-4a0c99f2-d0c5-47e6-9502-f6bd4a4ab98a-end",
+    "commit": "5c76ae9be05bb9fab6456bf1e12f7b407d43e113",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-80f80f3d-99b6-40e9-8375-71074a67dadc-turn-4a0c99f2-d0c5-47e6-9502-f6bd4a4ab98a-start",
+    "commit": "ebf42bd9e96dcebba3132d75fcf5212081c14f84",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-80f80f3d-99b6-40e9-8375-71074a67dadc-turn-4a1f732c-7d99-4885-b23c-22049dcc9e41-end",
+    "commit": "2ec8ff1954959691473e4fc9b79757e34a1a210f",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-80f80f3d-99b6-40e9-8375-71074a67dadc-turn-4a1f732c-7d99-4885-b23c-22049dcc9e41-start",
+    "commit": "7ce32b9d7b94276af90ef5a80807acf59b4328a6",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-80f80f3d-99b6-40e9-8375-71074a67dadc-turn-52ac4cd1-3886-48b0-b964-20abcbab8aa9-end",
+    "commit": "08d9bfd2421d25896eca9f2ca8c5ae05cbf3a525",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-80f80f3d-99b6-40e9-8375-71074a67dadc-turn-52ac4cd1-3886-48b0-b964-20abcbab8aa9-start",
+    "commit": "755ed77f803a432693f05c8d263fea2a310e1e86",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-80f80f3d-99b6-40e9-8375-71074a67dadc-turn-53a54c5e-8b71-4283-81cf-2c92344621a9-end",
+    "commit": "29fead7c3b545c2a593840c2fc1edfd352690e9f",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-80f80f3d-99b6-40e9-8375-71074a67dadc-turn-53a54c5e-8b71-4283-81cf-2c92344621a9-start",
+    "commit": "9067e32e12f6ff9aca005521bb826e6328282bcc",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-80f80f3d-99b6-40e9-8375-71074a67dadc-turn-6431a24e-95b3-4e6f-b6ab-1b9d6f5ae177-end",
+    "commit": "b53593bd50bd7a73728ef744afc9dde4f57f1dd2",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-80f80f3d-99b6-40e9-8375-71074a67dadc-turn-6431a24e-95b3-4e6f-b6ab-1b9d6f5ae177-start",
+    "commit": "59c36ea71a577041324645558bac9a97ed1d4963",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-80f80f3d-99b6-40e9-8375-71074a67dadc-turn-68e69341-9aeb-4da8-89ee-4fbe09225efd-end",
+    "commit": "780a0fe6953413f1d0905e178bdae74e3a56fa13",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-80f80f3d-99b6-40e9-8375-71074a67dadc-turn-68e69341-9aeb-4da8-89ee-4fbe09225efd-start",
+    "commit": "592c516fcb699aa3d6e013f77480276e37544a28",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-80f80f3d-99b6-40e9-8375-71074a67dadc-turn-73544fb8-af48-4a63-8d83-fd3231afbeaf-end",
+    "commit": "2133a66bb9c83ca8bb5838ad30a8591561063417",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-80f80f3d-99b6-40e9-8375-71074a67dadc-turn-73544fb8-af48-4a63-8d83-fd3231afbeaf-start",
+    "commit": "2c4b9cf408b2f4661a747ab0fc6776755dde117d",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-80f80f3d-99b6-40e9-8375-71074a67dadc-turn-7d5d8013-9b7d-4ec4-98ee-dd8aa5e0898b-end",
+    "commit": "130a56e4c9c791ce9bafca545846e8049516ad7b",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-80f80f3d-99b6-40e9-8375-71074a67dadc-turn-7d5d8013-9b7d-4ec4-98ee-dd8aa5e0898b-start",
+    "commit": "bde7f34c0f2223b43baaee9641b35d3bb634d49d",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-80f80f3d-99b6-40e9-8375-71074a67dadc-turn-7e0e5141-93cd-4985-80b6-8f23de65f849-end",
+    "commit": "f346db83a30da9e3c9644e7195994bfa329f12ac",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-80f80f3d-99b6-40e9-8375-71074a67dadc-turn-7e0e5141-93cd-4985-80b6-8f23de65f849-start",
+    "commit": "7139966d6634f8a39f72a36028ffa342db51a508",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-80f80f3d-99b6-40e9-8375-71074a67dadc-turn-a0b7999f-8a2d-41a8-90a8-0cae31dce154-end",
+    "commit": "5049af594f4419703516efa251da2816f21d444c",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-80f80f3d-99b6-40e9-8375-71074a67dadc-turn-a0b7999f-8a2d-41a8-90a8-0cae31dce154-start",
+    "commit": "f10b5e600480e3ba4e44898076f88603a7ecfd0a",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-80f80f3d-99b6-40e9-8375-71074a67dadc-turn-d50d8ec6-4b04-4cdf-8e04-10b412ef148f-end",
+    "commit": "a0593993a7c88134e058967ead0645201bbda87d",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-80f80f3d-99b6-40e9-8375-71074a67dadc-turn-d50d8ec6-4b04-4cdf-8e04-10b412ef148f-start",
+    "commit": "fd368889dadbb153e357680d4399cf7d04551bfc",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-80f80f3d-99b6-40e9-8375-71074a67dadc-turn-d8b5b86c-aa29-4e0c-8011-3501766e0854-end",
+    "commit": "49e590d3e89979b7585b14804e8d1faa33fffca2",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-80f80f3d-99b6-40e9-8375-71074a67dadc-turn-d8b5b86c-aa29-4e0c-8011-3501766e0854-start",
+    "commit": "53fb09530d9119c8fc8a1af7fe7998bf572b8d6b",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-80f80f3d-99b6-40e9-8375-71074a67dadc-turn-e6b5399b-917b-4ec1-a491-07d96ff22c60-end",
+    "commit": "136a3b4e9a3ba4080fd8111e4523cbac461a9359",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-80f80f3d-99b6-40e9-8375-71074a67dadc-turn-e6b5399b-917b-4ec1-a491-07d96ff22c60-start",
+    "commit": "6e052d6e70063faa93d5c79dd331d65bf56a49c9",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-80f80f3d-99b6-40e9-8375-71074a67dadc-turn-f3ec6028-e4b5-4852-b884-a668ca54e41c-end",
+    "commit": "6ae689476f696a6ed9082778436cb78b3dc40f95",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-80f80f3d-99b6-40e9-8375-71074a67dadc-turn-f3ec6028-e4b5-4852-b884-a668ca54e41c-start",
+    "commit": "1df8c27bd78950ef5cce576959c4bb4b737f9496",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-010b50d2-4f01-4897-9cc5-00ba06c221e8-end",
+    "commit": "35e64ba574b43eca40b3e74f2f178dd4704ff5b8",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-010b50d2-4f01-4897-9cc5-00ba06c221e8-start",
+    "commit": "d8c7220e3453262a68da0c2837aa467280e9ec9b",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-026621a6-31be-4f53-bd7e-04e0ee1d75f8-end",
+    "commit": "4002d1938854cc734967dfcd69fc74c8aca317ac",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-026621a6-31be-4f53-bd7e-04e0ee1d75f8-start",
+    "commit": "4a806bc52a9d265fa2335fedf30fabe9126e8c4f",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-03db32ca-fcbb-4309-9e2d-faf0ad5e3204-end",
+    "commit": "158b049488555a24b11de6ee5178fb7eb3511f07",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-03db32ca-fcbb-4309-9e2d-faf0ad5e3204-start",
+    "commit": "88f76ad0685da9a94e009ce940735f73491295fa",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-044746b9-815e-4a48-8bbe-ff09bfe9b12d-end",
+    "commit": "e23e73a190a90cd6cfbb76f1f334147fbbe34d61",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-044746b9-815e-4a48-8bbe-ff09bfe9b12d-start",
+    "commit": "57abfc34d223a4f31d2421289e671678962f3f06",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-06d0b6a9-1098-4540-8245-d91644349a99-end",
+    "commit": "8167f103bda542dc0307ab73c9952cd357055b45",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-06d0b6a9-1098-4540-8245-d91644349a99-start",
+    "commit": "55b602fa7aa09c3a8acc86471f03f4218d7117e9",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-076ac99c-4227-4b7d-818e-31f5f269f0b4-end",
+    "commit": "f2c5e57d5b7fd98458abe9b9f0f7bb941b7d74c5",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-076ac99c-4227-4b7d-818e-31f5f269f0b4-start",
+    "commit": "cf5c911b29f6a1d9a298c2e438cebfcd45aca6aa",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-08fffb5f-0c9f-4cee-96e8-0ae18fdd7585-end",
+    "commit": "e1bd61d8a2638737c3eefc210afc066503d993c9",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-08fffb5f-0c9f-4cee-96e8-0ae18fdd7585-start",
+    "commit": "b2a1a83e0584b936b6baeccb63f52e80f1939d3f",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-09ef6605-d38e-484d-9701-499ffae8af70-end",
+    "commit": "d1413d6ee373c24d6ec2f136602ac39d6c7c3a35",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-09ef6605-d38e-484d-9701-499ffae8af70-start",
+    "commit": "1148c789883a5adfa331596101f1c162f4700f04",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-0c2e6210-ff43-4665-a6e7-0bc981d88abf-end",
+    "commit": "b100214dca9c41cb91ea2f1b3cb2cb91e9b91640",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-0c2e6210-ff43-4665-a6e7-0bc981d88abf-start",
+    "commit": "66048fd45b34690afeeb83b38c3d29169d2db59d",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-0d16df66-ad1e-45dd-bc9c-7b8b7673a5bd-end",
+    "commit": "ba355f4047c4976c54a3f809066c704e4d0ed2d2",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-0d16df66-ad1e-45dd-bc9c-7b8b7673a5bd-start",
+    "commit": "6f9dbc0413aae413316b72bcd995b218cf4fc53a",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-119c14f3-b845-40e5-b04a-c68d03362801-end",
+    "commit": "7f0d8d16aaca602504bf58c890960a572876b8a7",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-119c14f3-b845-40e5-b04a-c68d03362801-start",
+    "commit": "457500958ae84476da0bdb7493d6bddbf3c4ae92",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-12a7380b-f697-4fcc-8bd1-3ac2202abd78-end",
+    "commit": "5e0f0a851767a86312c8587341acb4964162d4c9",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-12a7380b-f697-4fcc-8bd1-3ac2202abd78-start",
+    "commit": "a37bc72595d7f18cef7c2716e7bbc3dd7d66b26d",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-13c2ff8d-ad91-485f-ab35-6333d7fb56ad-end",
+    "commit": "f1dad6e98a5079d64b9de8fc04f33c02caf1f3c8",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-13c2ff8d-ad91-485f-ab35-6333d7fb56ad-start",
+    "commit": "8f8778f8d5e80277e0de9bb9f67f5b1120fb0370",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-147e538c-88cb-4a35-bd5a-41bd9fe14606-end",
+    "commit": "eb9ad025b92e5925ca41aae6ab568a454e0ec6a0",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-147e538c-88cb-4a35-bd5a-41bd9fe14606-start",
+    "commit": "956b1055e4d76fff5cc96800e31cf412fb72cf21",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-14cb6136-bacf-4b4f-9fc5-62a7594f3fa0-end",
+    "commit": "06238017e99595500206893f1ac9721e8775193e",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-14cb6136-bacf-4b4f-9fc5-62a7594f3fa0-start",
+    "commit": "24d444ceec6d5de157e72b80498af9126a0a170e",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-176e047b-4749-43bd-a718-bc251989b973-end",
+    "commit": "d2068b8ec3a36d190e3200b7929305adccfdefc2",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-176e047b-4749-43bd-a718-bc251989b973-start",
+    "commit": "f934f9d76dfdeb1fa8944974433010178b1499c3",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-17b19ec0-5c5f-48ef-9208-5ef06ae10f10-end",
+    "commit": "9310fd32022d0f76e4c6dfdf35846fa56b34eedc",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-17b19ec0-5c5f-48ef-9208-5ef06ae10f10-start",
+    "commit": "21e699f54e2ef78e2d1de2453263a10a943da8ae",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-17c46ce7-83bd-44c5-98da-0beec35e8980-end",
+    "commit": "f83de6e3384bbe0b3a205ae2caf2923774925388",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-17c46ce7-83bd-44c5-98da-0beec35e8980-start",
+    "commit": "e1f64762acca508e5a397c0b7a3f8659f279b3c3",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-18b80fc9-bdae-41c4-bfaa-1a9bf215516f-end",
+    "commit": "8497b5b4eb74e815d4ab1e7d3315be4c575b3881",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-18b80fc9-bdae-41c4-bfaa-1a9bf215516f-start",
+    "commit": "297697ad2e554241e01aac375f6fbc8c342af1f1",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-1935e16b-dc3f-4b6f-9401-62bb8d773a0c-end",
+    "commit": "397e235fc45dfa3d15dc467ade62be795b16005e",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-1935e16b-dc3f-4b6f-9401-62bb8d773a0c-start",
+    "commit": "aa525d6b9a1dbce59da834f0aa1db563c95038ea",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-1b28d737-f3b4-4d16-ac69-816fa1da1eeb-end",
+    "commit": "9754078cbdd7dbeee4ce8fcae86a5dea5df0a02d",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-1b28d737-f3b4-4d16-ac69-816fa1da1eeb-start",
+    "commit": "8fbb399591ad1f1476440951fc8a372d9324a7e2",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-1b75149a-6d29-47cc-8a7a-c03c9038572f-end",
+    "commit": "bf8a124494e70b1c0a87a4c52956a0739b918e19",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-1b75149a-6d29-47cc-8a7a-c03c9038572f-start",
+    "commit": "88b9a95fe486071eca8dfd590ed52991011e67bc",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-1e522c78-9486-4d79-b96a-0e07875f5ddf-end",
+    "commit": "e4be708f8fadf9ac48fc53bca0fd5e9b18e18da1",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-1e522c78-9486-4d79-b96a-0e07875f5ddf-start",
+    "commit": "0d7abef706fa91dfa370d8f39e0be74c8a417486",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-1e8f1e4c-c13d-44a4-be09-45d901c282ec-end",
+    "commit": "9cf2db1807dd2014eab0785767af3ec831304231",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-1e8f1e4c-c13d-44a4-be09-45d901c282ec-start",
+    "commit": "b0d290cc4724f00e68e2db3ef389c08f351379f4",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-1e9d89fa-cb50-4ae2-b8d3-f1aa93ea63b8-end",
+    "commit": "da4cf9975365a474f4b0b018ad277c8fc0b7e5bf",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-1e9d89fa-cb50-4ae2-b8d3-f1aa93ea63b8-start",
+    "commit": "f1ce6516ded0911bb50bcd3aa94f69c3c409e0f7",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-2564c871-fba5-4248-8140-8489af290b5c-end",
+    "commit": "fc7a64d772d07066ba650831310114b1c75601e5",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-2564c871-fba5-4248-8140-8489af290b5c-start",
+    "commit": "1ae9cd74b7d0ff18862eff3f97427276b62a56e7",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-265d9bc7-a408-4f71-ad3b-d0d33cfa1a31-end",
+    "commit": "47e3d8b5e22a6c3a7157cfed19b3c760ddaf1316",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-265d9bc7-a408-4f71-ad3b-d0d33cfa1a31-start",
+    "commit": "0c5ce2e351d9412be3f46407fe2ced10a1395131",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-38a48c58-7e8c-468d-9039-cec0f3e3e42b-end",
+    "commit": "44c9ac1befe5b4c9a52003da2764df191e7331ad",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-38a48c58-7e8c-468d-9039-cec0f3e3e42b-start",
+    "commit": "61be94ad81b9405bd57c5bf44c54a06fed81537c",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-3a0de7d4-b9ae-4ed0-a68b-d03ee636993e-end",
+    "commit": "96aa53bc1ae19c284bc7907ca5aba7ca2cec8035",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-3a0de7d4-b9ae-4ed0-a68b-d03ee636993e-start",
+    "commit": "6c91fc46d515252758f426fad944f08724f6f238",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-3b85dcd4-027e-4285-9b32-7c9ad7f53113-end",
+    "commit": "e93cf39da7578395a62f2b503e8087b467f4e2dd",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-3b85dcd4-027e-4285-9b32-7c9ad7f53113-start",
+    "commit": "61b1e8ef024deedd6aa11d86b9a89467061d6acf",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-3f657703-51b4-42b4-9568-2f103b882bd8-end",
+    "commit": "fe6a1e16fb060d3135e86063c72b613b73bd2a1a",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-3f657703-51b4-42b4-9568-2f103b882bd8-start",
+    "commit": "3415926b810f17702411c1fc88c146fbf8a573c9",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-40cdb793-93ed-4553-bace-2fabc44d373d-end",
+    "commit": "347edb65e5b11df6c6f8ac08863142b23c4cb002",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-40cdb793-93ed-4553-bace-2fabc44d373d-start",
+    "commit": "de978b442d5575888139437464a99b6e9b390c06",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-42162e0a-31d6-4e0c-a3c3-f0026a10423c-end",
+    "commit": "48f17b49581bc698df9ed8965b3db8d0c607d622",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-42162e0a-31d6-4e0c-a3c3-f0026a10423c-start",
+    "commit": "15a010f5d867c0f585aa287f441314633f9a5684",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-46664109-09db-406a-b386-92a5c75be79f-end",
+    "commit": "19f74ad3d16234a49188226fcb74ab855a243c98",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-46664109-09db-406a-b386-92a5c75be79f-start",
+    "commit": "0c661713840080006bfb42f88504ee86d858228d",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-47ba7149-c51c-4bf1-ad5c-361e95f07f12-end",
+    "commit": "66af06e5d2bc7c67819f9183bcd9d630b6026eac",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-47ba7149-c51c-4bf1-ad5c-361e95f07f12-start",
+    "commit": "bb08e57cdd215f95f18725d2089e2afded6068b2",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-4806b8c2-ae2a-42ab-a7d1-6a731a4a07df-end",
+    "commit": "f2a24dfc2b0ab345e8cda5aec94c6316c07cb72f",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-4806b8c2-ae2a-42ab-a7d1-6a731a4a07df-start",
+    "commit": "bc2775cc764719e75794130daae09795de1c79be",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-490c28d9-1b4e-4bc1-a4f0-b6105754a39b-end",
+    "commit": "b7805af72fa40f20667e9986779b27ab155d038a",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-490c28d9-1b4e-4bc1-a4f0-b6105754a39b-start",
+    "commit": "c6f9e583feed2a01a817cc6353a640fb848b82fd",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-4ce32a38-61e5-4459-94b9-29ea7bb8ab2c-end",
+    "commit": "2893a045cb7b557b397f154d851f8114c737abe4",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-4ce32a38-61e5-4459-94b9-29ea7bb8ab2c-start",
+    "commit": "b3c1e5b5ed5ad33c27af50e5b94d4a98de634e1a",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-4d4ee1ac-63da-4370-87b3-51f0af6f6d86-end",
+    "commit": "06c0e9947831ff031008cff52a447311b7d2fd39",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-4d4ee1ac-63da-4370-87b3-51f0af6f6d86-start",
+    "commit": "1b126fa92884385eac29d10ad6008293aee63a61",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-4e574bad-f3d8-4eb5-a02c-4ad02a85cfa2-end",
+    "commit": "29475dfb700f63787e862d10a4bedbb4db285b74",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-4e574bad-f3d8-4eb5-a02c-4ad02a85cfa2-start",
+    "commit": "0f6cfbc450d605302eba0a10902e52acf81942c1",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-5ad5c551-cb1f-47e1-b5f5-50b634225a93-end",
+    "commit": "891a7fa7a96858163fe8055531e4795fd11f4593",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-5ad5c551-cb1f-47e1-b5f5-50b634225a93-start",
+    "commit": "e47df67b7b229d77c1993dcb848a7672cfd79344",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-5b609c08-fe95-41ea-b161-d1ce5e681957-end",
+    "commit": "8f17244616ecc0fa83123547690214a77b000cec",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-5b609c08-fe95-41ea-b161-d1ce5e681957-start",
+    "commit": "66834e4789e87d1fb35578d1ac17d7747aa79a99",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-5c4b212d-3397-4f03-bbe9-0d9078965b75-end",
+    "commit": "493d18005be461cf43c6410b04b1517b5c7e64d4",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-5c4b212d-3397-4f03-bbe9-0d9078965b75-start",
+    "commit": "76874b568a0bc6123dbcf111f39907c560421760",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-5c782990-de85-42d3-beec-66e5fab97056-end",
+    "commit": "5352f77812fef0f4560fb4dc1fcdfbb43ee428a5",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-5c782990-de85-42d3-beec-66e5fab97056-start",
+    "commit": "27b89fe9542c0aa2802c551c1e89ab88a19642ef",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-5c93178a-85f8-4e9f-b328-6171873af59a-end",
+    "commit": "0d548abd6a553fdd89662a6f948d770495466780",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-5c93178a-85f8-4e9f-b328-6171873af59a-start",
+    "commit": "51ef652c228d9788daef9ab4140f1d262606ea9f",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-68b51f27-837c-42cd-93ee-5aa02dc2447b-end",
+    "commit": "a31751711e5052d194ce42398ba7060fa4535218",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-68b51f27-837c-42cd-93ee-5aa02dc2447b-start",
+    "commit": "49647217f48311777ee24b0cd7b03986bc45be9f",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-6bf95ee2-991c-4276-a172-14c520f37cdf-end",
+    "commit": "15ac129560b9575391299c3cf3379b3644217bba",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-6bf95ee2-991c-4276-a172-14c520f37cdf-start",
+    "commit": "855fed8e1999d25cfc6bdbd72b1951d2cedc6682",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-6d27029d-e3fa-418e-8c77-2fd31432255d-end",
+    "commit": "f0ec7bb863d797cbe43fbd377c50dcae33c4eec9",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-6d27029d-e3fa-418e-8c77-2fd31432255d-start",
+    "commit": "e1b548d2d9c844101207e5bf8abae5971d6225d4",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-6f151085-ced8-4c14-b929-cc17538f8c3f-end",
+    "commit": "e00d1443e185c378152a4c578c22f1ec2a2e49bd",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-6f151085-ced8-4c14-b929-cc17538f8c3f-start",
+    "commit": "f43d93149f997fc73938c373978fc67b03bc720f",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-73cb63b3-cb50-4877-b17f-517753fda168-end",
+    "commit": "4f97a4812005f660999e83ee27c05b0977ccea53",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-73cb63b3-cb50-4877-b17f-517753fda168-start",
+    "commit": "d0122d015c674f6563c8f5fe38a1621e20d8284e",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-73dc3c95-ebed-43d4-a45a-ef4f285795a9-end",
+    "commit": "7660cd4356e157cf0519f83577988b576e1fdeb9",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-73dc3c95-ebed-43d4-a45a-ef4f285795a9-start",
+    "commit": "e7ba8e93e5ced222430ce0372ea9a32c2da67e26",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-7be6ebf1-78f2-413c-8867-fd914d42ab96-end",
+    "commit": "1d388367f8b9a6b4289a76f10c08c6032bb8a196",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-7be6ebf1-78f2-413c-8867-fd914d42ab96-start",
+    "commit": "649923a557fb234d807199ff6fca472c7b4f67bb",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-7ea9a138-81fb-4ef6-a82d-2613729e593f-end",
+    "commit": "3583a9b761b0de8e5de230f272e1ce31f46ddc95",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-7ea9a138-81fb-4ef6-a82d-2613729e593f-start",
+    "commit": "80979e84d3f135a3f0413089f3d14cab7a26c873",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-7f7e9c9e-b895-4fc7-9335-553889d6b7bd-end",
+    "commit": "0d3eb32ac6f7b3982ec50e88d0546891b8550479",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-7f7e9c9e-b895-4fc7-9335-553889d6b7bd-start",
+    "commit": "34b8eac614c93f3142ce5f8d923007cfbe9b8d30",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-82aab02f-cd7b-4602-a6c2-c1a81943c42f-end",
+    "commit": "4bba7a1a54dbe4d3843ee1a4a45e52d17570d23b",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-82aab02f-cd7b-4602-a6c2-c1a81943c42f-start",
+    "commit": "425c97aa51938243c3be14cee2123cfa621b0d7e",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-8484920e-13ef-4313-8567-6ebdb54060b6-end",
+    "commit": "46672f2831c34627e9193949d5385bc2b2d7877a",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-8484920e-13ef-4313-8567-6ebdb54060b6-start",
+    "commit": "183a36208a979c1a597ddb06a3b8c907e4bc1d26",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-87c3331b-0028-4e04-a4bd-fdee28ae5eae-end",
+    "commit": "5967dd53cbae7d7014ab89a973cca531f4b40587",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-87c3331b-0028-4e04-a4bd-fdee28ae5eae-start",
+    "commit": "d82b2d5c54104c61b9055fa27db4dfa0b9d3e3a1",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-8c315fad-1396-4085-9468-42b32161a181-end",
+    "commit": "c7a89bd1964d455445437872fa86e783a358de3c",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-8c315fad-1396-4085-9468-42b32161a181-start",
+    "commit": "bc49dce17e27dc19634c3f589c0f9000223946da",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-8ea12d7c-7c31-4360-ab53-03b162ce2380-end",
+    "commit": "2c8905f63b31c23c03be01dd8dc1e8e964d6b0fe",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-8ea12d7c-7c31-4360-ab53-03b162ce2380-start",
+    "commit": "f3873e1ebcf574f939c36a0f97633af77ea3c23b",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-8ee84088-43fc-4d53-afb5-7e67581aebeb-end",
+    "commit": "50e4f7ee101854e4a19afcf8ee91ef7e5af16151",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-8ee84088-43fc-4d53-afb5-7e67581aebeb-start",
+    "commit": "b42d07af5d5587aeed7bd213b1a74ef7bad48536",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-9012ea76-d32d-4d40-bb08-5c485f0afbf0-end",
+    "commit": "f5f149b0820b87cca74c60a19d1eb6c11232e9f1",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-9012ea76-d32d-4d40-bb08-5c485f0afbf0-start",
+    "commit": "e600d97aa1490646fee778d23b90e925c7f24071",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-9459ed21-ab3d-4fad-a5a6-0939f1089aeb-end",
+    "commit": "1a7b99e08c796b4b33c78e5e7ad9085d87d7ddd1",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-9459ed21-ab3d-4fad-a5a6-0939f1089aeb-start",
+    "commit": "6ba37a90c5bc33209a3989890d01972543d9da06",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-948eeac5-0577-4c17-93a5-93b9348eb16e-end",
+    "commit": "666a7ef5b54c2bdb1ca17b123af74d6d040d2b19",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-948eeac5-0577-4c17-93a5-93b9348eb16e-start",
+    "commit": "5cf1129e6022336d4300f6bc0564ba5710e7ef97",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-96470c64-fa1a-4832-9aff-0da896c3ff7c-end",
+    "commit": "534c4253e96082f4b09fa248001388b71460c8b2",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-96470c64-fa1a-4832-9aff-0da896c3ff7c-start",
+    "commit": "07f08cab6b119e5285d82525f3f03f13f675d8d1",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-9b7d2150-392a-4196-bb0a-c0b20be14c82-end",
+    "commit": "edd0890d0cabb2b2a791e297aa0c4dc3a2c12f29",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-9b7d2150-392a-4196-bb0a-c0b20be14c82-start",
+    "commit": "b054f1b469bbdf675fea1df7da756b5c99cf870c",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-a6127da0-0d4d-4169-8a0b-15597350613a-end",
+    "commit": "f3b0d87e6a8842fd06dfa2acbe1cbfaf9b1a0a32",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-a6127da0-0d4d-4169-8a0b-15597350613a-start",
+    "commit": "0b5770a80a3086df38d842555636ea4f5482b21d",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-b1646e82-14ca-457d-b7e7-7d8207c70325-end",
+    "commit": "b6929b6b294050d978a350f3774afaf71af1de3c",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-b1646e82-14ca-457d-b7e7-7d8207c70325-start",
+    "commit": "024897b0ac27b7b7ae1b2f148b7a90f770e10478",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-b65ef992-20e5-414a-8b84-b336e6781af7-end",
+    "commit": "4c4537d6c3ac046ed98fa7d312d263fea7eff15e",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-b65ef992-20e5-414a-8b84-b336e6781af7-start",
+    "commit": "a9acbb3d4cec4839cbbd974b68067ecc1ebd9d60",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-b8ba2807-36f7-42af-b7c5-e6f20bc355d5-end",
+    "commit": "7edec75e4dd2eb82eeef09d7577967fc9887a51a",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-b8ba2807-36f7-42af-b7c5-e6f20bc355d5-start",
+    "commit": "7584dd655f62caec12fee0665d8940509379036e",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-b929cfd9-a8d0-4564-887e-52056044fc36-end",
+    "commit": "cf0c9a873816974b04f891707a8aaa9c977aa303",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-b929cfd9-a8d0-4564-887e-52056044fc36-start",
+    "commit": "034828faab331e003f4606ff20ba0ae69132dce5",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-bd2cbb8d-19ae-437a-8606-6b2287120615-end",
+    "commit": "af1abc2612d4a38e3c67ac0f6a602649052569be",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-bd2cbb8d-19ae-437a-8606-6b2287120615-start",
+    "commit": "eeaaec63ba93efcb3482a4b781f704fa22982734",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-be609bf2-06dc-42d2-b61d-c431bb77b47f-end",
+    "commit": "b39be864c1e074859637104f97e42652b58e7559",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-be609bf2-06dc-42d2-b61d-c431bb77b47f-start",
+    "commit": "f766f2fc5ba40a6d0975d686cb1caf8cea1347f2",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-c038332c-9e4b-4205-b52f-4aae48d3f1dd-start",
+    "commit": "1cf4f860d4866762a7fd04b79697cdaa8330d55e",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-c8435b8b-0ef6-4b78-bfb3-110a81126908-end",
+    "commit": "40acd79d66dde0d4a817e8c1eb5e9e12361f0aeb",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-c8435b8b-0ef6-4b78-bfb3-110a81126908-start",
+    "commit": "edbc2a7d5b5a1764f97c18ad8c5d534ca02329d9",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-d0e3ee50-802b-4b11-b136-499759974d26-end",
+    "commit": "d75fe09cde3dd25bea47556f9a11f308a5c1a761",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-d0e3ee50-802b-4b11-b136-499759974d26-start",
+    "commit": "162f75d39eb59ccc91ff919a890278790384b12b",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-d6c9f5ce-6b7e-4a66-99e9-8108ab5ee809-end",
+    "commit": "2dff77c0ee615e340e71c06c3d5687f8e7bf23af",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-d6c9f5ce-6b7e-4a66-99e9-8108ab5ee809-start",
+    "commit": "4d4b4f68f22da5a826fd11c859b045f4e51161b0",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-d6d68a87-1be7-4b8b-a785-530b3a08c460-end",
+    "commit": "8391e22555d97643d8aaaa1a3faf68392b24c43d",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-d6d68a87-1be7-4b8b-a785-530b3a08c460-start",
+    "commit": "ebb4c6aefd70eca32ef1124bdb3c8f54c4381012",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-d6f37b12-314d-45b8-a923-d057b0718e8a-end",
+    "commit": "846a5ca3ffbbca528452f5d6becc2a1e4861bada",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-d6f37b12-314d-45b8-a923-d057b0718e8a-start",
+    "commit": "6340c5f6e1866ee234db3829d989503c71892b18",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-e1b36573-4b1e-4174-a95c-6000d6ce8af2-end",
+    "commit": "03e6899859dfd6e58021477aa30b7df41fba6bac",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-e1b36573-4b1e-4174-a95c-6000d6ce8af2-start",
+    "commit": "cf53ed8d4616b87f2a174ac229d61d84ff39a656",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-ef9538b7-6788-4b3c-ba68-dc2d3080a7a7-end",
+    "commit": "3f5b43631c780e9713df5faccf8edb9a6f9529eb",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-ef9538b7-6788-4b3c-ba68-dc2d3080a7a7-start",
+    "commit": "9cb3aeec6f2c76b02658f4b6a102355b12ca5267",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-f0258eaf-f280-4c28-9cea-bd12e9549da8-end",
+    "commit": "b954586bbb18ace7d203df902e8dc86bbdcca27c",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-a2d252c7-8105-4081-a63a-056c6c307acc-turn-f0258eaf-f280-4c28-9cea-bd12e9549da8-start",
+    "commit": "ebe2aed06185e2320ebc0cf4a7c077c48be60fc0",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-d69d2599-48a4-4ac1-b0c6-91315a73121e-turn-023c9345-bd44-416f-91a6-97fe55f8045c-end",
+    "commit": "50189fa12a387f1bb1492a140388197da29d61c4",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-d69d2599-48a4-4ac1-b0c6-91315a73121e-turn-023c9345-bd44-416f-91a6-97fe55f8045c-start",
+    "commit": "4a71678be13e33c62a2bac9863222fd016b76df5",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-d69d2599-48a4-4ac1-b0c6-91315a73121e-turn-0a882f0b-f188-4c6e-8866-762ac9928ab8-end",
+    "commit": "cbfccd6686108888fd8f2b1e19d0c8fa9fdbbe8c",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-d69d2599-48a4-4ac1-b0c6-91315a73121e-turn-0a882f0b-f188-4c6e-8866-762ac9928ab8-start",
+    "commit": "465ea4f8a51ca972d986c483266a04f330148101",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-d69d2599-48a4-4ac1-b0c6-91315a73121e-turn-24f120cd-0000-4388-8b4a-db1970ec56eb-end",
+    "commit": "5caf74115bc6c8755e0a20ec88eeb75196088dce",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-d69d2599-48a4-4ac1-b0c6-91315a73121e-turn-24f120cd-0000-4388-8b4a-db1970ec56eb-start",
+    "commit": "bcb34c8517ec6d82797741cb37a42ab3509dd889",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-d69d2599-48a4-4ac1-b0c6-91315a73121e-turn-353131a2-d8f0-4647-b9fe-dfbbb7643905-end",
+    "commit": "2bca482bf2e76781256790dbcc0278d354f797b2",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-d69d2599-48a4-4ac1-b0c6-91315a73121e-turn-353131a2-d8f0-4647-b9fe-dfbbb7643905-start",
+    "commit": "4ab864240ceb63467a0c8784eea8dbc541cb57da",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-d69d2599-48a4-4ac1-b0c6-91315a73121e-turn-3618d049-b4df-493d-baef-4ac6ad21704d-end",
+    "commit": "9506e806f1f4a3a522605694c78ccb62d55a0c55",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-d69d2599-48a4-4ac1-b0c6-91315a73121e-turn-3618d049-b4df-493d-baef-4ac6ad21704d-start",
+    "commit": "617e3050940fe509826d015d0c9d6d31df7c097e",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-d69d2599-48a4-4ac1-b0c6-91315a73121e-turn-37e35893-f039-4448-8751-b4b494064a57-end",
+    "commit": "eec26d4b3c2ea3cc3da08621560ac1070d0a13fa",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-d69d2599-48a4-4ac1-b0c6-91315a73121e-turn-37e35893-f039-4448-8751-b4b494064a57-start",
+    "commit": "a6f113b5114e804e975b01a89659a7dc6ff98e32",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-d69d2599-48a4-4ac1-b0c6-91315a73121e-turn-41d9ad02-09f1-440a-a0e6-143c94501005-end",
+    "commit": "75c34001c1069eccea78b3df881ddcab2639fb34",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-d69d2599-48a4-4ac1-b0c6-91315a73121e-turn-41d9ad02-09f1-440a-a0e6-143c94501005-start",
+    "commit": "2cd64fe836bb4e55f6988a349453cf8f6a93d17e",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-d69d2599-48a4-4ac1-b0c6-91315a73121e-turn-4942e46a-671b-4436-8b08-3948fe6a3ee9-end",
+    "commit": "64eaacaccf5fe76e8083b536981d34ad399ca158",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-d69d2599-48a4-4ac1-b0c6-91315a73121e-turn-4942e46a-671b-4436-8b08-3948fe6a3ee9-start",
+    "commit": "ea3a9fe7aa86dc6c26c50bbb60d11e44942df236",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-d69d2599-48a4-4ac1-b0c6-91315a73121e-turn-57df9202-3cd3-408e-9424-97e571fcfecb-end",
+    "commit": "77b60fef220d0f88cbc59465e1c4b039b8d5ad77",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-d69d2599-48a4-4ac1-b0c6-91315a73121e-turn-57df9202-3cd3-408e-9424-97e571fcfecb-start",
+    "commit": "201a06f4da68d04a290407a90a08784115455a06",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-d69d2599-48a4-4ac1-b0c6-91315a73121e-turn-6737cbde-00c6-411b-b5b2-4e010c990c03-end",
+    "commit": "f0899cda3d0a586652faf81fcf9b3a1cc48f65e5",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-d69d2599-48a4-4ac1-b0c6-91315a73121e-turn-6737cbde-00c6-411b-b5b2-4e010c990c03-start",
+    "commit": "f6924569ca531a15efa52702b7db57b64a15edae",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-d69d2599-48a4-4ac1-b0c6-91315a73121e-turn-70af8819-be41-4b6f-8750-d77608c2ebd6-end",
+    "commit": "5c1d079dfb2c2ee189800db6a06eda7e873c1173",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-d69d2599-48a4-4ac1-b0c6-91315a73121e-turn-70af8819-be41-4b6f-8750-d77608c2ebd6-start",
+    "commit": "845e38a7591092a0865b081cddb606a5f95fd904",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-d69d2599-48a4-4ac1-b0c6-91315a73121e-turn-75084f97-3c58-4611-8d48-4d14621dd85c-end",
+    "commit": "0144a070b1adfb1dae2f27238526d660fcfc22f1",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-d69d2599-48a4-4ac1-b0c6-91315a73121e-turn-75084f97-3c58-4611-8d48-4d14621dd85c-start",
+    "commit": "20251d6b5bf8b647b0ed674c86b60c357bfdccd1",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-d69d2599-48a4-4ac1-b0c6-91315a73121e-turn-77161b74-9aac-499c-ae0d-57a01c8b1e46-end",
+    "commit": "887c739d1884f7eea0f211b50395ea2e4938701e",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-d69d2599-48a4-4ac1-b0c6-91315a73121e-turn-77161b74-9aac-499c-ae0d-57a01c8b1e46-start",
+    "commit": "44a6fa00ce621c6b097db85307788e1fc2bb8da5",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-d69d2599-48a4-4ac1-b0c6-91315a73121e-turn-7da9ff55-c446-4a03-b76a-a98c8cefbc87-end",
+    "commit": "6a2d8eef964142f313723cb2e0d6d2487b5ced7d",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-d69d2599-48a4-4ac1-b0c6-91315a73121e-turn-7da9ff55-c446-4a03-b76a-a98c8cefbc87-start",
+    "commit": "7a7a5bbae7d4f25fb6cbf38e64abca70e09f72c4",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-d69d2599-48a4-4ac1-b0c6-91315a73121e-turn-9b174e0b-e4da-4115-8cc0-c92edf409a22-end",
+    "commit": "e2028ca7a4d894f652f8319a47cccd32856e2ac9",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-d69d2599-48a4-4ac1-b0c6-91315a73121e-turn-9b174e0b-e4da-4115-8cc0-c92edf409a22-start",
+    "commit": "d597ef04b6bef03d0f613202a03b884d446d90a8",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-d69d2599-48a4-4ac1-b0c6-91315a73121e-turn-a514ed61-9431-43da-9f0d-63234b9ae605-end",
+    "commit": "3cb15e1da64e24b042aac416766f87b9734f717b",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-d69d2599-48a4-4ac1-b0c6-91315a73121e-turn-a514ed61-9431-43da-9f0d-63234b9ae605-start",
+    "commit": "bab76b5c0ba9629ce65e3829a3946ee82dfd8ffe",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-d69d2599-48a4-4ac1-b0c6-91315a73121e-turn-acf818b7-11e1-47ac-bbb3-29761dd25647-end",
+    "commit": "8fc24bfb8e870a7a84901466b054ac8cf34f91af",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-d69d2599-48a4-4ac1-b0c6-91315a73121e-turn-acf818b7-11e1-47ac-bbb3-29761dd25647-start",
+    "commit": "aa147fb14baccbc4ba4cbba6bf5ad3e91f2afd24",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-d69d2599-48a4-4ac1-b0c6-91315a73121e-turn-d105a5df-35c3-483e-80f0-f120ec3b4b17-end",
+    "commit": "7aa0e2bc009d4e5fc2146ada5c040fd5b7a54c25",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-d69d2599-48a4-4ac1-b0c6-91315a73121e-turn-d105a5df-35c3-483e-80f0-f120ec3b4b17-start",
+    "commit": "c1d8db7a5f63d7a1d3358814e073da392e7957b1",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-d69d2599-48a4-4ac1-b0c6-91315a73121e-turn-d2fc57d7-101e-4031-815f-6c48a95e4d24-end",
+    "commit": "a2154634699f90205660771432d062811d5ccce4",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-d69d2599-48a4-4ac1-b0c6-91315a73121e-turn-d2fc57d7-101e-4031-815f-6c48a95e4d24-start",
+    "commit": "6ac046033fb6d20bbc215c166492ad2b491873f6",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-d69d2599-48a4-4ac1-b0c6-91315a73121e-turn-d56c21d2-071b-4afc-80db-3a4eeb57d668-end",
+    "commit": "2cd903611ea66dc841ec47c87e3a13a0cf8316ed",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-d69d2599-48a4-4ac1-b0c6-91315a73121e-turn-d56c21d2-071b-4afc-80db-3a4eeb57d668-start",
+    "commit": "94b499a092032df76eb6089a2c698ca4d39e2728",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-d69d2599-48a4-4ac1-b0c6-91315a73121e-turn-fc96da94-084b-44a7-a694-590f0a79c0ef-end",
+    "commit": "9941d5d77de848eac5342d6e3d307d2d228174d2",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "refs/conductor-checkpoints/session-d69d2599-48a4-4ac1-b0c6-91315a73121e-turn-fc96da94-084b-44a7-a694-590f0a79c0ef-start",
+    "commit": "c1e10eae57f67f5043a86cbb27c09f56c32bd62b",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "HEAD",
+    "commit": "f0393345a9f2301f713c3c4ff46785a18e9f3405",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "main-worktree/HEAD",
+    "commit": "85946c2f60768ab2dae23a5a36cd927662feef94",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "worktrees/TradingAgents1/HEAD",
+    "commit": "fc3040f5211c13288c0b624fa9810fbe209e680b",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "worktrees/TradingAgents/HEAD",
+    "commit": "d93c66bc11699e7440f61f4cce3bf60375c497df",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "worktrees/TradingAgents5/HEAD",
+    "commit": "afbd64f6e36602c0f403042a4fc94b3c4c79de5f",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "worktrees/TradingAgents2/HEAD",
+    "commit": "96ae9d74268be204af1a1b0ef1bc8fb69925da57",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "worktrees/TradingAgents3/HEAD",
+    "commit": "a649cce2c97442f80ab684b6a9c3bf8c519b9bee",
+    "preserved_in": "git-history.bundle"
+  },
+  {
+    "ref": "worktrees/TradingAgents4/HEAD",
+    "commit": "fb6d48cce83f0ec1df4f5fea6687275d26718189",
+    "preserved_in": "git-history.bundle"
+  }
+]

@@ -1,0 +1,19 @@
+{
+  "checked_at": "2026-09-16T02:28:05.554080+00:00",
+  "app": "tradagent",
+  "machine_count": 0,
+  "machine_states": [],
+  "process_groups_scaled_to_zero": [
+    "app",
+    "trader"
+  ],
+  "original_volumes_preserved": true,
+  "volumes": [
+    {
+      "id": "vol_vjygd6w6ye73dyov",
+      "name": "temporal_store",
+      "state": "created",
+      "attached_machine_id": null
+    }
+  ]
+}

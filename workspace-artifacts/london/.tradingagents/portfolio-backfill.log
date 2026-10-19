@@ -1,0 +1,9 @@
+=== DAY 2026-08-18 ===
+$BRK.B: possibly delisted; no timezone found
+$BRK.B: possibly delisted; no timezone found
+
+1 Failed download:
+['BRK.B']: possibly delisted; no timezone found
+HTTP Error 401: {"finance":{"result":null,"error":{"code":"Unauthorized","description":"Invalid Crumb"}}}
+failed to persist temporal LLM request; run invalidated
+failed to persist temporal LLM response; run invalidated

@@ -1,0 +1,136 @@
+I001 [*] Import block is un-sorted or un-formatted
+  --> tests/test_temporal_retrieval_bench.py:48:5
+   |
+47 |   def test_current_store_benchmark_uses_normalized_documents_without_legacy_fts(tmp_path):
+48 | /     from datetime import datetime, timezone
+49 | |     from tradingagents.temporal import TemporalStore
+   | |____________________________________________________^
+50 |
+51 |       root = tmp_path / "store"
+   |
+help: Organize imports
+   |
+48 |     from datetime import datetime, timezone
+49 +
+50 |     from tradingagents.temporal import TemporalStore
+   |
+
+F401 [*] `.models.TemporalDocument` imported but unused
+  --> tradingagents/temporal/store.py:28:5
+   |
+26 |     SearchManifest,
+27 |     SearchTraceRecord,
+28 |     TemporalDocument,
+   |     ^^^^^^^^^^^^^^^^
+29 |     TemporalSearchResponse,
+30 |     TemporalSearchResult,
+   |
+help: Remove unused import
+   |
+27 |     SearchTraceRecord,
+   -     TemporalDocument,
+28 |     TemporalSearchResponse,
+   -     TemporalSearchResult,
+29 |     ToolTraceRecord,
+   |
+
+F401 [*] `.models.TemporalSearchResult` imported but unused
+  --> tradingagents/temporal/store.py:30:5
+   |
+28 |     TemporalDocument,
+29 |     TemporalSearchResponse,
+30 |     TemporalSearchResult,
+   |     ^^^^^^^^^^^^^^^^^^^^
+31 |     ToolTraceRecord,
+32 |     canonical_json,
+   |
+help: Remove unused import
+   |
+27 |     SearchTraceRecord,
+   -     TemporalDocument,
+28 |     TemporalSearchResponse,
+   -     TemporalSearchResult,
+29 |     ToolTraceRecord,
+   |
+
+F401 [*] `.ranking.RANKER_VERSION` imported but unused
+  --> tradingagents/temporal/store.py:35:22
+   |
+33 |     request_key,
+34 | )
+35 | from .ranking import RANKER_VERSION, EligibleChunkIndex, build_eligible_index, rank
+   |                      ^^^^^^^^^^^^^^
+36 |
+37 | # Long enough to outlast a mirror batch's cluster refresh on a grown corpus
+   |
+help: Remove unused import
+   |
+34 | )
+   - from .ranking import RANKER_VERSION, EligibleChunkIndex, build_eligible_index, rank
+35 + from .ranking import EligibleChunkIndex, build_eligible_index
+36 |
+   |
+
+F401 [*] `.ranking.rank` imported but unused
+  --> tradingagents/temporal/store.py:35:80
+   |
+33 |     request_key,
+34 | )
+35 | from .ranking import RANKER_VERSION, EligibleChunkIndex, build_eligible_index, rank
+   |                                                                                ^^^^
+36 |
+37 | # Long enough to outlast a mirror batch's cluster refresh on a grown corpus
+   |
+help: Remove unused import
+   |
+34 | )
+   - from .ranking import RANKER_VERSION, EligibleChunkIndex, build_eligible_index, rank
+35 + from .ranking import EligibleChunkIndex, build_eligible_index
+36 |
+   |
+
+UP037 [*] Remove quotes from type annotation
+   --> tradingagents/temporal/store.py:140:28
+    |
+138 |             del self._thread_connections.connection
+139 |
+140 |     def __enter__(self) -> "TemporalStore":
+    |                            ^^^^^^^^^^^^^^^
+141 |         return self
+    |
+help: Remove quotes
+    |
+139 |
+    -     def __enter__(self) -> "TemporalStore":
+140 +     def __enter__(self) -> TemporalStore:
+141 |         return self
+    |
+
+SIM105 Use `contextlib.suppress(AttributeError, sqlite3.Error)` instead of `try`-`except`-`pass`
+   --> tradingagents/temporal/store.py:149:9
+    |
+147 |           # Tests and short-lived CLI commands often rely on object lifetime;
+148 |           # explicit close() remains the production lifecycle boundary.
+149 | /         try:
+150 | |             self.close()
+151 | |         except (AttributeError, sqlite3.Error):
+152 | |             pass
+    | |________________^
+153 |
+154 |       @contextmanager
+    |
+help: Replace `try`-`except`-`pass` with `with contextlib.suppress(AttributeError, sqlite3.Error): ...`
+
+SIM115 Use a context manager for opening files
+   --> tradingagents/temporal/store.py:164:18
+    |
+162 |         self.root.mkdir(parents=True, exist_ok=True)
+163 |         lock_path = self.root / "mutator.lock"
+164 |         handle = open(lock_path, "a+")
+    |                  ^^^^
+165 |         try:
+166 |             fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+    |
+
+Found 8 errors.
+[*] 6 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).

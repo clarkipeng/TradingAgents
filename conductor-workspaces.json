@@ -1,0 +1,24 @@
+[
+  {
+    "id": "32f09c1a-7d30-46fa-96d8-0708694c7af0",
+    "repository_id": "88c0ab47-e322-4478-9bc0-d3798c4f1b51",
+    "directory_name": "calgary",
+    "workspace_name": null,
+    "workspace_path": "/Users/clarkpeng/conductor/workspaces/TradingAgents/calgary",
+    "branch": "add-x-api-key",
+    "state": "archived",
+    "derived_status": "in-progress",
+    "active_session_id": "a2d252c7-8105-4081-a63a-056c6c307acc"
+  },
+  {
+    "id": "108eed06-8f17-41fc-9d8e-de1edd73874e",
+    "repository_id": "88c0ab47-e322-4478-9bc0-d3798c4f1b51",
+    "directory_name": "london",
+    "workspace_name": null,
+    "workspace_path": "/Users/clarkpeng/conductor/workspaces/TradingAgents/london",
+    "branch": "agent-trading-simulation-backtest",
+    "state": "ready",
+    "derived_status": "in-progress",
+    "active_session_id": "702d865c-6bfa-4a13-a5b3-682385f52511"
+  }
+]

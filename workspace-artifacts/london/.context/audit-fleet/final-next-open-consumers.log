@@ -1,0 +1,18 @@
+..................F............................                          [100%]
+=================================== FAILURES ===================================
+______ test_returns_do_not_silently_bridge_legacy_and_next_open_policies _______
+
+tmp_path = PosixPath('/private/var/folders/bb/q9_4j2pn5w53238kcp71jh8m0000gn/T/pytest-of-clarkpeng/pytest-152/test_returns_do_not_silently_b0')
+
+    def test_returns_do_not_silently_bridge_legacy_and_next_open_policies(tmp_path):
+        from tradingagents.portfolio_run import portfolio_report
+    
+        with TemporalStore(tmp_path) as store:
+>           claim = store.claim_portfolio_day("2026-09-03", "legacy")
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           TypeError: TemporalStore.claim_portfolio_day() missing 1 required keyword-only argument: 'claimed_at'
+
+tests/test_portfolio_next_open_lifecycle.py:195: TypeError
+=========================== short test summary info ============================
+FAILED tests/test_portfolio_next_open_lifecycle.py::test_returns_do_not_silently_bridge_legacy_and_next_open_policies
+1 failed, 46 passed in 2.32s

@@ -1,0 +1,14 @@
+{
+  "coverage": 0.13333333333333333,
+  "day": "2026-09-02",
+  "elapsed_seconds": 940.572,
+  "failures": [
+    "BRK.B: NoMarketDataError",
+    "research pool: deadline_exceeded"
+  ],
+  "reason": "deadline_exceeded",
+  "research_call_count": 9,
+  "scenario_id": "portfolio-2026-09-02",
+  "skipped": "policy breach",
+  "status": "failed_unsealed"
+}

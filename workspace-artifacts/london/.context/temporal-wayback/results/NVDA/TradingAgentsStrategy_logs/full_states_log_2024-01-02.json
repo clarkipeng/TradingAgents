@@ -1,0 +1,25 @@
+{
+    "company_of_interest": "NVDA",
+    "trade_date": "2024-01-02",
+    "market_report": "",
+    "sentiment_report": "",
+    "news_report": "Historical archive news report",
+    "fundamentals_report": "",
+    "investment_debate_state": {
+        "bull_history": "\nBull Analyst: HOLD",
+        "bear_history": "\nBear Analyst: ",
+        "history": "\nBull Analyst: HOLD\nBear Analyst: ",
+        "current_response": "HOLD",
+        "judge_decision": "HOLD"
+    },
+    "trader_investment_decision": "Historical archive news report",
+    "risk_debate_state": {
+        "aggressive_history": "\nAggressive Analyst: HOLD",
+        "conservative_history": "\nConservative Analyst: ",
+        "neutral_history": "\nNeutral Analyst: Historical archive news report",
+        "history": "\nAggressive Analyst: HOLD\nConservative Analyst: \nNeutral Analyst: Historical archive news report",
+        "judge_decision": ""
+    },
+    "investment_plan": "HOLD",
+    "final_trade_decision": ""
+}

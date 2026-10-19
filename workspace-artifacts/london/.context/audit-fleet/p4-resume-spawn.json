@@ -1,0 +1,67 @@
+{
+  "workspace": {
+    "id": "bf9a5eae-6447-4333-8ea2-a296f2fb4676",
+    "task_id": null,
+    "container_ref": null,
+    "branch": "cdt/bf9a-ta-luna-p4-resum",
+    "setup_completed_at": null,
+    "created_at": "2026-09-08T00:30:13.869Z",
+    "updated_at": "2026-09-08T00:30:13.869Z",
+    "archived": false,
+    "pinned": false,
+    "pin_order": null,
+    "name": "ta-luna-p4-resume",
+    "worktree_deleted": false,
+    "use_worktree": true,
+    "source": "user"
+  },
+  "execution_process": {
+    "id": "48297a2a-096c-454a-b2df-1aeceead0ccc",
+    "session_id": "a8e7b01c-84cc-4b89-bc60-384a8a86d8f5",
+    "run_reason": "codingagent",
+    "executor_action": {
+      "typ": {
+        "type": "CodingAgentInitialRequest",
+        "prompt": "You are Luna P4 storage/retrieval owner. Work in your isolated worktree from\nexact base 543a370 (branch cdt/8224-ta-audit-lead). Own only\ntradingagents/temporal/store.py, tradingagents/temporal/retriever.py, directly\nrelated local tests, and new directly related tooling. Implement the remaining\nP4 findings 20, 23, 24, 26, 31: versioned pinned retrieval generation/candidate\nsemantics, safe legacy readers, non-destructive retention/compaction contracts,\nand long-work-outside-lock publication. Do not alter portfolio, graph, CLI,\nbudget, cloud, poller, London files, production state, providers, or .env.\nPreserve old seals/readers/digest bytes. Use local fixtures only and add focused\nproof at real consumers. Request any required CLI interface from lead in one\nshort message; do not edit CLI. Commit coherent slices, write a <=600-word\n.context/audit-fleet/luna-p4-successor-handoff.md with SHAs/tests/residuals,\nand terminal-report the handoff path. No broad audit or hidden subagents.\n\nRead current London AGENTS.md and taste.md first. Parent Terra owns integration. Enable terminal parent signals and report complete slices using sightmesh parent. Do not stop after partial checkpoint if assigned local work remains. Use London .venv/bin/python from your worktree with PYTHONPATH=$PWD. Current root budget contract is London .context/audit-fleet/budget-contract.md.\n\n## Local agent coordination\n\n- Use `sightmesh peers` and `sightmesh peek @agent` for compact fleet awareness.\n- Use `sightmesh steer @agent --message \"...\"` for immediate peer contact. It interrupts only that agent's active turn.\n- Leads use `sightmesh inbox` and one `sightmesh respond --responses '...'` call for pending requests across the fleet.\n- Contact your launcher with `sightmesh parent --message \"STATUS: concise details\"` when blocked, when a decision is needed, and when complete.\n- Batch independent read-only tool calls and all currently known independent questions. Keep dependent or destructive actions sequential.\n- Do not use hidden or native subagents.",
+        "prompt_kind": "user",
+        "executor_config": {
+          "executor": "CODEX",
+          "model_id": "gpt-5.6-luna",
+          "reasoning_id": "medium",
+          "permission_policy": "BYPASS_PERMISSIONS"
+        },
+        "working_dir": null
+      },
+      "next_action": null,
+      "selected_provider_id": "00000000-0000-0000-0000-000000000001",
+      "selected_model_id": "gpt-5.6-luna"
+    },
+    "status": "running",
+    "exit_code": null,
+    "dropped": false,
+    "started_at": "2026-09-08T00:30:15.926783Z",
+    "completed_at": null,
+    "created_at": "2026-09-08T00:30:15.926783Z",
+    "updated_at": "2026-09-08T00:30:15.926783Z"
+  },
+  "lease": {
+    "owner": "cdesktop-spawn:ta-luna-p4-resume",
+    "repo_path": "/Users/clarkpeng/Documents/Code/TradingAgents",
+    "worktree_path": "/Users/clarkpeng/.local/share/sightmesh/.cdesktop-workspaces/bf9a-ta-luna-p4-resum/TradingAgents",
+    "created_at": 1788827416.8477418,
+    "expires_at": 1788841816.8477418,
+    "age_seconds": 0,
+    "expired": false,
+    "hostname": "MacBook-Pro.local",
+    "workspace_id": "bf9a5eae-6447-4333-8ea2-a296f2fb4676",
+    "session_id": "a8e7b01c-84cc-4b89-bc60-384a8a86d8f5"
+  },
+  "profile": "codex-luna",
+  "base_ref": "cdt/8224-ta-audit-lead",
+  "parent": {
+    "child_session_id": "a8e7b01c-84cc-4b89-bc60-384a8a86d8f5",
+    "child_workspace_id": "bf9a5eae-6447-4333-8ea2-a296f2fb4676",
+    "parent_session_id": "df867712-0bb8-43b5-87cd-92bb3f3127d5",
+    "parent_workspace_id": "822403cb-f787-4151-84e6-ccfc15084873"
+  }
+}

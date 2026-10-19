@@ -1,0 +1,34 @@
+Traceback (most recent call last):
+  File "/Users/clarkpeng/.local/share/uv/tools/sightmesh/lib/python3.13/site-packages/sightmesh/cdesktop.py", line 308, in request
+    with open_transport(urlopen, request, timeout=15) as response:
+         ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/clarkpeng/.local/share/uv/tools/sightmesh/lib/python3.13/site-packages/sightmesh/fence.py", line 26, in open_transport
+    return opener(*args, **kwargs)
+  File "/Users/clarkpeng/.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/urllib/request.py", line 189, in urlopen
+    return opener.open(url, data, timeout)
+           ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/Users/clarkpeng/.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/urllib/request.py", line 495, in open
+    response = meth(req, response)
+  File "/Users/clarkpeng/.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/urllib/request.py", line 604, in http_response
+    response = self.parent.error(
+        'http', request, response, code, msg, hdrs)
+  File "/Users/clarkpeng/.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/urllib/request.py", line 533, in error
+    return self._call_chain(*args)
+           ~~~~~~~~~~~~~~~~^^^^^^^
+  File "/Users/clarkpeng/.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/urllib/request.py", line 466, in _call_chain
+    result = func(*args)
+  File "/Users/clarkpeng/.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/urllib/request.py", line 613, in http_error_default
+    raise HTTPError(req.full_url, code, msg, hdrs, fp)
+urllib.error.HTTPError: HTTP Error 500: Internal Server Error
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/clarkpeng/conductor/workspaces/TradingAgents/london/.context/audit-fleet/spawn_targeted.py", line 22, in <module>
+    r=c.spawn_workspace(name=name,repo_path=repo,target_branch='audit-resume-base-543a370',executor=profile.executor,prompt=(root/f'luna-{kind}-resume.md').read_text(),use_worktree=True,permission_policy='BYPASS_PERMISSIONS',model=profile.model,reasoning=profile.reasoning,provider_id=profile.provider_id)
+  File "/Users/clarkpeng/.local/share/uv/tools/sightmesh/lib/python3.13/site-packages/sightmesh/cdesktop.py", line 801, in spawn_workspace
+    return self.request("POST", "/workspaces/start", payload)
+           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/clarkpeng/.local/share/uv/tools/sightmesh/lib/python3.13/site-packages/sightmesh/cdesktop.py", line 315, in request
+    raise CdesktopError(message) from exc
+sightmesh.cdesktop.CdesktopError: POST /workspaces/start failed: HTTP 500: {"success":false,"data":null,"error_data":null,"message":"An internal error occurred. Please try again."}

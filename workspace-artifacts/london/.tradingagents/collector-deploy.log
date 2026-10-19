@@ -1,0 +1,138 @@
+collector deploy owns the shared remote lock for tradagent
+Validating fly.toml
+[32m✓[0m Configuration is valid
+
+==> Verifying app config
+Validating fly.toml
+[32m✓[0m Configuration is valid
+--> Verified app config
+==> Building image
+[33mWARN[0m ignoring /Users/clarkpeng/conductor/workspaces/TradingAgents/london/Dockerfile, and using /Users/clarkpeng/conductor/workspaces/TradingAgents/london/Dockerfile.poller (from fly.toml)
+Waiting for depot builder...
+
+==> Building image with Depot
+--> build:  (​)
+#1 [internal] load build definition from Dockerfile.poller
+#1 transferring dockerfile: 37B 0.1s
+#1 transferring dockerfile: 2.70kB 0.3s done
+#1 DONE 0.3s
+
+#2 [internal] load metadata for docker.io/library/python:3.12-slim@sha256:646fb0bca3dd3ea1bcc6feb72c17ed16eed6e10cffc732fcc1478bd3e7f02d7b
+#2 DONE 0.3s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 33B 0.1s
+#3 transferring context: 713B 0.3s done
+#3 DONE 0.3s
+
+#4 [builder 1/9] FROM docker.io/library/python:3.12-slim@sha256:646fb0bca3dd3ea1bcc6feb72c17ed16eed6e10cffc732fcc1478bd3e7f02d7b
+#4 resolve docker.io/library/python:3.12-slim@sha256:646fb0bca3dd3ea1bcc6feb72c17ed16eed6e10cffc732fcc1478bd3e7f02d7b done
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 355.85kB 0.8s done
+#5 DONE 0.8s
+
+#6 [builder 2/9] RUN python -m venv /opt/venv
+#6 CACHED
+
+#7 [builder 4/9] COPY constraints-poller.txt ./
+#7 CACHED
+
+#8 [builder 5/9] RUN pip install --no-cache-dir --require-hashes -r constraints-poller.txt
+#8 CACHED
+
+#9 [builder 3/9] WORKDIR /build
+#9 CACHED
+
+#10 [builder 6/9] COPY pyproject.toml README.md ./
+#10 CACHED
+
+#11 [builder 7/9] COPY tradingagents ./tradingagents
+#11 DONE 0.1s
+
+#12 [builder 8/9] COPY cli ./cli
+#12 DONE 0.0s
+
+#13 [builder 9/9] RUN pip install --no-cache-dir --no-deps --no-build-isolation ".[poller]"
+#13 1.422 Processing /build
+#13 1.425   Preparing metadata (pyproject.toml): started
+#13 2.239   Preparing metadata (pyproject.toml): finished with status 'done'
+#13 2.246 Building wheels for collected packages: tradingagents
+#13 2.247   Building wheel for tradingagents (pyproject.toml): started
+#13 3.256   Building wheel for tradingagents (pyproject.toml): finished with status 'done'
+#13 3.257   Created wheel for tradingagents: filename=tradingagents-0.3.1-py3-none-any.whl size=509180 sha256=01b570d17ca0de18df697ed85807d2d903cda681043bfdd970d99e67d0f41f44
+#13 3.257   Stored in directory: /tmp/pip-ephem-wheel-cache-31bp0qle/wheels/7f/5c/67/61a4ca28ccbc7df61f55a044560f100aa81c66ef20585de495
+#13 3.266 Successfully built tradingagents
+#13 3.266 Installing collected packages: tradingagents
+#13 3.662 Successfully installed tradingagents-0.3.1
+#13 DONE 3.8s
+
+#4 [builder 1/9] FROM docker.io/library/python:3.12-slim@sha256:646fb0bca3dd3ea1bcc6feb72c17ed16eed6e10cffc732fcc1478bd3e7f02d7b
+#4 CACHED
+
+#14 [stage-1 2/4] COPY --from=builder /opt/venv /opt/venv
+#14 DONE 8.2s
+
+#15 [stage-1 3/4] RUN printf '%s' "bf96d3e3eceb6611eec17607a9c1b0703855af9a" | grep -Eq '^[0-9a-f]{40}$'  && printf '%s' "2ef7b65dbf25c8db15f5ff1caa7c211b" | grep -Eq '^[0-9a-f]{32}$'  && install -d -m 0755 /opt/tradingagents  && printf '%s\n' "bf96d3e3eceb6611eec17607a9c1b0703855af9a" > /opt/tradingagents/REVISION  && chmod 0444 /opt/tradingagents/REVISION  && useradd --create-home appuser  && install -d -m 0755 -o appuser -g appuser /home/appuser/.tradingagents
+#15 DONE 0.5s
+
+#16 [stage-1 4/4] WORKDIR /home/appuser/app
+#16 DONE 0.0s
+
+#17 exporting to image
+#17 exporting layers
+#17 exporting layers 8.7s done
+#17 exporting manifest sha256:b4139748afc9fefa730a86fb3068ba8fd50125f73a2666551a14563f40862127 done
+#17 exporting config sha256:931024ec3c7ddb298ac2d60a5adc0e39333184dc1b5fa182fe8e3b27aff75526 done
+#17 pushing layers for registry.fly.io/tradagent:git-bf96d3e3eceb6611eec17607a9c1b0703855af9a-2ef7b65dbf25c8db15f5ff1caa7c211b@sha256:b4139748afc9fefa730a86fb3068ba8fd50125f73a2666551a14563f40862127
+#17 pushing layer sha256:931024ec3c7ddb298ac2d60a5adc0e39333184dc1b5fa182fe8e3b27aff75526
+#17 pushing layer sha256:c80cc3792a8c4b923b5d079c39547d30558ba61727f89441bab0808ce39f885c
+#17 pushing layer sha256:4d7ab0923dee0356f386e68dcabc1114de22363c5be18d90dbecb2c9868a6254
+#17 pushing layer sha256:275b48cc872ea040647d137bdc86efa2249531c60d60a4db6f60864af4c9b896
+#17 pushing layer sha256:c00b7c1f3dfed88da571e3e4852e4584457880cf3e00c4743247c7e427dde637 0.1s done
+#17 pushing layer sha256:40f0472a2ef29486f782e1dcb7792a8b983c62c9957f142badfcdd224d99f252
+#17 pushing layer sha256:2ff8d0b4d65cefc9bd22cf7e9ebe4566fff9b090498339d38545fd11a2791de2
+#17 pushing layer sha256:28ffbcdcd2fa4c1f0c5b219e2dd9f7bf4890b491fb61cf603294d78c852d16dc
+#17 pushing layer sha256:275b48cc872ea040647d137bdc86efa2249531c60d60a4db6f60864af4c9b896 0.2s done
+#17 pushing layer sha256:4d7ab0923dee0356f386e68dcabc1114de22363c5be18d90dbecb2c9868a6254 0.7s done
+#17 pushing layer sha256:28ffbcdcd2fa4c1f0c5b219e2dd9f7bf4890b491fb61cf603294d78c852d16dc 0.9s done
+#17 pushing layer sha256:931024ec3c7ddb298ac2d60a5adc0e39333184dc1b5fa182fe8e3b27aff75526 0.9s done
+#17 pushing layer sha256:c80cc3792a8c4b923b5d079c39547d30558ba61727f89441bab0808ce39f885c 0.9s done
+#17 pushing layer sha256:2ff8d0b4d65cefc9bd22cf7e9ebe4566fff9b090498339d38545fd11a2791de2 0.9s done
+#17 pushing layers for registry.fly.io/tradagent:git-bf96d3e3eceb6611eec17607a9c1b0703855af9a-2ef7b65dbf25c8db15f5ff1caa7c211b@sha256:b4139748afc9fefa730a86fb3068ba8fd50125f73a2666551a14563f40862127 2.5s done
+#17 pushing layer sha256:40f0472a2ef29486f782e1dcb7792a8b983c62c9957f142badfcdd224d99f252 2.5s done
+#17 pushing manifest for registry.fly.io/tradagent:git-bf96d3e3eceb6611eec17607a9c1b0703855af9a-2ef7b65dbf25c8db15f5ff1caa7c211b@sha256:b4139748afc9fefa730a86fb3068ba8fd50125f73a2666551a14563f40862127
+#17 pushing manifest for registry.fly.io/tradagent:git-bf96d3e3eceb6611eec17607a9c1b0703855af9a-2ef7b65dbf25c8db15f5ff1caa7c211b@sha256:b4139748afc9fefa730a86fb3068ba8fd50125f73a2666551a14563f40862127 0.2s done
+#17 DONE 11.4s
+--> Build Summary:  (​)
+[38;5;252m--> Building image done[0m
+image: registry.fly.io/tradagent:git-bf96d3e3eceb6611eec17607a9c1b0703855af9a-2ef7b65dbf25c8db15f5ff1caa7c211b
+image size: 154 MB
+
+Watch your deployment at https://fly.io/apps/tradagent/monitoring
+
+[2mINFO[0m Using wait timeout: 10m0s lease timeout: 13s delay between lease refreshes: 4s
+
+Running tradagent release_command: --global-only --preflight
+> Created release_command machine 8d9294ce31ed58
+> Waiting for 8d9294ce31ed58 to have state: stopped
+> Machine 8d9294ce31ed58 has state: stopped
+Starting machine
+> Waiting for 8d9294ce31ed58 to have state: started
+> Waiting for 8d9294ce31ed58 to have state: started
+> Machine 8d9294ce31ed58 has state: started
+> Waiting for 8d9294ce31ed58 to have state: destroyed
+> Machine 8d9294ce31ed58 has state: destroyed
+> Waiting for 8d9294ce31ed58 to get exit event
+✔ release_command 8d9294ce31ed58 completed successfully
+Updating existing machines in 'tradagent' with immediate strategy
+> Acquiring lease for 891e16dce79598
+> Acquired lease for 891e16dce79598
+> Updating machine config for 891e16dce79598
+> Updating 891e16dce79598 [app]
+> Updated machine config for 891e16dce79598
+✔ Machine 891e16dce79598 is now in a good state
+> Clearing lease for 891e16dce79598
+✔ Cleared lease for 891e16dce79598
+collector deployment is runtime-ready at bf96d3e3eceb6611eec17607a9c1b0703855af9a on Machine 891e16dce79598

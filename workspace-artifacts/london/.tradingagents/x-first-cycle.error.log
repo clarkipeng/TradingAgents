@@ -1,0 +1,47 @@
+2026-08-24 17:05:05,587 INFO Store: configured local database · build: build_9a914d3e1c84c4b1d0c511c9 · news themes: 6 · news cadence: 3600s · X cadence: 86400s
+2026-08-24 17:05:05,590 WARNING X start-window check bypassed by TRADINGAGENTS_POLLER_X_IGNORE_START_WINDOW; timing is relaxed but collector identity, budget caps, and receipts are unchanged
+2026-08-24 17:17:10,163 INFO globalnews fetch mirrored 25 temporal documents
+2026-08-24 17:37:39,385 INFO globalnews fetch mirrored 25 temporal documents
+2026-08-24 17:37:40,117 ERROR polymarket fetch slot 7c1fd12cc8afa930 failed (ProviderResponseError)
+2026-08-24 17:37:40,619 ERROR polymarket fetch slot 862ae99949dd1977 failed (ProviderResponseError)
+2026-08-24 17:37:40,620 INFO macro[rates]: globalnews +4 · polymarket-odds +0
+2026-08-24 17:46:06,448 INFO globalnews fetch mirrored 25 temporal documents
+2026-08-24 17:48:53,390 INFO globalnews fetch mirrored 25 temporal documents
+2026-08-24 17:48:54,212 INFO macro[trade]: globalnews +9 · polymarket-odds +5
+2026-08-24 17:56:14,095 INFO globalnews fetch mirrored 22 temporal documents
+2026-08-24 17:58:21,237 INFO globalnews fetch mirrored 12 temporal documents
+2026-08-24 17:58:22,343 ERROR polymarket fetch slot 6050f08a0d3ef9fc failed (ProviderResponseError)
+2026-08-24 17:58:22,343 INFO macro[politics]: globalnews +8 · polymarket-odds +10
+2026-08-24 18:05:58,841 INFO globalnews fetch mirrored 25 temporal documents
+2026-08-24 18:05:58,843 INFO macro[companies]: globalnews +2 · polymarket-odds +0
+2026-08-24 18:08:51,987 INFO globalnews fetch mirrored 25 temporal documents
+2026-08-24 18:16:52,716 INFO globalnews fetch mirrored 25 temporal documents
+2026-08-24 18:16:53,502 INFO macro[technology]: globalnews +6 · polymarket-odds +11
+2026-08-24 18:19:35,003 INFO globalnews fetch mirrored 25 temporal documents
+2026-08-24 18:19:35,913 INFO macro[energy]: globalnews +1 · polymarket-odds +6
+2026-08-24 18:19:35,915 WARNING X start-window check bypassed by TRADINGAGENTS_POLLER_X_IGNORE_START_WINDOW; timing is relaxed but collector identity, budget caps, and receipts are unchanged
+2026-08-24 18:19:39,162 WARNING X start-window check bypassed by TRADINGAGENTS_POLLER_X_IGNORE_START_WINDOW; timing is relaxed but collector identity, budget caps, and receipts are unchanged
+2026-08-24 18:27:18,208 INFO xtrend fetch mirrored 30 temporal documents
+2026-08-24 18:30:01,808 INFO xtrend fetch mirrored 30 temporal documents
+2026-08-24 18:33:23,609 INFO trendnews fetch mirrored 6 temporal documents
+2026-08-24 19:32:54,897 INFO x fetch mirrored 3 temporal documents
+2026-08-24 19:32:54,901 INFO x-discovery[world]: google_news_v1_e017a3ccfd3f27db426e8d0d · slot=f8d6788bff690434 · x success +3
+2026-08-24 19:34:12,572 INFO x fetch mirrored 2 temporal documents
+2026-08-24 19:34:12,574 INFO x-discovery[world]: google_news_v1_2d946eb7fba1348690ff04e7 · slot=44acc5e79d41b896 · x success +2
+2026-08-24 19:35:15,645 INFO x fetch mirrored 3 temporal documents
+2026-08-24 19:35:15,646 INFO x-discovery[us]: google_news_v1_da639ddd68c41f25e7277757 · slot=076da7a712b4e9ad · x success +3
+2026-08-24 19:35:52,127 INFO x fetch mirrored 3 temporal documents
+2026-08-24 19:35:52,129 INFO x-discovery[world]: google_news_v1_9a3aaf54157cac2cf3ad0dd4 · slot=a161885a3c2f66ca · x success +3
+2026-08-24 19:37:20,844 INFO x fetch mirrored 7 temporal documents
+2026-08-24 19:37:20,845 INFO x-discovery[world]: google_news_v1_2fcee3796aad34e14aa4ef33 · slot=e821c5804ebbddf1 · x success +7
+2026-08-24 19:37:20,854 INFO x-cycle cycle_35ad87ad7dec8f7b88a636d4: complete · manifest=cycle_manifest_2b5c0f82980ace6c584634b2
+2026-08-24 19:37:20,861 WARNING collector alert: query_slot_coverage_incomplete · {"expected_query_slot_count": 28, "missing_periodic_requirement_count": 0, "missing_query_slot_count": 3, "missing_source_group_count": 0, "missing_x_daily_requirement": false, "reason_counts": {"failed": 3}, "slots": [{"provider": "polymarket", "reason": "failed", "slot_id": "7c1fd12cc8afa930"}, {"provider": "polymarket", "reason": "failed", "slot_id": "862ae99949dd1977"}, {"provider": "polymarket", "reason": "failed", "slot_id": "6050f08a0d3ef9fc"}], "slots_truncated": 0, "x_daily_state": "complete"}
+2026-08-24 19:37:20,861 WARNING Operations webhook was not acknowledged (not_configured)
+2026-08-24 19:38:44,715 INFO xtrend fetch mirrored 5 temporal documents
+2026-08-24 19:40:10,667 INFO xtrend fetch mirrored 5 temporal documents
+2026-08-24 19:41:21,078 INFO xcount fetch mirrored 1 temporal documents
+2026-08-24 19:41:23,542 INFO xcount fetch mirrored 1 temporal documents
+2026-08-24 19:41:26,196 INFO xcount fetch mirrored 1 temporal documents
+2026-08-24 19:41:28,675 INFO xcount fetch mirrored 1 temporal documents
+2026-08-24 19:41:31,190 INFO xcount fetch mirrored 1 temporal documents
+2026-08-24 19:41:31,192 INFO x-shadow-cycle cycle_f14a50e4bae4d3c4b3417c5f: complete · manifest=cycle_manifest_4965f77c113cc12905370a8a

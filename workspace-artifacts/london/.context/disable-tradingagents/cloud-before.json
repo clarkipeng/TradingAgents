@@ -1,0 +1,27 @@
+{
+  "machine": [
+    {
+      "id": "891e16dce79598",
+      "state": "started",
+      "process_group": "app",
+      "mount_ids": []
+    },
+    {
+      "id": "e82e501b3d66d8",
+      "state": "started",
+      "process_group": "trader",
+      "mount_ids": [
+        "vol_vjygd6w6ye73dyov"
+      ]
+    }
+  ],
+  "volumes": [
+    {
+      "id": "vol_vjygd6w6ye73dyov",
+      "name": "temporal_store",
+      "state": "created",
+      "attached_machine_id": "e82e501b3d66d8"
+    }
+  ],
+  "checked_at": "2026-09-16T02:26:45.020239+00:00"
+}

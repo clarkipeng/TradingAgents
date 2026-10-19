@@ -1,0 +1,31 @@
+SIM105 Use `contextlib.suppress(ProcessLookupError)` instead of `try`-`except`-`pass`
+   --> tradingagents/cloud_supervisor.py:115:5
+    |
+113 |           process.wait()
+114 |           return
+115 | /     try:
+116 | |         os.killpg(process.pid, signal.SIGTERM)
+117 | |     except ProcessLookupError:
+118 | |         pass
+    | |____________^
+119 |       try:
+120 |           process.wait(timeout=grace)
+    |
+help: Replace `try`-`except`-`pass` with `with contextlib.suppress(ProcessLookupError): ...`
+
+SIM105 Use `contextlib.suppress(ProcessLookupError)` instead of `try`-`except`-`pass`
+   --> tradingagents/cloud_supervisor.py:122:9
+    |
+120 |           process.wait(timeout=grace)
+121 |       except subprocess.TimeoutExpired:
+122 | /         try:
+123 | |             os.killpg(process.pid, signal.SIGKILL)
+124 | |         except ProcessLookupError:
+125 | |             pass
+    | |________________^
+126 |           process.wait()
+    |
+help: Replace `try`-`except`-`pass` with `with contextlib.suppress(ProcessLookupError): ...`
+
+Found 6 errors (4 fixed, 2 remaining).
+No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` option).

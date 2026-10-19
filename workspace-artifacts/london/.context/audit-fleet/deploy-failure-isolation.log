@@ -1,0 +1,22 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+___________ test_success_is_bound_to_the_target_process_incarnation ____________
+tests/test_deploy_collector.py:808: in test_success_is_bound_to_the_target_process_incarnation
+    result = _run(env)
+             ^^^^^^^^^
+tests/test_deploy_collector.py:717: in _run
+    return subprocess.run(
+../../../../.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/subprocess.py:556: in run
+    stdout, stderr = process.communicate(input, timeout=timeout)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../../../.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/subprocess.py:1222: in communicate
+    stdout, stderr = self._communicate(input, endtime, timeout)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../../../.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/subprocess.py:2155: in _communicate
+    self._check_timeout(endtime, orig_timeout, stdout, stderr)
+../../../../.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/subprocess.py:1269: in _check_timeout
+    raise TimeoutExpired(
+E   subprocess.TimeoutExpired: Command '['/Users/clarkpeng/conductor/workspaces/TradingAgents/london/scripts/deploy_collector.sh', 'tradagent']' timed out after 10 seconds
+=========================== short test summary info ============================
+FAILED tests/test_deploy_collector.py::test_success_is_bound_to_the_target_process_incarnation
+1 failed in 10.87s

@@ -1,0 +1,9 @@
+[
+  {
+    "path": "/Users/clarkpeng/Library/LaunchAgents/io.tradingagents.audit-fleet-wake-20260906.plist",
+    "label": "io.tradingagents.audit-fleet-wake-20260906",
+    "keep_alive": false,
+    "scheduled": true,
+    "run_at_load": false
+  }
+]

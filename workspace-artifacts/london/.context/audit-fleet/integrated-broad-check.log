@@ -1,0 +1,145 @@
+........................................................................ [  4%]
+.................................s...................................... [  8%]
+........................................................................ [ 12%]
+........................................................................ [ 16%]
+........................................................................ [ 20%]
+........................................................................ [ 24%]
+........................................................................ [ 28%]
+..................................................................... [ 32%]
+........................................................................ [ 36%]
+........................................................................ [ 40%]
+........................................................................ [ 44%]
+.............................................................................. [ 48%]
+........................................................................ [ 52%]
+........................................................................ [ 56%]
+........................................................................ [ 60%]
+...................................................................... [ 64%]
+........................................................................ [ 68%]
+........................................................................ [ 72%]
+........................................................................ [ 76%]
+........................................................................ [ 80%]
+........................................................................ [ 84%]
+........................................................................ [ 88%]
+........................................................................ [ 93%]
+........................................................................ [ 97%]
+..............F.....................................                     [100%]
+=================================== FAILURES ===================================
+_____ test_global_only_mode_runs_news_and_bounded_x_without_ticker_sources _____
+
+self = <tradingagents.dataflows.media_store.SqliteMediaStore object at 0x1186affb0>
+provider = 'gdelt', query_key = 'category:global_affairs'
+started_utc = 1788841980.508405, cursor_before = None
+metadata = {'labels': [], 'kind': 'media', 'protocol_id': 'protocol_1ff2fdbc8ee9097e48fb4c4e', 'collector_semantics_id': 'collector_8420c22876af9f518a99128e', ...}
+collection_cycle_id = 'cycle_2e03d1b07792e0e298ad3e89'
+
+    def start_fetch(
+        self, provider: str, query_key: str, started_utc: float,
+        *, cursor_before: float | None = None, metadata: dict | None = None,
+        collection_cycle_id: str | None = None,
+    ) -> str:
+        fetch_run_id = str(uuid.uuid4())
+        build_id = _collector_build_id(metadata)
+        cycle_id = self._validate_cycle_fetch_binding(
+            collection_cycle_id, provider, query_key, started_utc
+        )
+        try:
+            server_started = _sqlite_server_observed_utc(self.conn)
+>           self.conn.execute(
+                "INSERT INTO fetch_runs "
+                "(fetch_run_id,provider,query_key,started_utc,status,cost_units,"
+                "cursor_before,metadata_json,collection_cycle_id,server_started_utc,"
+                "collector_build_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                (fetch_run_id, provider, query_key, started_utc, "running", 0.0,
+                 cursor_before, json.dumps(metadata or {}, sort_keys=True), cycle_id,
+                 server_started, build_id),
+            )
+E           sqlite3.IntegrityError: fetch receipt build differs from its cycle
+
+tradingagents/dataflows/media_store.py:3187: IntegrityError
+
+The above exception was the direct cause of the following exception:
+
+tmp_path = PosixPath('/private/var/folders/bb/q9_4j2pn5w53238kcp71jh8m0000gn/T/pytest-of-clarkpeng/pytest-156/test_global_only_mode_runs_new0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x114b39940>
+
+    @pytest.mark.unit
+    def test_global_only_mode_runs_news_and_bounded_x_without_ticker_sources(
+        tmp_path, monkeypatch,
+    ):
+        captured = {}
+    
+        def fake_run_cycle(store, tickers, sources, macro_themes, x_enabled,
+                           x_interval, x_limit, x_topic_limit, force_x):
+            captured.update(
+                tickers=tickers,
+                sources=sources,
+                macro_themes=macro_themes,
+                x_enabled=x_enabled,
+                x_interval=x_interval,
+                x_limit=x_limit,
+                x_topic_limit=x_topic_limit,
+                force_x=force_x,
+            )
+    
+        monkeypatch.setenv("X_BEARER_TOKEN", "secret-test-token")
+        monkeypatch.setattr(poller, "run_cycle", fake_run_cycle)
+    
+>       poller.main([
+            "--global-only",
+            "--sources", "x",
+            "--once",
+            "--no-trading-hours",
+            "--interval", "3600",
+            "--x-interval", "86400",
+            "--db", str(tmp_path / "global.db"),
+        ])
+
+tests/test_x_topic_poller.py:1600: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tradingagents/poller.py:4704: in main
+    poll_source_shadow_once(store, shadow_period_utc)
+tradingagents/poller.py:3148: in poll_source_shadow_once
+    _run_fetch(
+tradingagents/poller.py:1061: in _run_fetch
+    fetch_run_id = store.start_fetch(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <tradingagents.dataflows.media_store.SqliteMediaStore object at 0x1186affb0>
+provider = 'gdelt', query_key = 'category:global_affairs'
+started_utc = 1788841980.508405, cursor_before = None
+metadata = {'labels': [], 'kind': 'media', 'protocol_id': 'protocol_1ff2fdbc8ee9097e48fb4c4e', 'collector_semantics_id': 'collector_8420c22876af9f518a99128e', ...}
+collection_cycle_id = 'cycle_2e03d1b07792e0e298ad3e89'
+
+    def start_fetch(
+        self, provider: str, query_key: str, started_utc: float,
+        *, cursor_before: float | None = None, metadata: dict | None = None,
+        collection_cycle_id: str | None = None,
+    ) -> str:
+        fetch_run_id = str(uuid.uuid4())
+        build_id = _collector_build_id(metadata)
+        cycle_id = self._validate_cycle_fetch_binding(
+            collection_cycle_id, provider, query_key, started_utc
+        )
+        try:
+            server_started = _sqlite_server_observed_utc(self.conn)
+            self.conn.execute(
+                "INSERT INTO fetch_runs "
+                "(fetch_run_id,provider,query_key,started_utc,status,cost_units,"
+                "cursor_before,metadata_json,collection_cycle_id,server_started_utc,"
+                "collector_build_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                (fetch_run_id, provider, query_key, started_utc, "running", 0.0,
+                 cursor_before, json.dumps(metadata or {}, sort_keys=True), cycle_id,
+                 server_started, build_id),
+            )
+            self.conn.commit()
+            return fetch_run_id
+        except sqlite3.IntegrityError as exc:
+            self.conn.rollback()
+>           raise ValueError("fetch cycle slot already has a receipt or is invalid") from exc
+E           ValueError: fetch cycle slot already has a receipt or is invalid
+
+tradingagents/dataflows/media_store.py:3200: ValueError
+=========================== short test summary info ============================
+SKIPPED [1] tests/test_bedrock_provider.py:74: could not import 'langchain_aws': No module named 'langchain_aws'
+FAILED tests/test_x_topic_poller.py::test_global_only_mode_runs_news_and_bounded_x_without_ticker_sources
+1 failed, 1779 passed, 1 skipped, 14 deselected, 71 subtests passed in 66.26s (0:01:06)

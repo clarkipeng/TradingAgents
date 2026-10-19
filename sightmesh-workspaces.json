@@ -1,0 +1,684 @@
+[
+  {
+    "id": "0a1162de-d417-4f7b-b03f-3379f88a489b",
+    "name": "ta-sol-execution-v2",
+    "branch": "cdt/0a11-ta-sol-execution",
+    "archived": false,
+    "container_ref": "/Users/clarkpeng/.local/share/sightmesh/.cdesktop-workspaces/0a11-ta-sol-execution",
+    "created_at": "2026-09-08T01:20:16.938Z",
+    "updated_at": "2026-09-08T01:41:07.657Z",
+    "repos": [
+      {
+        "id": "922343a4-6357-47d8-b769-c154dfd87b45",
+        "repo_id": null,
+        "name": "TradingAgents",
+        "path": "/Users/clarkpeng/Documents/Code/TradingAgents",
+        "target_branch": "cdt/8224-ta-audit-lead"
+      }
+    ],
+    "sessions": [
+      {
+        "id": "44f16653-0565-417d-9b8b-7422d929f612",
+        "executor": "CODEX",
+        "created_at": "2026-09-08T01:20:17.812Z",
+        "updated_at": "2026-09-08T01:20:18.240Z"
+      }
+    ]
+  },
+  {
+    "id": "bf9a5eae-6447-4333-8ea2-a296f2fb4676",
+    "name": "ta-luna-p4-resume",
+    "branch": "cdt/bf9a-ta-luna-p4-resum",
+    "archived": false,
+    "container_ref": "/Users/clarkpeng/.local/share/sightmesh/.cdesktop-workspaces/bf9a-ta-luna-p4-resum",
+    "created_at": "2026-09-08T00:30:13.869Z",
+    "updated_at": "2026-09-25T19:13:09.980Z",
+    "repos": [
+      {
+        "id": "922343a4-6357-47d8-b769-c154dfd87b45",
+        "repo_id": null,
+        "name": "TradingAgents",
+        "path": "/Users/clarkpeng/Documents/Code/TradingAgents",
+        "target_branch": "cdt/8224-ta-audit-lead"
+      }
+    ],
+    "sessions": [
+      {
+        "id": "a8e7b01c-84cc-4b89-bc60-384a8a86d8f5",
+        "executor": "CODEX",
+        "created_at": "2026-09-08T00:30:15.804Z",
+        "updated_at": "2026-09-08T00:31:08.337Z"
+      }
+    ]
+  },
+  {
+    "id": "c9836aea-6030-4b3b-86e1-75c8af909039",
+    "name": "ta-sol-review",
+    "branch": "cdt/c983-ta-sol-review",
+    "archived": false,
+    "container_ref": "/Users/clarkpeng/.local/share/sightmesh/.cdesktop-workspaces/c983-ta-sol-review",
+    "created_at": "2026-09-06T23:36:51.276Z",
+    "updated_at": "2026-09-06T23:41:46.933Z",
+    "repos": [
+      {
+        "id": "922343a4-6357-47d8-b769-c154dfd87b45",
+        "repo_id": null,
+        "name": "TradingAgents",
+        "path": "/Users/clarkpeng/Documents/Code/TradingAgents",
+        "target_branch": "cdt/8224-ta-audit-lead"
+      }
+    ],
+    "sessions": [
+      {
+        "id": "28867288-0080-4d9d-903a-9cd04a2742a3",
+        "executor": "CODEX",
+        "created_at": "2026-09-06T23:36:51.619Z",
+        "updated_at": "2026-09-06T23:36:58.799Z"
+      }
+    ]
+  },
+  {
+    "id": "67b7d7e7-6cc7-4280-8c0b-ea3da8b3d2d4",
+    "name": "ta-luna-store",
+    "branch": "cdt/67b7-ta-luna-store",
+    "archived": true,
+    "container_ref": "/Users/clarkpeng/.local/share/sightmesh/.cdesktop-workspaces/67b7-ta-luna-store",
+    "created_at": "2026-09-06T23:29:05.060Z",
+    "updated_at": "2026-09-07T07:37:46Z",
+    "repos": [
+      {
+        "id": "922343a4-6357-47d8-b769-c154dfd87b45",
+        "repo_id": null,
+        "name": "TradingAgents",
+        "path": "/Users/clarkpeng/Documents/Code/TradingAgents",
+        "target_branch": "agent-trading-simulation-backtest"
+      }
+    ],
+    "sessions": [
+      {
+        "id": "1ad9882e-57b3-42ba-a696-89312c054456",
+        "executor": "CODEX",
+        "created_at": "2026-09-06T23:29:05.290Z",
+        "updated_at": "2026-09-06T23:29:17.445Z"
+      }
+    ]
+  },
+  {
+    "id": "a87f14d2-fc09-4d46-a62c-c82b5afaf885",
+    "name": "ta-luna-ops",
+    "branch": "cdt/a87f-ta-luna-ops",
+    "archived": true,
+    "container_ref": "/Users/clarkpeng/.local/share/sightmesh/.cdesktop-workspaces/a87f-ta-luna-ops",
+    "created_at": "2026-09-06T23:28:27.783Z",
+    "updated_at": "2026-09-07T07:37:48Z",
+    "repos": [
+      {
+        "id": "922343a4-6357-47d8-b769-c154dfd87b45",
+        "repo_id": null,
+        "name": "TradingAgents",
+        "path": "/Users/clarkpeng/Documents/Code/TradingAgents",
+        "target_branch": "agent-trading-simulation-backtest"
+      }
+    ],
+    "sessions": [
+      {
+        "id": "5f3e9cc0-43b9-47c1-beed-f7034fd445c5",
+        "executor": "CODEX",
+        "created_at": "2026-09-06T23:28:28.320Z",
+        "updated_at": "2026-09-06T23:28:44.920Z"
+      }
+    ]
+  },
+  {
+    "id": "822403cb-f787-4151-84e6-ccfc15084873",
+    "name": "ta-audit-lead",
+    "branch": "cdt/8224-ta-audit-lead",
+    "archived": false,
+    "container_ref": "/Users/clarkpeng/.local/share/sightmesh/.cdesktop-workspaces/8224-ta-audit-lead",
+    "created_at": "2026-09-06T23:24:29.102Z",
+    "updated_at": "2026-10-01T18:37:46.650Z",
+    "repos": [
+      {
+        "id": "922343a4-6357-47d8-b769-c154dfd87b45",
+        "repo_id": null,
+        "name": "TradingAgents",
+        "path": "/Users/clarkpeng/Documents/Code/TradingAgents",
+        "target_branch": "agent-trading-simulation-backtest"
+      }
+    ],
+    "sessions": [
+      {
+        "id": "df867712-0bb8-43b5-87cd-92bb3f3127d5",
+        "executor": "CODEX",
+        "created_at": "2026-09-06T23:24:29.611Z",
+        "updated_at": "2026-09-06T23:24:29.611Z"
+      },
+      {
+        "id": "a18f5abf-6f82-44bb-8cb9-26eaaadd6a2f",
+        "executor": "CODEX",
+        "created_at": "2026-09-08T00:35:45.600Z",
+        "updated_at": "2026-09-08T00:35:45.600Z"
+      }
+    ]
+  },
+  {
+    "id": "89d7a15c-b16f-4111-a1e5-95da12a64836",
+    "name": "luna-round3-generation",
+    "branch": "cdt/89d7-luna-round3-gene",
+    "archived": false,
+    "container_ref": "/Users/clarkpeng/.local/share/sightmesh/.cdesktop-workspaces/89d7-luna-round3-gene",
+    "created_at": "2026-09-02T05:01:44.654Z",
+    "updated_at": "2026-09-06T06:45:04Z",
+    "repos": [
+      {
+        "id": "922343a4-6357-47d8-b769-c154dfd87b45",
+        "repo_id": null,
+        "name": "TradingAgents",
+        "path": "/Users/clarkpeng/Documents/Code/TradingAgents",
+        "target_branch": "fleet/round3"
+      }
+    ],
+    "sessions": [
+      {
+        "id": "d5039eae-1c18-4ec9-b65a-e07ac2b0d757",
+        "executor": "CODEX",
+        "created_at": "2026-09-02T05:01:44.873Z",
+        "updated_at": "2026-09-02T05:01:55.467Z"
+      }
+    ]
+  },
+  {
+    "id": "2c128890-a39b-449c-b308-d1009e172e2c",
+    "name": "luna-round3-portfolio",
+    "branch": "cdt/2c12-luna-round3-port",
+    "archived": false,
+    "container_ref": "/Users/clarkpeng/.local/share/sightmesh/.cdesktop-workspaces/2c12-luna-round3-port",
+    "created_at": "2026-09-02T05:01:29.518Z",
+    "updated_at": "2026-09-06T06:45:05Z",
+    "repos": [
+      {
+        "id": "922343a4-6357-47d8-b769-c154dfd87b45",
+        "repo_id": null,
+        "name": "TradingAgents",
+        "path": "/Users/clarkpeng/Documents/Code/TradingAgents",
+        "target_branch": "fleet/round3"
+      }
+    ],
+    "sessions": [
+      {
+        "id": "7c9518a5-4f33-4ee3-80a6-085609b4b4a3",
+        "executor": "CODEX",
+        "created_at": "2026-09-02T05:01:29.722Z",
+        "updated_at": "2026-09-02T05:01:36.091Z"
+      }
+    ]
+  },
+  {
+    "id": "f2bc7497-8e07-40ba-b50f-793db76e996c",
+    "name": "ta-round2-sol",
+    "branch": "cdt/f2bc-ta-round2-sol",
+    "archived": false,
+    "container_ref": "/Users/clarkpeng/.local/share/sightmesh/.cdesktop-workspaces/f2bc-ta-round2-sol",
+    "created_at": "2026-09-01T19:19:29.388Z",
+    "updated_at": "2026-09-06T06:39:49Z",
+    "repos": [
+      {
+        "id": "922343a4-6357-47d8-b769-c154dfd87b45",
+        "repo_id": null,
+        "name": "TradingAgents",
+        "path": "/Users/clarkpeng/Documents/Code/TradingAgents",
+        "target_branch": "agent-trading-simulation-backtest"
+      }
+    ],
+    "sessions": [
+      {
+        "id": "deb225e1-a296-4d65-b01f-c793e5e794ad",
+        "executor": "CODEX",
+        "created_at": "2026-09-01T19:19:29.663Z",
+        "updated_at": "2026-09-01T19:19:29.663Z"
+      }
+    ]
+  },
+  {
+    "id": "9944853e-2824-4863-9da1-d5a2c938506f",
+    "name": "luna-day-repair",
+    "branch": "cdt/9944-luna-day-repair",
+    "archived": false,
+    "container_ref": "/Users/clarkpeng/.local/share/sightmesh/.cdesktop-workspaces/9944-luna-day-repair",
+    "created_at": "2026-09-01T19:00:23.664Z",
+    "updated_at": "2026-09-06T06:39:49Z",
+    "repos": [
+      {
+        "id": "922343a4-6357-47d8-b769-c154dfd87b45",
+        "repo_id": null,
+        "name": "TradingAgents",
+        "path": "/Users/clarkpeng/Documents/Code/TradingAgents",
+        "target_branch": "fleet/round2"
+      }
+    ],
+    "sessions": [
+      {
+        "id": "a467d830-bc44-4a3c-99a1-77497790fc9b",
+        "executor": "CODEX",
+        "created_at": "2026-09-01T19:00:23.878Z",
+        "updated_at": "2026-09-01T19:00:30.631Z"
+      }
+    ]
+  },
+  {
+    "id": "e11bea59-380c-496f-b5a5-dc3a7bbf4f55",
+    "name": "luna-honesty",
+    "branch": "cdt/e11b-luna-honesty",
+    "archived": false,
+    "container_ref": "/Users/clarkpeng/.local/share/sightmesh/.cdesktop-workspaces/e11b-luna-honesty",
+    "created_at": "2026-09-01T18:22:15.107Z",
+    "updated_at": "2026-09-06T06:39:45Z",
+    "repos": [
+      {
+        "id": "922343a4-6357-47d8-b769-c154dfd87b45",
+        "repo_id": null,
+        "name": "TradingAgents",
+        "path": "/Users/clarkpeng/Documents/Code/TradingAgents",
+        "target_branch": "fleet/round2"
+      }
+    ],
+    "sessions": [
+      {
+        "id": "82696e64-c8cd-4090-9419-1d91e8b73fea",
+        "executor": "CODEX",
+        "created_at": "2026-09-01T18:22:15.414Z",
+        "updated_at": "2026-09-01T18:22:29.218Z"
+      }
+    ]
+  },
+  {
+    "id": "06de20c2-dc5d-4517-af05-8e22cbd09085",
+    "name": "luna-reindex",
+    "branch": "cdt/06de-luna-reindex",
+    "archived": false,
+    "container_ref": "/Users/clarkpeng/.local/share/sightmesh/.cdesktop-workspaces/06de-luna-reindex",
+    "created_at": "2026-09-01T18:21:54.639Z",
+    "updated_at": "2026-09-06T06:39:40Z",
+    "repos": [
+      {
+        "id": "922343a4-6357-47d8-b769-c154dfd87b45",
+        "repo_id": null,
+        "name": "TradingAgents",
+        "path": "/Users/clarkpeng/Documents/Code/TradingAgents",
+        "target_branch": "fleet/round2"
+      }
+    ],
+    "sessions": [
+      {
+        "id": "befd69b5-3f24-4fde-b0ab-3f4c380b89a5",
+        "executor": "CODEX",
+        "created_at": "2026-09-01T18:21:54.861Z",
+        "updated_at": "2026-09-01T18:22:01.879Z"
+      }
+    ]
+  },
+  {
+    "id": "4549a773-150f-4a60-b4c0-365e2cfb97e7",
+    "name": "luna-day",
+    "branch": "cdt/4549-luna-day",
+    "archived": false,
+    "container_ref": "/Users/clarkpeng/.local/share/sightmesh/.cdesktop-workspaces/4549-luna-day",
+    "created_at": "2026-09-01T18:20:42.281Z",
+    "updated_at": "2026-09-06T06:39:42Z",
+    "repos": [
+      {
+        "id": "922343a4-6357-47d8-b769-c154dfd87b45",
+        "repo_id": null,
+        "name": "TradingAgents",
+        "path": "/Users/clarkpeng/Documents/Code/TradingAgents",
+        "target_branch": "fleet/round2"
+      }
+    ],
+    "sessions": [
+      {
+        "id": "7371520f-4b4a-4546-88b1-d1e4f8791685",
+        "executor": "CODEX",
+        "created_at": "2026-09-01T18:20:45.358Z",
+        "updated_at": "2026-09-01T18:21:14.866Z"
+      }
+    ]
+  },
+  {
+    "id": "155252c2-52d5-43b9-abd6-623af6cb19b7",
+    "name": "luna-day",
+    "branch": "cdt/1552-luna-day",
+    "archived": false,
+    "container_ref": "/Users/clarkpeng/.local/share/sightmesh/.cdesktop-workspaces/1552-luna-day",
+    "created_at": "2026-09-01T18:20:01.231Z",
+    "updated_at": "2026-09-06T06:39:41Z",
+    "repos": [
+      {
+        "id": "922343a4-6357-47d8-b769-c154dfd87b45",
+        "repo_id": null,
+        "name": "TradingAgents",
+        "path": "/Users/clarkpeng/Documents/Code/TradingAgents",
+        "target_branch": "fleet/round2"
+      }
+    ],
+    "sessions": [
+      {
+        "id": "559be055-dddf-44ef-8e9d-7d806c7b6309",
+        "executor": "CODEX",
+        "created_at": "2026-09-01T18:20:01.582Z",
+        "updated_at": "2026-09-01T18:20:01.582Z"
+      }
+    ]
+  },
+  {
+    "id": "83bb8029-2d69-43ab-ab67-795204c9c064",
+    "name": "luna-day",
+    "branch": "cdt/83bb-luna-day",
+    "archived": false,
+    "container_ref": "/Users/clarkpeng/.local/share/sightmesh/.cdesktop-workspaces/83bb-luna-day",
+    "created_at": "2026-09-01T18:19:32.032Z",
+    "updated_at": "2026-09-06T06:39:44Z",
+    "repos": [
+      {
+        "id": "9e68b9f6-5baf-456f-b3b8-eea8a2652c8f",
+        "repo_id": null,
+        "name": "TradingAgents",
+        "path": "/Users/clarkpeng/.local/share/sightmesh/.cdesktop-workspaces/8ba5-ta-round2-terra/TradingAgents",
+        "target_branch": "fleet/round2"
+      }
+    ],
+    "sessions": [
+      {
+        "id": "a24e548e-2483-455e-80fb-f837124411a9",
+        "executor": "CODEX",
+        "created_at": "2026-09-01T18:19:32.554Z",
+        "updated_at": "2026-09-01T18:19:58.525Z"
+      }
+    ]
+  },
+  {
+    "id": "8ba5c13e-b8b2-45fb-b7f9-a4b0d2c576ed",
+    "name": "ta-round2-terra",
+    "branch": "cdt/8ba5-ta-round2-terra",
+    "archived": false,
+    "container_ref": "/Users/clarkpeng/.local/share/sightmesh/.cdesktop-workspaces/8ba5-ta-round2-terra",
+    "created_at": "2026-09-01T18:17:38.830Z",
+    "updated_at": "2026-10-13T19:41:43.070Z",
+    "repos": [
+      {
+        "id": "922343a4-6357-47d8-b769-c154dfd87b45",
+        "repo_id": null,
+        "name": "TradingAgents",
+        "path": "/Users/clarkpeng/Documents/Code/TradingAgents",
+        "target_branch": "agent-trading-simulation-backtest"
+      }
+    ],
+    "sessions": [
+      {
+        "id": "4103c545-68d5-463b-8ab6-5366e16ae889",
+        "executor": "CODEX",
+        "created_at": "2026-09-01T18:17:39.027Z",
+        "updated_at": "2026-09-01T18:17:39.027Z"
+      }
+    ]
+  },
+  {
+    "id": "0405ada5-bcf3-4e17-818f-5c5dc0a41c79",
+    "name": "luna-ops",
+    "branch": "cdt/0405-luna-ops",
+    "archived": true,
+    "container_ref": "/Users/clarkpeng/.local/share/sightmesh/.cdesktop-workspaces/0405-luna-ops",
+    "created_at": "2026-09-01T05:19:04.701Z",
+    "updated_at": "2026-09-01T15:45:28Z",
+    "repos": [
+      {
+        "id": "922343a4-6357-47d8-b769-c154dfd87b45",
+        "repo_id": null,
+        "name": "TradingAgents",
+        "path": "/Users/clarkpeng/Documents/Code/TradingAgents",
+        "target_branch": "agent-trading-simulation-backtest"
+      }
+    ],
+    "sessions": [
+      {
+        "id": "5d38fdef-2bd7-4b0b-ae96-93879404576d",
+        "executor": "CODEX",
+        "created_at": "2026-09-01T05:19:10.712Z",
+        "updated_at": "2026-09-01T05:19:32.757Z"
+      }
+    ]
+  },
+  {
+    "id": "9dec7b7b-eecb-4839-b8e3-9c1900ffaff3",
+    "name": "luna-docs",
+    "branch": "cdt/9dec-luna-docs",
+    "archived": true,
+    "container_ref": "/Users/clarkpeng/.local/share/sightmesh/.cdesktop-workspaces/9dec-luna-docs",
+    "created_at": "2026-09-01T05:19:04.482Z",
+    "updated_at": "2026-09-01T15:45:28Z",
+    "repos": [
+      {
+        "id": "922343a4-6357-47d8-b769-c154dfd87b45",
+        "repo_id": null,
+        "name": "TradingAgents",
+        "path": "/Users/clarkpeng/Documents/Code/TradingAgents",
+        "target_branch": "agent-trading-simulation-backtest"
+      }
+    ],
+    "sessions": [
+      {
+        "id": "17cbd290-dc81-489a-b585-de0bacb23aec",
+        "executor": "CODEX",
+        "created_at": "2026-09-01T05:19:05.768Z",
+        "updated_at": "2026-09-01T05:19:31.159Z"
+      }
+    ]
+  },
+  {
+    "id": "be483039-599f-4dbe-9258-b9182ae7a0b6",
+    "name": "luna-harden",
+    "branch": "cdt/be48-luna-harden",
+    "archived": true,
+    "container_ref": "/Users/clarkpeng/.local/share/sightmesh/.cdesktop-workspaces/be48-luna-harden",
+    "created_at": "2026-09-01T05:19:04.231Z",
+    "updated_at": "2026-09-01T15:45:31Z",
+    "repos": [
+      {
+        "id": "922343a4-6357-47d8-b769-c154dfd87b45",
+        "repo_id": null,
+        "name": "TradingAgents",
+        "path": "/Users/clarkpeng/Documents/Code/TradingAgents",
+        "target_branch": "agent-trading-simulation-backtest"
+      }
+    ],
+    "sessions": [
+      {
+        "id": "b6f87574-bc11-4d70-9f2b-eda4d50809f5",
+        "executor": "CODEX",
+        "created_at": "2026-09-01T05:19:09.218Z",
+        "updated_at": "2026-09-01T05:19:31.223Z"
+      }
+    ]
+  },
+  {
+    "id": "7504f0d0-e09c-4bce-879a-d1cbff282381",
+    "name": "luna-taste",
+    "branch": "cdt/7504-luna-taste",
+    "archived": true,
+    "container_ref": "/Users/clarkpeng/.local/share/sightmesh/.cdesktop-workspaces/7504-luna-taste",
+    "created_at": "2026-09-01T05:19:03.388Z",
+    "updated_at": "2026-09-01T15:45:32Z",
+    "repos": [
+      {
+        "id": "922343a4-6357-47d8-b769-c154dfd87b45",
+        "repo_id": null,
+        "name": "TradingAgents",
+        "path": "/Users/clarkpeng/Documents/Code/TradingAgents",
+        "target_branch": "agent-trading-simulation-backtest"
+      }
+    ],
+    "sessions": [
+      {
+        "id": "abc82c8e-ae89-49be-afd3-039569af829a",
+        "executor": "CODEX",
+        "created_at": "2026-09-01T05:19:04.063Z",
+        "updated_at": "2026-09-01T05:19:30.213Z"
+      }
+    ]
+  },
+  {
+    "id": "2bffca96-cf42-4cca-9f37-c53d7018a165",
+    "name": "luna-taste",
+    "branch": "cdt/2bff-luna-taste",
+    "archived": true,
+    "container_ref": "/Users/clarkpeng/.local/share/sightmesh/.cdesktop-workspaces/2bff-luna-taste",
+    "created_at": "2026-09-01T05:17:58.082Z",
+    "updated_at": "2026-09-01T15:45:33Z",
+    "repos": [
+      {
+        "id": "62a57a13-8616-4f13-a852-1a919309d7ff",
+        "repo_id": null,
+        "name": "TradingAgents",
+        "path": "/Users/clarkpeng/.local/share/sightmesh/.cdesktop-workspaces/0539-ta-fleet-terra/TradingAgents",
+        "target_branch": "fleet/cleanup-2026-08-31"
+      }
+    ],
+    "sessions": [
+      {
+        "id": "4f6ef646-ba09-4ce6-8500-4da77f1f62fe",
+        "executor": "CODEX",
+        "created_at": "2026-09-01T05:18:04Z",
+        "updated_at": "2026-09-01T05:18:45.929Z"
+      }
+    ]
+  },
+  {
+    "id": "f468b40f-9c82-475c-a5f9-eefd47f0859c",
+    "name": "luna-docs",
+    "branch": "cdt/f468-luna-docs",
+    "archived": true,
+    "container_ref": "/Users/clarkpeng/.local/share/sightmesh/.cdesktop-workspaces/f468-luna-docs",
+    "created_at": "2026-09-01T05:17:51.150Z",
+    "updated_at": "2026-09-01T15:45:29Z",
+    "repos": [
+      {
+        "id": "62a57a13-8616-4f13-a852-1a919309d7ff",
+        "repo_id": null,
+        "name": "TradingAgents",
+        "path": "/Users/clarkpeng/.local/share/sightmesh/.cdesktop-workspaces/0539-ta-fleet-terra/TradingAgents",
+        "target_branch": "fleet/cleanup-2026-08-31"
+      }
+    ],
+    "sessions": [
+      {
+        "id": "c509364b-1887-4d0e-ac45-a48da0ff9c32",
+        "executor": "CODEX",
+        "created_at": "2026-09-01T05:17:51.828Z",
+        "updated_at": "2026-09-01T05:18:42.513Z"
+      }
+    ]
+  },
+  {
+    "id": "540f4910-b623-4161-9817-6edcbee9842d",
+    "name": "luna-ops",
+    "branch": "cdt/540f-luna-ops",
+    "archived": true,
+    "container_ref": "/Users/clarkpeng/.local/share/sightmesh/.cdesktop-workspaces/540f-luna-ops",
+    "created_at": "2026-09-01T05:17:51.114Z",
+    "updated_at": "2026-09-01T15:45:30Z",
+    "repos": [
+      {
+        "id": "62a57a13-8616-4f13-a852-1a919309d7ff",
+        "repo_id": null,
+        "name": "TradingAgents",
+        "path": "/Users/clarkpeng/.local/share/sightmesh/.cdesktop-workspaces/0539-ta-fleet-terra/TradingAgents",
+        "target_branch": "fleet/cleanup-2026-08-31"
+      }
+    ],
+    "sessions": [
+      {
+        "id": "93b2b202-0ad6-4bbf-9f2b-7244bf9f2a37",
+        "executor": "CODEX",
+        "created_at": "2026-09-01T05:17:51.478Z",
+        "updated_at": "2026-09-01T05:18:43.417Z"
+      }
+    ]
+  },
+  {
+    "id": "5d52db7e-c188-48b4-b7b2-61eece8cc629",
+    "name": "luna-harden",
+    "branch": "cdt/5d52-luna-harden",
+    "archived": true,
+    "container_ref": "/Users/clarkpeng/.local/share/sightmesh/.cdesktop-workspaces/5d52-luna-harden",
+    "created_at": "2026-09-01T05:17:50.888Z",
+    "updated_at": "2026-09-01T15:45:29Z",
+    "repos": [
+      {
+        "id": "62a57a13-8616-4f13-a852-1a919309d7ff",
+        "repo_id": null,
+        "name": "TradingAgents",
+        "path": "/Users/clarkpeng/.local/share/sightmesh/.cdesktop-workspaces/0539-ta-fleet-terra/TradingAgents",
+        "target_branch": "fleet/cleanup-2026-08-31"
+      }
+    ],
+    "sessions": [
+      {
+        "id": "d56e2f8c-3987-4168-add3-a5e87e075d4d",
+        "executor": "CODEX",
+        "created_at": "2026-09-01T05:17:51.484Z",
+        "updated_at": "2026-09-01T05:18:42.360Z"
+      }
+    ]
+  },
+  {
+    "id": "0539f8e5-2959-4773-a983-c40620e1cd55",
+    "name": "ta-fleet-terra",
+    "branch": "cdt/0539-ta-fleet-terra",
+    "archived": false,
+    "container_ref": "/Users/clarkpeng/.local/share/sightmesh/.cdesktop-workspaces/0539-ta-fleet-terra",
+    "created_at": "2026-09-01T05:15:49.676Z",
+    "updated_at": "2026-09-06T06:37:58Z",
+    "repos": [
+      {
+        "id": "922343a4-6357-47d8-b769-c154dfd87b45",
+        "repo_id": null,
+        "name": "TradingAgents",
+        "path": "/Users/clarkpeng/Documents/Code/TradingAgents",
+        "target_branch": "agent-trading-simulation-backtest"
+      }
+    ],
+    "sessions": [
+      {
+        "id": "8ce77945-54e8-4859-8029-637927f01e62",
+        "executor": "CODEX",
+        "created_at": "2026-09-01T05:15:50Z",
+        "updated_at": "2026-09-01T05:15:50Z"
+      }
+    ]
+  },
+  {
+    "id": "e0352a17-9879-4dc1-836d-7c0674f0836b",
+    "name": "ta-audit-sol",
+    "branch": "cdt/e035-ta-audit-sol",
+    "archived": false,
+    "container_ref": "/Users/clarkpeng/.local/share/sightmesh/.cdesktop-workspaces/e035-ta-audit-sol",
+    "created_at": "2026-09-01T05:15:37.938Z",
+    "updated_at": "2026-09-05T08:06:43Z",
+    "repos": [
+      {
+        "id": "922343a4-6357-47d8-b769-c154dfd87b45",
+        "repo_id": null,
+        "name": "TradingAgents",
+        "path": "/Users/clarkpeng/Documents/Code/TradingAgents",
+        "target_branch": "agent-trading-simulation-backtest"
+      }
+    ],
+    "sessions": [
+      {
+        "id": "804b3af8-f881-4f07-af77-95861915dda8",
+        "executor": "CODEX",
+        "created_at": "2026-09-01T05:15:38.316Z",
+        "updated_at": "2026-09-01T05:15:38.316Z"
+      }
+    ]
+  }
+]

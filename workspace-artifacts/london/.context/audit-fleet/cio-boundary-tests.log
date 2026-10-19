@@ -1,0 +1,19 @@
+F................                                                        [100%]
+=================================== FAILURES ===================================
+_______________ test_cio_provider_failure_cannot_seal_a_hold_day _______________
+
+tmp_path = PosixPath('/private/var/folders/bb/q9_4j2pn5w53238kcp71jh8m0000gn/T/pytest-of-clarkpeng/pytest-48/test_cio_provider_failure_cann0')
+
+    def test_cio_provider_failure_cannot_seal_a_hold_day(tmp_path):
+        def unavailable(_prompt):
+            raise RuntimeError("provider unavailable")
+    
+        with TemporalStore(tmp_path) as store:
+>           with pytest.raises(RuntimeError, match="provider unavailable"):
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           Failed: DID NOT RAISE RuntimeError
+
+tests/test_portfolio_cio_failure.py:15: Failed
+=========================== short test summary info ============================
+FAILED tests/test_portfolio_cio_failure.py::test_cio_provider_failure_cannot_seal_a_hold_day
+1 failed, 16 passed in 2.66s

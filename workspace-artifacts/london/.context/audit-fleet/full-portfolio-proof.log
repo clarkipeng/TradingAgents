@@ -1,0 +1,139 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+___________ test_actual_portfolio_capture_replays_without_providers ____________
+
+tmp_path = PosixPath('/private/var/folders/bb/q9_4j2pn5w53238kcp71jh8m0000gn/T/pytest-of-clarkpeng/pytest-66/test_actual_portfolio_capture_0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10fbad940>
+
+    def test_actual_portfolio_capture_replays_without_providers(tmp_path, monkeypatch):
+        day = datetime.now(timezone.utc).date().isoformat()
+        network_attempts = []
+    
+        def forbidden_network(*args, **kwargs):
+            network_attempts.append(True)
+            raise AssertionError("external network forbidden")
+    
+        monkeypatch.setattr(socket.socket, "connect", forbidden_network)
+        monkeypatch.setattr(graph_module.TradingAgentsGraph, "resolve_instrument_context", lambda self, ticker, *args: f"Captured {ticker} identity")
+        monkeypatch.setattr(sentiment, "fetch_stocktwits_messages", lambda *args, **kwargs: "fixture social")
+        monkeypatch.setattr(sentiment, "fetch_reddit_posts", lambda *args, **kwargs: "fixture social")
+        for method, vendors in interface.VENDOR_METHODS.items():
+            response = f"Date,Close\n{day},100\n" if method == "get_stock_data" else "fixture evidence"
+            monkeypatch.setitem(interface.VENDOR_METHODS, method, {vendor: (lambda *args, value=response, **kwargs: value) for vendor in vendors})
+    
+        def client(provider, model, **kwargs):
+            response = '{"weights":{"NVDA":0.1,"AAPL":0.1}}' if model == "fixture-cio" else "Fixture analyst report."
+            llm = FixtureModel(responses=[response], callbacks=kwargs.get("callbacks"), cache=False)
+            return SimpleNamespace(get_llm=lambda: llm)
+    
+        monkeypatch.setattr(factory, "create_llm_client", client)
+        monkeypatch.setattr(graph_module, "create_llm_client", client)
+        # Keep ordinary graph artifacts in the fixture directory.
+        monkeypatch.setitem(graph_module.DEFAULT_CONFIG, "results_dir", str(tmp_path / "results"))
+        monkeypatch.setitem(graph_module.DEFAULT_CONFIG, "memory_log_path", str(tmp_path / "memory.md"))
+        with TemporalStore(tmp_path / "store") as store:
+            inputs = production_day_inputs(store, deep_model="fixture-cio", sweep_model="fixture-analyst")
+            failures = []
+            original_research = inputs["research_fn"]
+            def inspect_research(ticker, context):
+                try:
+                    return original_research(ticker, context)
+                except Exception as error:
+                    import traceback
+                    failures.append((type(error).__name__, [(frame.name, frame.lineno) for frame in traceback.extract_tb(error.__traceback__)]))
+                    raise
+            inputs["research_fn"] = inspect_research
+            try:
+                captured = run_portfolio_day(store, ["NVDA", "AAPL"], day=day, **inputs)
+            except Exception:
+                raise AssertionError(failures) from None
+            assert captured.get("status") != "failed_unsealed", captured.get("reason")
+            scenario_id = f"portfolio-{day}"
+            scenario = store.get_scenario(scenario_id)
+            assert scenario is not None
+            assert len(scenario.metadata["replay_manifest"]["workers"]) == 2
+            for stream in scenario.metadata["replay_manifest"]["workers"]:
+                assert stream["llm_call_count"] >= 4
+    
+            monkeypatch.setattr(factory, "create_llm_client", forbidden_network)
+            monkeypatch.setattr(graph_module, "create_llm_client", forbidden_network)
+            monkeypatch.setattr(graph_module.TradingAgentsGraph, "resolve_instrument_context", forbidden_network)
+            monkeypatch.setattr(sentiment, "fetch_stocktwits_messages", forbidden_network)
+            monkeypatch.setattr(sentiment, "fetch_reddit_posts", forbidden_network)
+            for method, vendors in interface.VENDOR_METHODS.items():
+                monkeypatch.setitem(interface.VENDOR_METHODS, method, {vendor: forbidden_network for vendor in vendors})
+>           replayed = replay_production_portfolio_day(store, scenario_id)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_portfolio_capture_replay_boundary.py:82: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tradingagents/portfolio_replay.py:210: in replay_production_portfolio_day
+    replay = replay_portfolio_day(store, scenario_id, replay_worker=worker, replay_cio=cio)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tradingagents/portfolio_replay.py:112: in replay_portfolio_day
+    result = replay_worker(stream["ticker"], stream["run_id"])
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tradingagents/portfolio_replay.py:174: in worker
+    result, _signal = worker_graph_factory(tape).propagate(
+tradingagents/graph/trading_graph.py:477: in propagate
+    result = self._run_graph(company_name, trade_date, asset_type=asset_type)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tradingagents/graph/trading_graph.py:667: in _run_graph
+    final_state = self.graph.invoke(init_agent_state, **args)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.13/site-packages/langgraph/pregel/main.py:3913: in invoke
+    for chunk in self.stream(
+.venv/lib/python3.13/site-packages/langgraph/pregel/main.py:2967: in stream
+    for _ in runner.tick(
+.venv/lib/python3.13/site-packages/langgraph/pregel/_runner.py:207: in tick
+    run_with_retry(
+.venv/lib/python3.13/site-packages/langgraph/pregel/_retry.py:617: in run_with_retry
+    return task.proc.invoke(task.input, config)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.13/site-packages/langgraph/_internal/_runnable.py:684: in invoke
+    input = context.run(step.invoke, input, config, **kwargs)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.13/site-packages/langgraph/_internal/_runnable.py:426: in invoke
+    ret = self.func(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^
+tradingagents/agents/analysts/market_analyst.py:88: in market_analyst_node
+    result = chain.invoke(state["messages"])
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.13/site-packages/langchain_core/runnables/base.py:3444: in invoke
+    input_ = context.run(step.invoke, input_, config)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.13/site-packages/langchain_core/language_models/chat_models.py:476: in invoke
+    self.generate_prompt(
+.venv/lib/python3.13/site-packages/langchain_core/language_models/chat_models.py:1849: in generate_prompt
+    return self.generate(prompt_messages, stop=stop, callbacks=callbacks, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.13/site-packages/langchain_core/language_models/chat_models.py:1656: in generate
+    self._generate_with_cache(
+.venv/lib/python3.13/site-packages/langchain_core/language_models/chat_models.py:1994: in _generate_with_cache
+    result = self._generate(
+tradingagents/temporal_adapters/langchain.py:468: in _generate
+    self._verify_messages(call, messages)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+call = LLMCallRecord(call_id='2b022102664450816e25e4512294c9eb6acbd71b665888d5597abcbc018ee5ae', run_id='01a07e80-ddb1-7971-9...d=None, mode='live_capture', temporal_run_id='34d63bb2-ab43-4ab2-996a-9ed8b48d669d:research:AAPL', temporal_sequence=1)
+messages = [SystemMessage(content="You are a helpful AI assistant, collaborating with other assistants. Use the provided tools to...), HumanMessage(content='AAPL', additional_kwargs={}, response_metadata={}, id='2ca09746-d9a0-4a1d-9f0e-c5f274a7ab6e')]
+
+    @staticmethod
+    def _verify_messages(call: LLMCallRecord, messages: list[BaseMessage]) -> None:
+        request = call.request
+        if request.get("kind") != "chat":
+            raise TapeMismatchError(
+                f"LLM tape call {call.call_id} is {request.get('kind', 'unknown')!r}, not chat"
+            )
+        expected_batches = request.get("messages") or []
+        expected = [_stable_message_dict(message) for message in (expected_batches[0] if expected_batches else [])]
+        actual = [_stable_message_dict(message) for message in messages]
+        if canonical_json(expected) != canonical_json(actual):
+>           raise TapeMismatchError(f"LLM prompt mismatch at tape call {call.call_id}")
+E           tradingagents.temporal_adapters.langchain.TapeMismatchError: LLM prompt mismatch at tape call 2b022102664450816e25e4512294c9eb6acbd71b665888d5597abcbc018ee5ae
+E           During task with name 'Market Analyst' and id '7d66a375-9a50-b688-be72-43412831024f'
+
+tradingagents/temporal_adapters/langchain.py:530: TapeMismatchError
+=========================== short test summary info ============================
+FAILED tests/test_portfolio_capture_replay_boundary.py::test_actual_portfolio_capture_replays_without_providers
+1 failed in 6.54s

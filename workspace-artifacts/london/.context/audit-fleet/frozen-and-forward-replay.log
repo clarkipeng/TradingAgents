@@ -1,0 +1,863 @@
+FFFFFFF....................                                              [100%]
+=================================== FAILURES ===================================
+_ test_actual_portfolio_capture_replays_without_providers[-2-close-legacy-v1-None] _
+
+tmp_path = PosixPath('/private/var/folders/bb/q9_4j2pn5w53238kcp71jh8m0000gn/T/pytest-of-clarkpeng/pytest-153/test_actual_portfolio_capture_0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10aa91350>
+mutation = None, policy = 'close-legacy-v1', capture_age = -2
+
+    @pytest.mark.parametrize("mutation", [None, "report", "quote", "missing_tape"])
+    @pytest.mark.parametrize("policy", ["close-legacy-v1", "next-open-v1"])
+    @pytest.mark.parametrize("capture_age", [-2, 1])
+    def test_actual_portfolio_capture_replays_without_providers(tmp_path, monkeypatch, mutation, policy, capture_age):
+        # Keep this synthetic forward capture ahead of its actual observations,
+        # independent of when the offline fixture runs.
+        day = (datetime.now(timezone.utc) + timedelta(days=capture_age)).date().isoformat()
+        network_attempts = []
+    
+        def forbidden_network(*args, **kwargs):
+            network_attempts.append(True)
+            raise AssertionError("external network forbidden")
+    
+        monkeypatch.setattr(socket.socket, "connect", forbidden_network)
+        monkeypatch.setattr(graph_module.TradingAgentsGraph, "resolve_instrument_context", lambda self, ticker, *args: f"Captured {ticker} identity")
+        monkeypatch.setattr(sentiment, "fetch_stocktwits_messages", lambda *args, **kwargs: "fixture social")
+        monkeypatch.setattr(sentiment, "fetch_reddit_posts", lambda *args, **kwargs: "fixture social")
+        for method, vendors in interface.VENDOR_METHODS.items():
+            response = f"Date,Close\n{day},100\n" if method == "get_stock_data" else "fixture evidence"
+            monkeypatch.setitem(interface.VENDOR_METHODS, method, {vendor: (lambda *args, value=response, **kwargs: value) for vendor in vendors})
+    
+        def client(provider, model, **kwargs):
+            response = '{"weights":{"NVDA":0.1,"AAPL":0.1}}' if model == "fixture-cio" else "Fixture analyst report."
+            llm = FixtureModel(responses=[response], callbacks=kwargs.get("callbacks"), cache=False)
+            return SimpleNamespace(get_llm=lambda: llm)
+    
+        monkeypatch.setattr(factory, "create_llm_client", client)
+        monkeypatch.setattr(graph_module, "create_llm_client", client)
+        # Keep ordinary graph artifacts in the fixture directory.
+        monkeypatch.setitem(graph_module.DEFAULT_CONFIG, "results_dir", str(tmp_path / "results"))
+        monkeypatch.setitem(graph_module.DEFAULT_CONFIG, "memory_log_path", str(tmp_path / "memory.md"))
+        with TemporalStore(tmp_path / "store") as store:
+            inputs = production_day_inputs(store, deep_model="fixture-cio", sweep_model="fixture-analyst")
+            cutoff = datetime.fromisoformat(f"{day}T21:30:00+00:00")
+            if capture_age < 0 and policy == "next-open-v1":
+                # Logical trading day and UTC capture date can differ. The
+                # production graph and replay must still use the same prompt day.
+                cutoff += timedelta(hours=3)
+            captured = run_portfolio_day(
+                store, ["NVDA", "AAPL"], day=day, **inputs,
+                execution_policy=policy, capture_cutoff=cutoff,
+                decision_ready_clock=lambda: cutoff + timedelta(hours=1),
+            )
+>           assert captured.get("status") != "failed_unsealed", captured.get("reason")
+E           AssertionError: execution_error
+E           assert 'failed_unsealed' != 'failed_unsealed'
+E            +  where 'failed_unsealed' = <built-in method get of dict object at 0x1101ea1c0>('status')
+E            +    where <built-in method get of dict object at 0x1101ea1c0> = {'status': 'failed_unsealed', 'reason': 'execution_error', 'scenario_id': 'portfolio-2026-09-06', 'day': '2026-09-06'}.get
+
+tests/test_portfolio_capture_replay_boundary.py:75: AssertionError
+_ test_actual_portfolio_capture_replays_without_providers[-2-close-legacy-v1-report] _
+
+tmp_path = PosixPath('/private/var/folders/bb/q9_4j2pn5w53238kcp71jh8m0000gn/T/pytest-of-clarkpeng/pytest-153/test_actual_portfolio_capture_1')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x110055a70>
+mutation = 'report', policy = 'close-legacy-v1', capture_age = -2
+
+    @pytest.mark.parametrize("mutation", [None, "report", "quote", "missing_tape"])
+    @pytest.mark.parametrize("policy", ["close-legacy-v1", "next-open-v1"])
+    @pytest.mark.parametrize("capture_age", [-2, 1])
+    def test_actual_portfolio_capture_replays_without_providers(tmp_path, monkeypatch, mutation, policy, capture_age):
+        # Keep this synthetic forward capture ahead of its actual observations,
+        # independent of when the offline fixture runs.
+        day = (datetime.now(timezone.utc) + timedelta(days=capture_age)).date().isoformat()
+        network_attempts = []
+    
+        def forbidden_network(*args, **kwargs):
+            network_attempts.append(True)
+            raise AssertionError("external network forbidden")
+    
+        monkeypatch.setattr(socket.socket, "connect", forbidden_network)
+        monkeypatch.setattr(graph_module.TradingAgentsGraph, "resolve_instrument_context", lambda self, ticker, *args: f"Captured {ticker} identity")
+        monkeypatch.setattr(sentiment, "fetch_stocktwits_messages", lambda *args, **kwargs: "fixture social")
+        monkeypatch.setattr(sentiment, "fetch_reddit_posts", lambda *args, **kwargs: "fixture social")
+        for method, vendors in interface.VENDOR_METHODS.items():
+            response = f"Date,Close\n{day},100\n" if method == "get_stock_data" else "fixture evidence"
+            monkeypatch.setitem(interface.VENDOR_METHODS, method, {vendor: (lambda *args, value=response, **kwargs: value) for vendor in vendors})
+    
+        def client(provider, model, **kwargs):
+            response = '{"weights":{"NVDA":0.1,"AAPL":0.1}}' if model == "fixture-cio" else "Fixture analyst report."
+            llm = FixtureModel(responses=[response], callbacks=kwargs.get("callbacks"), cache=False)
+            return SimpleNamespace(get_llm=lambda: llm)
+    
+        monkeypatch.setattr(factory, "create_llm_client", client)
+        monkeypatch.setattr(graph_module, "create_llm_client", client)
+        # Keep ordinary graph artifacts in the fixture directory.
+        monkeypatch.setitem(graph_module.DEFAULT_CONFIG, "results_dir", str(tmp_path / "results"))
+        monkeypatch.setitem(graph_module.DEFAULT_CONFIG, "memory_log_path", str(tmp_path / "memory.md"))
+        with TemporalStore(tmp_path / "store") as store:
+            inputs = production_day_inputs(store, deep_model="fixture-cio", sweep_model="fixture-analyst")
+            cutoff = datetime.fromisoformat(f"{day}T21:30:00+00:00")
+            if capture_age < 0 and policy == "next-open-v1":
+                # Logical trading day and UTC capture date can differ. The
+                # production graph and replay must still use the same prompt day.
+                cutoff += timedelta(hours=3)
+            captured = run_portfolio_day(
+                store, ["NVDA", "AAPL"], day=day, **inputs,
+                execution_policy=policy, capture_cutoff=cutoff,
+                decision_ready_clock=lambda: cutoff + timedelta(hours=1),
+            )
+>           assert captured.get("status") != "failed_unsealed", captured.get("reason")
+E           AssertionError: execution_error
+E           assert 'failed_unsealed' != 'failed_unsealed'
+E            +  where 'failed_unsealed' = <built-in method get of dict object at 0x1101470c0>('status')
+E            +    where <built-in method get of dict object at 0x1101470c0> = {'status': 'failed_unsealed', 'reason': 'execution_error', 'scenario_id': 'portfolio-2026-09-06', 'day': '2026-09-06'}.get
+
+tests/test_portfolio_capture_replay_boundary.py:75: AssertionError
+_ test_actual_portfolio_capture_replays_without_providers[-2-close-legacy-v1-quote] _
+
+tmp_path = PosixPath('/private/var/folders/bb/q9_4j2pn5w53238kcp71jh8m0000gn/T/pytest-of-clarkpeng/pytest-153/test_actual_portfolio_capture_2')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x11011f410>
+mutation = 'quote', policy = 'close-legacy-v1', capture_age = -2
+
+    @pytest.mark.parametrize("mutation", [None, "report", "quote", "missing_tape"])
+    @pytest.mark.parametrize("policy", ["close-legacy-v1", "next-open-v1"])
+    @pytest.mark.parametrize("capture_age", [-2, 1])
+    def test_actual_portfolio_capture_replays_without_providers(tmp_path, monkeypatch, mutation, policy, capture_age):
+        # Keep this synthetic forward capture ahead of its actual observations,
+        # independent of when the offline fixture runs.
+        day = (datetime.now(timezone.utc) + timedelta(days=capture_age)).date().isoformat()
+        network_attempts = []
+    
+        def forbidden_network(*args, **kwargs):
+            network_attempts.append(True)
+            raise AssertionError("external network forbidden")
+    
+        monkeypatch.setattr(socket.socket, "connect", forbidden_network)
+        monkeypatch.setattr(graph_module.TradingAgentsGraph, "resolve_instrument_context", lambda self, ticker, *args: f"Captured {ticker} identity")
+        monkeypatch.setattr(sentiment, "fetch_stocktwits_messages", lambda *args, **kwargs: "fixture social")
+        monkeypatch.setattr(sentiment, "fetch_reddit_posts", lambda *args, **kwargs: "fixture social")
+        for method, vendors in interface.VENDOR_METHODS.items():
+            response = f"Date,Close\n{day},100\n" if method == "get_stock_data" else "fixture evidence"
+            monkeypatch.setitem(interface.VENDOR_METHODS, method, {vendor: (lambda *args, value=response, **kwargs: value) for vendor in vendors})
+    
+        def client(provider, model, **kwargs):
+            response = '{"weights":{"NVDA":0.1,"AAPL":0.1}}' if model == "fixture-cio" else "Fixture analyst report."
+            llm = FixtureModel(responses=[response], callbacks=kwargs.get("callbacks"), cache=False)
+            return SimpleNamespace(get_llm=lambda: llm)
+    
+        monkeypatch.setattr(factory, "create_llm_client", client)
+        monkeypatch.setattr(graph_module, "create_llm_client", client)
+        # Keep ordinary graph artifacts in the fixture directory.
+        monkeypatch.setitem(graph_module.DEFAULT_CONFIG, "results_dir", str(tmp_path / "results"))
+        monkeypatch.setitem(graph_module.DEFAULT_CONFIG, "memory_log_path", str(tmp_path / "memory.md"))
+        with TemporalStore(tmp_path / "store") as store:
+            inputs = production_day_inputs(store, deep_model="fixture-cio", sweep_model="fixture-analyst")
+            cutoff = datetime.fromisoformat(f"{day}T21:30:00+00:00")
+            if capture_age < 0 and policy == "next-open-v1":
+                # Logical trading day and UTC capture date can differ. The
+                # production graph and replay must still use the same prompt day.
+                cutoff += timedelta(hours=3)
+            captured = run_portfolio_day(
+                store, ["NVDA", "AAPL"], day=day, **inputs,
+                execution_policy=policy, capture_cutoff=cutoff,
+                decision_ready_clock=lambda: cutoff + timedelta(hours=1),
+            )
+>           assert captured.get("status") != "failed_unsealed", captured.get("reason")
+E           AssertionError: execution_error
+E           assert 'failed_unsealed' != 'failed_unsealed'
+E            +  where 'failed_unsealed' = <built-in method get of dict object at 0x1101a3bc0>('status')
+E            +    where <built-in method get of dict object at 0x1101a3bc0> = {'status': 'failed_unsealed', 'reason': 'execution_error', 'scenario_id': 'portfolio-2026-09-06', 'day': '2026-09-06'}.get
+
+tests/test_portfolio_capture_replay_boundary.py:75: AssertionError
+_ test_actual_portfolio_capture_replays_without_providers[-2-close-legacy-v1-missing_tape] _
+
+tmp_path = PosixPath('/private/var/folders/bb/q9_4j2pn5w53238kcp71jh8m0000gn/T/pytest-of-clarkpeng/pytest-153/test_actual_portfolio_capture_3')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1102c3ac0>
+mutation = 'missing_tape', policy = 'close-legacy-v1', capture_age = -2
+
+    @pytest.mark.parametrize("mutation", [None, "report", "quote", "missing_tape"])
+    @pytest.mark.parametrize("policy", ["close-legacy-v1", "next-open-v1"])
+    @pytest.mark.parametrize("capture_age", [-2, 1])
+    def test_actual_portfolio_capture_replays_without_providers(tmp_path, monkeypatch, mutation, policy, capture_age):
+        # Keep this synthetic forward capture ahead of its actual observations,
+        # independent of when the offline fixture runs.
+        day = (datetime.now(timezone.utc) + timedelta(days=capture_age)).date().isoformat()
+        network_attempts = []
+    
+        def forbidden_network(*args, **kwargs):
+            network_attempts.append(True)
+            raise AssertionError("external network forbidden")
+    
+        monkeypatch.setattr(socket.socket, "connect", forbidden_network)
+        monkeypatch.setattr(graph_module.TradingAgentsGraph, "resolve_instrument_context", lambda self, ticker, *args: f"Captured {ticker} identity")
+        monkeypatch.setattr(sentiment, "fetch_stocktwits_messages", lambda *args, **kwargs: "fixture social")
+        monkeypatch.setattr(sentiment, "fetch_reddit_posts", lambda *args, **kwargs: "fixture social")
+        for method, vendors in interface.VENDOR_METHODS.items():
+            response = f"Date,Close\n{day},100\n" if method == "get_stock_data" else "fixture evidence"
+            monkeypatch.setitem(interface.VENDOR_METHODS, method, {vendor: (lambda *args, value=response, **kwargs: value) for vendor in vendors})
+    
+        def client(provider, model, **kwargs):
+            response = '{"weights":{"NVDA":0.1,"AAPL":0.1}}' if model == "fixture-cio" else "Fixture analyst report."
+            llm = FixtureModel(responses=[response], callbacks=kwargs.get("callbacks"), cache=False)
+            return SimpleNamespace(get_llm=lambda: llm)
+    
+        monkeypatch.setattr(factory, "create_llm_client", client)
+        monkeypatch.setattr(graph_module, "create_llm_client", client)
+        # Keep ordinary graph artifacts in the fixture directory.
+        monkeypatch.setitem(graph_module.DEFAULT_CONFIG, "results_dir", str(tmp_path / "results"))
+        monkeypatch.setitem(graph_module.DEFAULT_CONFIG, "memory_log_path", str(tmp_path / "memory.md"))
+        with TemporalStore(tmp_path / "store") as store:
+            inputs = production_day_inputs(store, deep_model="fixture-cio", sweep_model="fixture-analyst")
+            cutoff = datetime.fromisoformat(f"{day}T21:30:00+00:00")
+            if capture_age < 0 and policy == "next-open-v1":
+                # Logical trading day and UTC capture date can differ. The
+                # production graph and replay must still use the same prompt day.
+                cutoff += timedelta(hours=3)
+            captured = run_portfolio_day(
+                store, ["NVDA", "AAPL"], day=day, **inputs,
+                execution_policy=policy, capture_cutoff=cutoff,
+                decision_ready_clock=lambda: cutoff + timedelta(hours=1),
+            )
+>           assert captured.get("status") != "failed_unsealed", captured.get("reason")
+E           AssertionError: execution_error
+E           assert 'failed_unsealed' != 'failed_unsealed'
+E            +  where 'failed_unsealed' = <built-in method get of dict object at 0x1102f5200>('status')
+E            +    where <built-in method get of dict object at 0x1102f5200> = {'status': 'failed_unsealed', 'reason': 'execution_error', 'scenario_id': 'portfolio-2026-09-06', 'day': '2026-09-06'}.get
+
+tests/test_portfolio_capture_replay_boundary.py:75: AssertionError
+_ test_actual_portfolio_capture_replays_without_providers[-2-next-open-v1-None] _
+
+tmp_path = PosixPath('/private/var/folders/bb/q9_4j2pn5w53238kcp71jh8m0000gn/T/pytest-of-clarkpeng/pytest-153/test_actual_portfolio_capture_4')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1100e2690>
+mutation = None, policy = 'next-open-v1', capture_age = -2
+
+    @pytest.mark.parametrize("mutation", [None, "report", "quote", "missing_tape"])
+    @pytest.mark.parametrize("policy", ["close-legacy-v1", "next-open-v1"])
+    @pytest.mark.parametrize("capture_age", [-2, 1])
+    def test_actual_portfolio_capture_replays_without_providers(tmp_path, monkeypatch, mutation, policy, capture_age):
+        # Keep this synthetic forward capture ahead of its actual observations,
+        # independent of when the offline fixture runs.
+        day = (datetime.now(timezone.utc) + timedelta(days=capture_age)).date().isoformat()
+        network_attempts = []
+    
+        def forbidden_network(*args, **kwargs):
+            network_attempts.append(True)
+            raise AssertionError("external network forbidden")
+    
+        monkeypatch.setattr(socket.socket, "connect", forbidden_network)
+        monkeypatch.setattr(graph_module.TradingAgentsGraph, "resolve_instrument_context", lambda self, ticker, *args: f"Captured {ticker} identity")
+        monkeypatch.setattr(sentiment, "fetch_stocktwits_messages", lambda *args, **kwargs: "fixture social")
+        monkeypatch.setattr(sentiment, "fetch_reddit_posts", lambda *args, **kwargs: "fixture social")
+        for method, vendors in interface.VENDOR_METHODS.items():
+            response = f"Date,Close\n{day},100\n" if method == "get_stock_data" else "fixture evidence"
+            monkeypatch.setitem(interface.VENDOR_METHODS, method, {vendor: (lambda *args, value=response, **kwargs: value) for vendor in vendors})
+    
+        def client(provider, model, **kwargs):
+            response = '{"weights":{"NVDA":0.1,"AAPL":0.1}}' if model == "fixture-cio" else "Fixture analyst report."
+            llm = FixtureModel(responses=[response], callbacks=kwargs.get("callbacks"), cache=False)
+            return SimpleNamespace(get_llm=lambda: llm)
+    
+        monkeypatch.setattr(factory, "create_llm_client", client)
+        monkeypatch.setattr(graph_module, "create_llm_client", client)
+        # Keep ordinary graph artifacts in the fixture directory.
+        monkeypatch.setitem(graph_module.DEFAULT_CONFIG, "results_dir", str(tmp_path / "results"))
+        monkeypatch.setitem(graph_module.DEFAULT_CONFIG, "memory_log_path", str(tmp_path / "memory.md"))
+        with TemporalStore(tmp_path / "store") as store:
+            inputs = production_day_inputs(store, deep_model="fixture-cio", sweep_model="fixture-analyst")
+            cutoff = datetime.fromisoformat(f"{day}T21:30:00+00:00")
+            if capture_age < 0 and policy == "next-open-v1":
+                # Logical trading day and UTC capture date can differ. The
+                # production graph and replay must still use the same prompt day.
+                cutoff += timedelta(hours=3)
+            captured = run_portfolio_day(
+                store, ["NVDA", "AAPL"], day=day, **inputs,
+                execution_policy=policy, capture_cutoff=cutoff,
+                decision_ready_clock=lambda: cutoff + timedelta(hours=1),
+            )
+            assert captured.get("status") != "failed_unsealed", captured.get("reason")
+            if policy == "next-open-v1":
+                assert captured["status"] == "pending_execution"
+                from tradingagents.portfolio_execution import next_open_timing
+    
+                timing = next_open_timing(cutoff + timedelta(hours=1))
+                wall_clock = [timing.submitted_at + timedelta(minutes=1)]
+    
+                class ObservedClock(datetime):
+                    @classmethod
+                    def now(cls, tz=None):
+                        return wall_clock[0]
+    
+                class Ticker:
+                    def __init__(self, symbol):
+                        self.symbol = symbol
+    
+                    def history(self, **options):
+                        assert options == {
+                            "start": timing.execution_session,
+                            "end": (timing.submitted_at.date() + timedelta(days=1)).isoformat(),
+                            "auto_adjust": False, "back_adjust": False,
+                            "actions": True, "repair": False,
+                        }
+                        # The response arrives after execution started. A clock
+                        # sampled before fetching cannot authorize this quote.
+                        wall_clock[0] += timedelta(seconds=2)
+                        return pd.DataFrame({"Open": [110 if self.symbol == "AAPL" else 90],
+                                             "Stock Splits": [0], "Dividends": [0]},
+                                            index=pd.to_datetime([timing.execution_session]))
+    
+                monkeypatch.setattr(execution_prices.yf, "Ticker", Ticker)
+                monkeypatch.setattr(gateway, "datetime", ObservedClock)
+                captured = portfolio_run.execute_pending_portfolio_day(
+                    store, day, **portfolio_run.production_execution_inputs(store),
+                    execution_clock=lambda: wall_clock[0],
+                )
+                assert captured["status"] == "completed", captured
+                assert captured["capture_cutoff"] != captured["filled_at"]
+            scenario_id = f"portfolio-{day}"
+            scenario = store.get_scenario(scenario_id)
+            assert scenario is not None
+            assert len(scenario.metadata["replay_manifest"]["workers"]) == 2
+            for stream in scenario.metadata["replay_manifest"]["workers"]:
+                assert stream["llm_call_count"] >= 4
+    
+            monkeypatch.setattr(factory, "create_llm_client", forbidden_network)
+            monkeypatch.setattr(execution_prices.yf, "Ticker", forbidden_network)
+            monkeypatch.setattr(graph_module, "create_llm_client", forbidden_network)
+            monkeypatch.setattr(graph_module.TradingAgentsGraph, "resolve_instrument_context", forbidden_network)
+            monkeypatch.setattr(sentiment, "fetch_stocktwits_messages", forbidden_network)
+            monkeypatch.setattr(sentiment, "fetch_reddit_posts", forbidden_network)
+            for method, vendors in interface.VENDOR_METHODS.items():
+                monkeypatch.setitem(interface.VENDOR_METHODS, method, dict.fromkeys(vendors, forbidden_network))
+            if mutation == "report":
+                propagate = graph_module.TradingAgentsGraph.propagate
+    
+                def changed_report(*args, **kwargs):
+                    state, signal = propagate(*args, **kwargs)
+                    state["news_report"] = "A changed graph output must reach the CIO boundary."
+                    return state, signal
+    
+                monkeypatch.setattr(graph_module.TradingAgentsGraph, "propagate", changed_report)
+            elif mutation == "quote":
+                if policy == "next-open-v1":
+                    execution_inputs = portfolio_run.production_execution_inputs
+    
+                    def changed_quote(store):
+                        quote_fn = execution_inputs(store)["execution_quote_fn"]
+                        return {"execution_quote_fn": lambda *args: replace(quote_fn(*args), price=Decimal("999"))}
+    
+                    monkeypatch.setattr(portfolio_run, "production_execution_inputs", changed_quote)
+                else:
+                    monkeypatch.setattr(portfolio_run, "_last_close", lambda *args, **kwargs: Decimal("999"))
+            elif mutation == "missing_tape":
+                worker_id = scenario.metadata["replay_manifest"]["workers"][0]["run_id"]
+                call_id = store.list_llm_calls(None, temporal_run_id=worker_id)[0].call_id
+                with store._connect() as connection:
+                    connection.execute("DELETE FROM llm_calls WHERE call_id = ?", (call_id,))
+            if mutation:
+                message = {"report": "research differs", "quote": "quote differs", "missing_tape": "complete LLM"}[mutation]
+                with pytest.raises(ValueError, match=message):
+                    replay_production_portfolio_day(store, scenario_id)
+                assert network_attempts == []
+                return
+>           replayed = replay_production_portfolio_day(store, scenario_id)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_portfolio_capture_replay_boundary.py:160: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tradingagents/portfolio_replay.py:242: in replay_production_portfolio_day
+    replay = replay_portfolio_day(store, scenario_id, replay_worker=worker, replay_cio=cio)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tradingagents/portfolio_replay.py:120: in replay_portfolio_day
+    result = replay_worker(stream["ticker"], stream["run_id"])
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tradingagents/portfolio_replay.py:201: in worker
+    result, _signal = worker_graph_factory(tape).propagate(
+tradingagents/graph/trading_graph.py:477: in propagate
+    result = self._run_graph(company_name, trade_date, asset_type=asset_type)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tradingagents/graph/trading_graph.py:667: in _run_graph
+    final_state = self.graph.invoke(init_agent_state, **args)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.13/site-packages/langgraph/pregel/main.py:3913: in invoke
+    for chunk in self.stream(
+.venv/lib/python3.13/site-packages/langgraph/pregel/main.py:2967: in stream
+    for _ in runner.tick(
+.venv/lib/python3.13/site-packages/langgraph/pregel/_runner.py:207: in tick
+    run_with_retry(
+.venv/lib/python3.13/site-packages/langgraph/pregel/_retry.py:617: in run_with_retry
+    return task.proc.invoke(task.input, config)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.13/site-packages/langgraph/_internal/_runnable.py:684: in invoke
+    input = context.run(step.invoke, input, config, **kwargs)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.13/site-packages/langgraph/_internal/_runnable.py:426: in invoke
+    ret = self.func(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^
+tradingagents/agents/analysts/sentiment_analyst.py:82: in sentiment_analyst_node
+    news_block = get_news.func(ticker, start_date, end_date)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tradingagents/agents/utils/news_data_tools.py:37: in get_news
+    result = route_to_vendor("get_news", real_ticker, start_date, end_date)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tradingagents/dataflows/interface.py:175: in route_to_vendor
+    return invoke_dataflow(
+tradingagents/temporal_adapters/tradingagents.py:59: in invoke_dataflow
+    return invoke_tool(
+tradingagents/temporal_adapters/tradingagents.py:75: in invoke_tool
+    outcome = TemporalGateway(context.store).invoke(
+tradingagents/temporal/gateway.py:42: in invoke
+    evidence = self._replay_evidence(tool, request, context)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <tradingagents.temporal.gateway.TemporalGateway object at 0x1105ff0c0>
+tool = 'dataflow.get_news'
+request = {'args': ['AAPL', '2026-08-30', '2026-09-06'], 'kwargs': {}}
+context = TemporalContext(mode=<TemporalMode.REPLAY: 'replay'>, clock=VirtualClock(as_of=datetime.datetime(2026, 9, 7, 0, 30, tz...ied point-in-time tools. Do not use latent knowledge of events after the trade date.', trade_date=None, _invalid=False)
+
+    def _replay_evidence(
+        self,
+        tool: str,
+        request: Mapping[str, Any],
+        context: TemporalContext,
+    ):
+        """Select time-eligible evidence, or the exact sequence from a sealed tool tape."""
+        if context.source_run_id is None:
+            return self.store.latest_eligible(tool, request, as_of=context.clock.as_of)
+        if context.run_id is None:
+            raise ReplayTapeMismatchError("full replay requires a replay run_id")
+        sequence = len(self.store.list_tool_traces(context.run_id)) + 1
+        captured = self.store.get_tool_trace(context.source_run_id, sequence)
+        if captured is None:
+>           raise ReplayTapeMismatchError(
+                f"tool tape exhausted at sequence {sequence} for run {context.source_run_id}"
+            )
+E           tradingagents.temporal.gateway.ReplayTapeMismatchError: tool tape exhausted at sequence 1 for run b726051b-d7fc-4838-b200-35c6e12d4636:research:AAPL
+E           During task with name 'Sentiment Analyst' and id '73a67398-aaad-150c-8dfb-adafaf780e2b'
+
+tradingagents/temporal/gateway.py:105: ReplayTapeMismatchError
+_ test_actual_portfolio_capture_replays_without_providers[-2-next-open-v1-report] _
+
+tmp_path = PosixPath('/private/var/folders/bb/q9_4j2pn5w53238kcp71jh8m0000gn/T/pytest-of-clarkpeng/pytest-153/test_actual_portfolio_capture_5')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1104d7650>
+mutation = 'report', policy = 'next-open-v1', capture_age = -2
+
+    @pytest.mark.parametrize("mutation", [None, "report", "quote", "missing_tape"])
+    @pytest.mark.parametrize("policy", ["close-legacy-v1", "next-open-v1"])
+    @pytest.mark.parametrize("capture_age", [-2, 1])
+    def test_actual_portfolio_capture_replays_without_providers(tmp_path, monkeypatch, mutation, policy, capture_age):
+        # Keep this synthetic forward capture ahead of its actual observations,
+        # independent of when the offline fixture runs.
+        day = (datetime.now(timezone.utc) + timedelta(days=capture_age)).date().isoformat()
+        network_attempts = []
+    
+        def forbidden_network(*args, **kwargs):
+            network_attempts.append(True)
+            raise AssertionError("external network forbidden")
+    
+        monkeypatch.setattr(socket.socket, "connect", forbidden_network)
+        monkeypatch.setattr(graph_module.TradingAgentsGraph, "resolve_instrument_context", lambda self, ticker, *args: f"Captured {ticker} identity")
+        monkeypatch.setattr(sentiment, "fetch_stocktwits_messages", lambda *args, **kwargs: "fixture social")
+        monkeypatch.setattr(sentiment, "fetch_reddit_posts", lambda *args, **kwargs: "fixture social")
+        for method, vendors in interface.VENDOR_METHODS.items():
+            response = f"Date,Close\n{day},100\n" if method == "get_stock_data" else "fixture evidence"
+            monkeypatch.setitem(interface.VENDOR_METHODS, method, {vendor: (lambda *args, value=response, **kwargs: value) for vendor in vendors})
+    
+        def client(provider, model, **kwargs):
+            response = '{"weights":{"NVDA":0.1,"AAPL":0.1}}' if model == "fixture-cio" else "Fixture analyst report."
+            llm = FixtureModel(responses=[response], callbacks=kwargs.get("callbacks"), cache=False)
+            return SimpleNamespace(get_llm=lambda: llm)
+    
+        monkeypatch.setattr(factory, "create_llm_client", client)
+        monkeypatch.setattr(graph_module, "create_llm_client", client)
+        # Keep ordinary graph artifacts in the fixture directory.
+        monkeypatch.setitem(graph_module.DEFAULT_CONFIG, "results_dir", str(tmp_path / "results"))
+        monkeypatch.setitem(graph_module.DEFAULT_CONFIG, "memory_log_path", str(tmp_path / "memory.md"))
+        with TemporalStore(tmp_path / "store") as store:
+            inputs = production_day_inputs(store, deep_model="fixture-cio", sweep_model="fixture-analyst")
+            cutoff = datetime.fromisoformat(f"{day}T21:30:00+00:00")
+            if capture_age < 0 and policy == "next-open-v1":
+                # Logical trading day and UTC capture date can differ. The
+                # production graph and replay must still use the same prompt day.
+                cutoff += timedelta(hours=3)
+            captured = run_portfolio_day(
+                store, ["NVDA", "AAPL"], day=day, **inputs,
+                execution_policy=policy, capture_cutoff=cutoff,
+                decision_ready_clock=lambda: cutoff + timedelta(hours=1),
+            )
+            assert captured.get("status") != "failed_unsealed", captured.get("reason")
+            if policy == "next-open-v1":
+                assert captured["status"] == "pending_execution"
+                from tradingagents.portfolio_execution import next_open_timing
+    
+                timing = next_open_timing(cutoff + timedelta(hours=1))
+                wall_clock = [timing.submitted_at + timedelta(minutes=1)]
+    
+                class ObservedClock(datetime):
+                    @classmethod
+                    def now(cls, tz=None):
+                        return wall_clock[0]
+    
+                class Ticker:
+                    def __init__(self, symbol):
+                        self.symbol = symbol
+    
+                    def history(self, **options):
+                        assert options == {
+                            "start": timing.execution_session,
+                            "end": (timing.submitted_at.date() + timedelta(days=1)).isoformat(),
+                            "auto_adjust": False, "back_adjust": False,
+                            "actions": True, "repair": False,
+                        }
+                        # The response arrives after execution started. A clock
+                        # sampled before fetching cannot authorize this quote.
+                        wall_clock[0] += timedelta(seconds=2)
+                        return pd.DataFrame({"Open": [110 if self.symbol == "AAPL" else 90],
+                                             "Stock Splits": [0], "Dividends": [0]},
+                                            index=pd.to_datetime([timing.execution_session]))
+    
+                monkeypatch.setattr(execution_prices.yf, "Ticker", Ticker)
+                monkeypatch.setattr(gateway, "datetime", ObservedClock)
+                captured = portfolio_run.execute_pending_portfolio_day(
+                    store, day, **portfolio_run.production_execution_inputs(store),
+                    execution_clock=lambda: wall_clock[0],
+                )
+                assert captured["status"] == "completed", captured
+                assert captured["capture_cutoff"] != captured["filled_at"]
+            scenario_id = f"portfolio-{day}"
+            scenario = store.get_scenario(scenario_id)
+            assert scenario is not None
+            assert len(scenario.metadata["replay_manifest"]["workers"]) == 2
+            for stream in scenario.metadata["replay_manifest"]["workers"]:
+                assert stream["llm_call_count"] >= 4
+    
+            monkeypatch.setattr(factory, "create_llm_client", forbidden_network)
+            monkeypatch.setattr(execution_prices.yf, "Ticker", forbidden_network)
+            monkeypatch.setattr(graph_module, "create_llm_client", forbidden_network)
+            monkeypatch.setattr(graph_module.TradingAgentsGraph, "resolve_instrument_context", forbidden_network)
+            monkeypatch.setattr(sentiment, "fetch_stocktwits_messages", forbidden_network)
+            monkeypatch.setattr(sentiment, "fetch_reddit_posts", forbidden_network)
+            for method, vendors in interface.VENDOR_METHODS.items():
+                monkeypatch.setitem(interface.VENDOR_METHODS, method, dict.fromkeys(vendors, forbidden_network))
+            if mutation == "report":
+                propagate = graph_module.TradingAgentsGraph.propagate
+    
+                def changed_report(*args, **kwargs):
+                    state, signal = propagate(*args, **kwargs)
+                    state["news_report"] = "A changed graph output must reach the CIO boundary."
+                    return state, signal
+    
+                monkeypatch.setattr(graph_module.TradingAgentsGraph, "propagate", changed_report)
+            elif mutation == "quote":
+                if policy == "next-open-v1":
+                    execution_inputs = portfolio_run.production_execution_inputs
+    
+                    def changed_quote(store):
+                        quote_fn = execution_inputs(store)["execution_quote_fn"]
+                        return {"execution_quote_fn": lambda *args: replace(quote_fn(*args), price=Decimal("999"))}
+    
+                    monkeypatch.setattr(portfolio_run, "production_execution_inputs", changed_quote)
+                else:
+                    monkeypatch.setattr(portfolio_run, "_last_close", lambda *args, **kwargs: Decimal("999"))
+            elif mutation == "missing_tape":
+                worker_id = scenario.metadata["replay_manifest"]["workers"][0]["run_id"]
+                call_id = store.list_llm_calls(None, temporal_run_id=worker_id)[0].call_id
+                with store._connect() as connection:
+                    connection.execute("DELETE FROM llm_calls WHERE call_id = ?", (call_id,))
+            if mutation:
+                message = {"report": "research differs", "quote": "quote differs", "missing_tape": "complete LLM"}[mutation]
+                with pytest.raises(ValueError, match=message):
+>                   replay_production_portfolio_day(store, scenario_id)
+
+tests/test_portfolio_capture_replay_boundary.py:157: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tradingagents/portfolio_replay.py:242: in replay_production_portfolio_day
+    replay = replay_portfolio_day(store, scenario_id, replay_worker=worker, replay_cio=cio)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tradingagents/portfolio_replay.py:120: in replay_portfolio_day
+    result = replay_worker(stream["ticker"], stream["run_id"])
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tradingagents/portfolio_replay.py:201: in worker
+    result, _signal = worker_graph_factory(tape).propagate(
+tests/test_portfolio_capture_replay_boundary.py:133: in changed_report
+    state, signal = propagate(*args, **kwargs)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+tradingagents/graph/trading_graph.py:477: in propagate
+    result = self._run_graph(company_name, trade_date, asset_type=asset_type)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tradingagents/graph/trading_graph.py:667: in _run_graph
+    final_state = self.graph.invoke(init_agent_state, **args)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.13/site-packages/langgraph/pregel/main.py:3913: in invoke
+    for chunk in self.stream(
+.venv/lib/python3.13/site-packages/langgraph/pregel/main.py:2967: in stream
+    for _ in runner.tick(
+.venv/lib/python3.13/site-packages/langgraph/pregel/_runner.py:207: in tick
+    run_with_retry(
+.venv/lib/python3.13/site-packages/langgraph/pregel/_retry.py:617: in run_with_retry
+    return task.proc.invoke(task.input, config)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.13/site-packages/langgraph/_internal/_runnable.py:684: in invoke
+    input = context.run(step.invoke, input, config, **kwargs)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.13/site-packages/langgraph/_internal/_runnable.py:426: in invoke
+    ret = self.func(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^
+tradingagents/agents/analysts/sentiment_analyst.py:82: in sentiment_analyst_node
+    news_block = get_news.func(ticker, start_date, end_date)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tradingagents/agents/utils/news_data_tools.py:37: in get_news
+    result = route_to_vendor("get_news", real_ticker, start_date, end_date)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tradingagents/dataflows/interface.py:175: in route_to_vendor
+    return invoke_dataflow(
+tradingagents/temporal_adapters/tradingagents.py:59: in invoke_dataflow
+    return invoke_tool(
+tradingagents/temporal_adapters/tradingagents.py:75: in invoke_tool
+    outcome = TemporalGateway(context.store).invoke(
+tradingagents/temporal/gateway.py:42: in invoke
+    evidence = self._replay_evidence(tool, request, context)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <tradingagents.temporal.gateway.TemporalGateway object at 0x11068c820>
+tool = 'dataflow.get_news'
+request = {'args': ['AAPL', '2026-08-30', '2026-09-06'], 'kwargs': {}}
+context = TemporalContext(mode=<TemporalMode.REPLAY: 'replay'>, clock=VirtualClock(as_of=datetime.datetime(2026, 9, 7, 0, 30, tz...ied point-in-time tools. Do not use latent knowledge of events after the trade date.', trade_date=None, _invalid=False)
+
+    def _replay_evidence(
+        self,
+        tool: str,
+        request: Mapping[str, Any],
+        context: TemporalContext,
+    ):
+        """Select time-eligible evidence, or the exact sequence from a sealed tool tape."""
+        if context.source_run_id is None:
+            return self.store.latest_eligible(tool, request, as_of=context.clock.as_of)
+        if context.run_id is None:
+            raise ReplayTapeMismatchError("full replay requires a replay run_id")
+        sequence = len(self.store.list_tool_traces(context.run_id)) + 1
+        captured = self.store.get_tool_trace(context.source_run_id, sequence)
+        if captured is None:
+>           raise ReplayTapeMismatchError(
+                f"tool tape exhausted at sequence {sequence} for run {context.source_run_id}"
+            )
+E           tradingagents.temporal.gateway.ReplayTapeMismatchError: tool tape exhausted at sequence 1 for run a617728a-71ed-498d-a6ec-56ce276d01a2:research:AAPL
+E           During task with name 'Sentiment Analyst' and id 'bae4e408-4778-1d6d-74f2-f7681e25f00c'
+
+tradingagents/temporal/gateway.py:105: ReplayTapeMismatchError
+_ test_actual_portfolio_capture_replays_without_providers[-2-next-open-v1-quote] _
+
+tmp_path = PosixPath('/private/var/folders/bb/q9_4j2pn5w53238kcp71jh8m0000gn/T/pytest-of-clarkpeng/pytest-153/test_actual_portfolio_capture_6')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1104d7950>
+mutation = 'quote', policy = 'next-open-v1', capture_age = -2
+
+    @pytest.mark.parametrize("mutation", [None, "report", "quote", "missing_tape"])
+    @pytest.mark.parametrize("policy", ["close-legacy-v1", "next-open-v1"])
+    @pytest.mark.parametrize("capture_age", [-2, 1])
+    def test_actual_portfolio_capture_replays_without_providers(tmp_path, monkeypatch, mutation, policy, capture_age):
+        # Keep this synthetic forward capture ahead of its actual observations,
+        # independent of when the offline fixture runs.
+        day = (datetime.now(timezone.utc) + timedelta(days=capture_age)).date().isoformat()
+        network_attempts = []
+    
+        def forbidden_network(*args, **kwargs):
+            network_attempts.append(True)
+            raise AssertionError("external network forbidden")
+    
+        monkeypatch.setattr(socket.socket, "connect", forbidden_network)
+        monkeypatch.setattr(graph_module.TradingAgentsGraph, "resolve_instrument_context", lambda self, ticker, *args: f"Captured {ticker} identity")
+        monkeypatch.setattr(sentiment, "fetch_stocktwits_messages", lambda *args, **kwargs: "fixture social")
+        monkeypatch.setattr(sentiment, "fetch_reddit_posts", lambda *args, **kwargs: "fixture social")
+        for method, vendors in interface.VENDOR_METHODS.items():
+            response = f"Date,Close\n{day},100\n" if method == "get_stock_data" else "fixture evidence"
+            monkeypatch.setitem(interface.VENDOR_METHODS, method, {vendor: (lambda *args, value=response, **kwargs: value) for vendor in vendors})
+    
+        def client(provider, model, **kwargs):
+            response = '{"weights":{"NVDA":0.1,"AAPL":0.1}}' if model == "fixture-cio" else "Fixture analyst report."
+            llm = FixtureModel(responses=[response], callbacks=kwargs.get("callbacks"), cache=False)
+            return SimpleNamespace(get_llm=lambda: llm)
+    
+        monkeypatch.setattr(factory, "create_llm_client", client)
+        monkeypatch.setattr(graph_module, "create_llm_client", client)
+        # Keep ordinary graph artifacts in the fixture directory.
+        monkeypatch.setitem(graph_module.DEFAULT_CONFIG, "results_dir", str(tmp_path / "results"))
+        monkeypatch.setitem(graph_module.DEFAULT_CONFIG, "memory_log_path", str(tmp_path / "memory.md"))
+        with TemporalStore(tmp_path / "store") as store:
+            inputs = production_day_inputs(store, deep_model="fixture-cio", sweep_model="fixture-analyst")
+            cutoff = datetime.fromisoformat(f"{day}T21:30:00+00:00")
+            if capture_age < 0 and policy == "next-open-v1":
+                # Logical trading day and UTC capture date can differ. The
+                # production graph and replay must still use the same prompt day.
+                cutoff += timedelta(hours=3)
+            captured = run_portfolio_day(
+                store, ["NVDA", "AAPL"], day=day, **inputs,
+                execution_policy=policy, capture_cutoff=cutoff,
+                decision_ready_clock=lambda: cutoff + timedelta(hours=1),
+            )
+            assert captured.get("status") != "failed_unsealed", captured.get("reason")
+            if policy == "next-open-v1":
+                assert captured["status"] == "pending_execution"
+                from tradingagents.portfolio_execution import next_open_timing
+    
+                timing = next_open_timing(cutoff + timedelta(hours=1))
+                wall_clock = [timing.submitted_at + timedelta(minutes=1)]
+    
+                class ObservedClock(datetime):
+                    @classmethod
+                    def now(cls, tz=None):
+                        return wall_clock[0]
+    
+                class Ticker:
+                    def __init__(self, symbol):
+                        self.symbol = symbol
+    
+                    def history(self, **options):
+                        assert options == {
+                            "start": timing.execution_session,
+                            "end": (timing.submitted_at.date() + timedelta(days=1)).isoformat(),
+                            "auto_adjust": False, "back_adjust": False,
+                            "actions": True, "repair": False,
+                        }
+                        # The response arrives after execution started. A clock
+                        # sampled before fetching cannot authorize this quote.
+                        wall_clock[0] += timedelta(seconds=2)
+                        return pd.DataFrame({"Open": [110 if self.symbol == "AAPL" else 90],
+                                             "Stock Splits": [0], "Dividends": [0]},
+                                            index=pd.to_datetime([timing.execution_session]))
+    
+                monkeypatch.setattr(execution_prices.yf, "Ticker", Ticker)
+                monkeypatch.setattr(gateway, "datetime", ObservedClock)
+                captured = portfolio_run.execute_pending_portfolio_day(
+                    store, day, **portfolio_run.production_execution_inputs(store),
+                    execution_clock=lambda: wall_clock[0],
+                )
+                assert captured["status"] == "completed", captured
+                assert captured["capture_cutoff"] != captured["filled_at"]
+            scenario_id = f"portfolio-{day}"
+            scenario = store.get_scenario(scenario_id)
+            assert scenario is not None
+            assert len(scenario.metadata["replay_manifest"]["workers"]) == 2
+            for stream in scenario.metadata["replay_manifest"]["workers"]:
+                assert stream["llm_call_count"] >= 4
+    
+            monkeypatch.setattr(factory, "create_llm_client", forbidden_network)
+            monkeypatch.setattr(execution_prices.yf, "Ticker", forbidden_network)
+            monkeypatch.setattr(graph_module, "create_llm_client", forbidden_network)
+            monkeypatch.setattr(graph_module.TradingAgentsGraph, "resolve_instrument_context", forbidden_network)
+            monkeypatch.setattr(sentiment, "fetch_stocktwits_messages", forbidden_network)
+            monkeypatch.setattr(sentiment, "fetch_reddit_posts", forbidden_network)
+            for method, vendors in interface.VENDOR_METHODS.items():
+                monkeypatch.setitem(interface.VENDOR_METHODS, method, dict.fromkeys(vendors, forbidden_network))
+            if mutation == "report":
+                propagate = graph_module.TradingAgentsGraph.propagate
+    
+                def changed_report(*args, **kwargs):
+                    state, signal = propagate(*args, **kwargs)
+                    state["news_report"] = "A changed graph output must reach the CIO boundary."
+                    return state, signal
+    
+                monkeypatch.setattr(graph_module.TradingAgentsGraph, "propagate", changed_report)
+            elif mutation == "quote":
+                if policy == "next-open-v1":
+                    execution_inputs = portfolio_run.production_execution_inputs
+    
+                    def changed_quote(store):
+                        quote_fn = execution_inputs(store)["execution_quote_fn"]
+                        return {"execution_quote_fn": lambda *args: replace(quote_fn(*args), price=Decimal("999"))}
+    
+                    monkeypatch.setattr(portfolio_run, "production_execution_inputs", changed_quote)
+                else:
+                    monkeypatch.setattr(portfolio_run, "_last_close", lambda *args, **kwargs: Decimal("999"))
+            elif mutation == "missing_tape":
+                worker_id = scenario.metadata["replay_manifest"]["workers"][0]["run_id"]
+                call_id = store.list_llm_calls(None, temporal_run_id=worker_id)[0].call_id
+                with store._connect() as connection:
+                    connection.execute("DELETE FROM llm_calls WHERE call_id = ?", (call_id,))
+            if mutation:
+                message = {"report": "research differs", "quote": "quote differs", "missing_tape": "complete LLM"}[mutation]
+                with pytest.raises(ValueError, match=message):
+>                   replay_production_portfolio_day(store, scenario_id)
+
+tests/test_portfolio_capture_replay_boundary.py:157: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tradingagents/portfolio_replay.py:242: in replay_production_portfolio_day
+    replay = replay_portfolio_day(store, scenario_id, replay_worker=worker, replay_cio=cio)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tradingagents/portfolio_replay.py:120: in replay_portfolio_day
+    result = replay_worker(stream["ticker"], stream["run_id"])
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tradingagents/portfolio_replay.py:201: in worker
+    result, _signal = worker_graph_factory(tape).propagate(
+tradingagents/graph/trading_graph.py:477: in propagate
+    result = self._run_graph(company_name, trade_date, asset_type=asset_type)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tradingagents/graph/trading_graph.py:667: in _run_graph
+    final_state = self.graph.invoke(init_agent_state, **args)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.13/site-packages/langgraph/pregel/main.py:3913: in invoke
+    for chunk in self.stream(
+.venv/lib/python3.13/site-packages/langgraph/pregel/main.py:2967: in stream
+    for _ in runner.tick(
+.venv/lib/python3.13/site-packages/langgraph/pregel/_runner.py:207: in tick
+    run_with_retry(
+.venv/lib/python3.13/site-packages/langgraph/pregel/_retry.py:617: in run_with_retry
+    return task.proc.invoke(task.input, config)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.13/site-packages/langgraph/_internal/_runnable.py:684: in invoke
+    input = context.run(step.invoke, input, config, **kwargs)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.13/site-packages/langgraph/_internal/_runnable.py:426: in invoke
+    ret = self.func(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^
+tradingagents/agents/analysts/sentiment_analyst.py:82: in sentiment_analyst_node
+    news_block = get_news.func(ticker, start_date, end_date)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tradingagents/agents/utils/news_data_tools.py:37: in get_news
+    result = route_to_vendor("get_news", real_ticker, start_date, end_date)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tradingagents/dataflows/interface.py:175: in route_to_vendor
+    return invoke_dataflow(
+tradingagents/temporal_adapters/tradingagents.py:59: in invoke_dataflow
+    return invoke_tool(
+tradingagents/temporal_adapters/tradingagents.py:75: in invoke_tool
+    outcome = TemporalGateway(context.store).invoke(
+tradingagents/temporal/gateway.py:42: in invoke
+    evidence = self._replay_evidence(tool, request, context)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <tradingagents.temporal.gateway.TemporalGateway object at 0x110662530>
+tool = 'dataflow.get_news'
+request = {'args': ['AAPL', '2026-08-30', '2026-09-06'], 'kwargs': {}}
+context = TemporalContext(mode=<TemporalMode.REPLAY: 'replay'>, clock=VirtualClock(as_of=datetime.datetime(2026, 9, 7, 0, 30, tz...ied point-in-time tools. Do not use latent knowledge of events after the trade date.', trade_date=None, _invalid=False)
+
+    def _replay_evidence(
+        self,
+        tool: str,
+        request: Mapping[str, Any],
+        context: TemporalContext,
+    ):
+        """Select time-eligible evidence, or the exact sequence from a sealed tool tape."""
+        if context.source_run_id is None:
+            return self.store.latest_eligible(tool, request, as_of=context.clock.as_of)
+        if context.run_id is None:
+            raise ReplayTapeMismatchError("full replay requires a replay run_id")
+        sequence = len(self.store.list_tool_traces(context.run_id)) + 1
+        captured = self.store.get_tool_trace(context.source_run_id, sequence)
+        if captured is None:
+>           raise ReplayTapeMismatchError(
+                f"tool tape exhausted at sequence {sequence} for run {context.source_run_id}"
+            )
+E           tradingagents.temporal.gateway.ReplayTapeMismatchError: tool tape exhausted at sequence 1 for run 3567198b-b9b6-4966-b19b-fe3baef490dc:research:AAPL
+E           During task with name 'Sentiment Analyst' and id 'bf89019c-670c-9d34-a195-874e1c84b72f'
+
+tradingagents/temporal/gateway.py:105: ReplayTapeMismatchError
+=========================== short test summary info ============================
+FAILED tests/test_portfolio_capture_replay_boundary.py::test_actual_portfolio_capture_replays_without_providers[-2-close-legacy-v1-None]
+FAILED tests/test_portfolio_capture_replay_boundary.py::test_actual_portfolio_capture_replays_without_providers[-2-close-legacy-v1-report]
+FAILED tests/test_portfolio_capture_replay_boundary.py::test_actual_portfolio_capture_replays_without_providers[-2-close-legacy-v1-quote]
+FAILED tests/test_portfolio_capture_replay_boundary.py::test_actual_portfolio_capture_replays_without_providers[-2-close-legacy-v1-missing_tape]
+FAILED tests/test_portfolio_capture_replay_boundary.py::test_actual_portfolio_capture_replays_without_providers[-2-next-open-v1-None]
+FAILED tests/test_portfolio_capture_replay_boundary.py::test_actual_portfolio_capture_replays_without_providers[-2-next-open-v1-report]
+FAILED tests/test_portfolio_capture_replay_boundary.py::test_actual_portfolio_capture_replays_without_providers[-2-next-open-v1-quote]
+7 failed, 20 passed in 3.59s

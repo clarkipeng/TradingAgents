@@ -1,0 +1,332 @@
+[
+  {
+    "local_ref": "refs/heads/add-x-api-key",
+    "commit": "36c56b56596844ec29786b84ba63c973c540f339",
+    "archive_ref": "refs/heads/add-x-api-key"
+  },
+  {
+    "local_ref": "refs/heads/agent-trading-simulation-backtest",
+    "commit": "fbceb0ee61dc12abf2bc4ee99ab8d3ba38c6a6c1",
+    "archive_ref": "refs/heads/agent-trading-simulation-backtest"
+  },
+  {
+    "local_ref": "refs/heads/archive/canonical-wip-2026-10-18",
+    "commit": "ac562991481611175c100e7e4c17d258b003e52f",
+    "archive_ref": "refs/heads/archive/canonical-wip-2026-10-18"
+  },
+  {
+    "local_ref": "refs/heads/audit-resume-base-543a370",
+    "commit": "543a370577403e245e7539cd4210603f4b6ee003",
+    "archive_ref": "refs/heads/audit-resume-base-543a370"
+  },
+  {
+    "local_ref": "refs/heads/cdt/0405-luna-ops",
+    "commit": "62ac153dddfeabb7d39d5534e3cb99839e907399",
+    "archive_ref": "refs/heads/cdt/0405-luna-ops"
+  },
+  {
+    "local_ref": "refs/heads/cdt/0539-ta-fleet-terra",
+    "commit": "1a70f38555e0729fff4b7789ecb69de58cf14298",
+    "archive_ref": "refs/heads/cdt/0539-ta-fleet-terra"
+  },
+  {
+    "local_ref": "refs/heads/cdt/06de-luna-reindex",
+    "commit": "52b14ff893fbffcefea0867ae5649e32f33355a6",
+    "archive_ref": "refs/heads/cdt/06de-luna-reindex"
+  },
+  {
+    "local_ref": "refs/heads/cdt/0a11-ta-sol-execution",
+    "commit": "a649cce2c97442f80ab684b6a9c3bf8c519b9bee",
+    "archive_ref": "refs/heads/cdt/0a11-ta-sol-execution"
+  },
+  {
+    "local_ref": "refs/heads/cdt/1552-luna-day",
+    "commit": "d33c95fb5d5f66f43f9bd22eccd5d135a99cf02d",
+    "archive_ref": "refs/heads/cdt/1552-luna-day"
+  },
+  {
+    "local_ref": "refs/heads/cdt/2bff-luna-taste",
+    "commit": "7555afeee7d35e431aabe74f01b5292c25667cda",
+    "archive_ref": "refs/heads/cdt/2bff-luna-taste"
+  },
+  {
+    "local_ref": "refs/heads/cdt/2c12-luna-round3-port",
+    "commit": "33e241963b6406cdd5f9e1762201a9aa100425c4",
+    "archive_ref": "refs/heads/cdt/2c12-luna-round3-port"
+  },
+  {
+    "local_ref": "refs/heads/cdt/32c2-retrieval-rubric",
+    "commit": "7db31f99c55caedfbb328091d370f9c54a0993d5",
+    "archive_ref": "refs/heads/cdt/32c2-retrieval-rubric"
+  },
+  {
+    "local_ref": "refs/heads/cdt/4549-luna-day",
+    "commit": "4cf5a0b0db62dc320fafb075c6f498b547de3628",
+    "archive_ref": "refs/heads/cdt/4549-luna-day"
+  },
+  {
+    "local_ref": "refs/heads/cdt/540f-luna-ops",
+    "commit": "2746be763a1e68e45d156ef6e9901602b1aff8b4",
+    "archive_ref": "refs/heads/cdt/540f-luna-ops"
+  },
+  {
+    "local_ref": "refs/heads/cdt/5445-retrieval-r1-ben",
+    "commit": "02e58508ad827ab602ccfe0ef24960f3b308cca6",
+    "archive_ref": "refs/heads/cdt/5445-retrieval-r1-ben"
+  },
+  {
+    "local_ref": "refs/heads/cdt/5a6f-retrieval-r4-too",
+    "commit": "a19db3c91390db61dae1b58e43e333c6481e94b4",
+    "archive_ref": "refs/heads/cdt/5a6f-retrieval-r4-too"
+  },
+  {
+    "local_ref": "refs/heads/cdt/5d52-luna-harden",
+    "commit": "5a94d83fc29f26a83983d23ac3cdecc9178f3c74",
+    "archive_ref": "refs/heads/cdt/5d52-luna-harden"
+  },
+  {
+    "local_ref": "refs/heads/cdt/67b7-ta-luna-store",
+    "commit": "5065685bd16c3ca23b5d4649f74103a951e95cf1",
+    "archive_ref": "refs/heads/cdt/67b7-ta-luna-store"
+  },
+  {
+    "local_ref": "refs/heads/cdt/6f55-retrieval-r3-hyb",
+    "commit": "08f6be3831abdfc1bbb4fbf5a3a954ac2b0558fd",
+    "archive_ref": "refs/heads/cdt/6f55-retrieval-r3-hyb"
+  },
+  {
+    "local_ref": "refs/heads/cdt/7117-retrieval-r2-doc",
+    "commit": "cc27b41339f8705af46b6a94ea99fb08f1d8705e",
+    "archive_ref": "refs/heads/cdt/7117-retrieval-r2-doc"
+  },
+  {
+    "local_ref": "refs/heads/cdt/7504-luna-taste",
+    "commit": "56f432d4c6a40078181dec63f7503a8e8e340bc9",
+    "archive_ref": "refs/heads/cdt/7504-luna-taste"
+  },
+  {
+    "local_ref": "refs/heads/cdt/8224-ta-audit-lead",
+    "commit": "63dff528e7d5bda970760139c935091548707730",
+    "archive_ref": "refs/heads/cdt/8224-ta-audit-lead"
+  },
+  {
+    "local_ref": "refs/heads/cdt/83bb-luna-day",
+    "commit": "7c477767eaff83ce993aee60ccabf2e2c50b6c81",
+    "archive_ref": "refs/heads/cdt/83bb-luna-day"
+  },
+  {
+    "local_ref": "refs/heads/cdt/89d7-luna-round3-gene",
+    "commit": "321e857124e48df45614a40613e718c3a2d977be",
+    "archive_ref": "refs/heads/cdt/89d7-luna-round3-gene"
+  },
+  {
+    "local_ref": "refs/heads/cdt/8ba5-ta-round2-terra",
+    "commit": "f03969540796481c3564ea4c942b0754eac07a30",
+    "archive_ref": "refs/heads/cdt/8ba5-ta-round2-terra"
+  },
+  {
+    "local_ref": "refs/heads/cdt/9944-luna-day-repair",
+    "commit": "dc5603329ac06679e9180f8387f0606fc2d5de2d",
+    "archive_ref": "refs/heads/cdt/9944-luna-day-repair"
+  },
+  {
+    "local_ref": "refs/heads/cdt/9dec-luna-docs",
+    "commit": "1a70f38555e0729fff4b7789ecb69de58cf14298",
+    "archive_ref": "refs/heads/cdt/9dec-luna-docs"
+  },
+  {
+    "local_ref": "refs/heads/cdt/a191-terra-manager",
+    "commit": "bb3a816a96632a21fde47a1bd60e4b3a20fc5874",
+    "archive_ref": "refs/heads/cdt/a191-terra-manager"
+  },
+  {
+    "local_ref": "refs/heads/cdt/a3ed-retrieval-r5-uni",
+    "commit": "94fd34cb4edac14d87d08523e0e55dbfa9cbf03d",
+    "archive_ref": "refs/heads/cdt/a3ed-retrieval-r5-uni"
+  },
+  {
+    "local_ref": "refs/heads/cdt/a87f-ta-luna-ops",
+    "commit": "8c4021f17335a00c8bb71631391c5b91b5b6db8c",
+    "archive_ref": "refs/heads/cdt/a87f-ta-luna-ops"
+  },
+  {
+    "local_ref": "refs/heads/cdt/be48-luna-harden",
+    "commit": "5333282a2af72ba8b96756df12a0f7207df6c759",
+    "archive_ref": "refs/heads/cdt/be48-luna-harden"
+  },
+  {
+    "local_ref": "refs/heads/cdt/bf9a-ta-luna-p4-resum",
+    "commit": "fc3040f5211c13288c0b624fa9810fbe209e680b",
+    "archive_ref": "refs/heads/cdt/bf9a-ta-luna-p4-resum"
+  },
+  {
+    "local_ref": "refs/heads/cdt/c983-ta-sol-review",
+    "commit": "fb6d48cce83f0ec1df4f5fea6687275d26718189",
+    "archive_ref": "refs/heads/cdt/c983-ta-sol-review"
+  },
+  {
+    "local_ref": "refs/heads/cdt/e02a-retrieval-r0-cit",
+    "commit": "7db31f99c55caedfbb328091d370f9c54a0993d5",
+    "archive_ref": "refs/heads/cdt/e02a-retrieval-r0-cit"
+  },
+  {
+    "local_ref": "refs/heads/cdt/e035-ta-audit-sol",
+    "commit": "1a70f38555e0729fff4b7789ecb69de58cf14298",
+    "archive_ref": "refs/heads/cdt/e035-ta-audit-sol"
+  },
+  {
+    "local_ref": "refs/heads/cdt/e11b-luna-honesty",
+    "commit": "0eeb755f2572aea62522b146ed40a78fe7e04b7f",
+    "archive_ref": "refs/heads/cdt/e11b-luna-honesty"
+  },
+  {
+    "local_ref": "refs/heads/cdt/f2bc-ta-round2-sol",
+    "commit": "2438b780a80eed4dc7fea1ed350c839c47c507a3",
+    "archive_ref": "refs/heads/cdt/f2bc-ta-round2-sol"
+  },
+  {
+    "local_ref": "refs/heads/cdt/f468-luna-docs",
+    "commit": "d334103456a20c1ae884e661622ee124591864d3",
+    "archive_ref": "refs/heads/cdt/f468-luna-docs"
+  },
+  {
+    "local_ref": "refs/heads/cp/taste-token-efficiency-20260906",
+    "commit": "afbd64f6e36602c0f403042a4fc94b3c4c79de5f",
+    "archive_ref": "refs/heads/cp/taste-token-efficiency-20260906"
+  },
+  {
+    "local_ref": "refs/heads/fleet/cleanup-2026-08-31",
+    "commit": "b02acb2995c22af46e9cd074249079b3edc794aa",
+    "archive_ref": "refs/heads/fleet/cleanup-2026-08-31"
+  },
+  {
+    "local_ref": "refs/heads/fleet/round2",
+    "commit": "26ff9bed9073b094889f45ee7f601b84ba13bb94",
+    "archive_ref": "refs/heads/fleet/round2"
+  },
+  {
+    "local_ref": "refs/heads/fleet/round3",
+    "commit": "96ae9d74268be204af1a1b0ef1bc8fb69925da57",
+    "archive_ref": "refs/heads/fleet/round3"
+  },
+  {
+    "local_ref": "refs/heads/main",
+    "commit": "85946c2f60768ab2dae23a5a36cd927662feef94",
+    "archive_ref": "refs/heads/main"
+  },
+  {
+    "local_ref": "refs/remotes/fork/add-x-api-key",
+    "commit": "36c56b56596844ec29786b84ba63c973c540f339",
+    "archive_ref": "refs/heads/archive/remote-tips/fork/add-x-api-key"
+  },
+  {
+    "local_ref": "refs/remotes/fork/agent-trading-simulation-backtest",
+    "commit": "afbd64f6e36602c0f403042a4fc94b3c4c79de5f",
+    "archive_ref": "refs/heads/archive/remote-tips/fork/agent-trading-simulation-backtest"
+  },
+  {
+    "local_ref": "refs/remotes/fork/fix/apps-script-webapp-policy",
+    "commit": "a38dbcf63f00cfc2653801a6602eb1d939b2681f",
+    "archive_ref": "refs/heads/archive/remote-tips/fork/fix/apps-script-webapp-policy"
+  },
+  {
+    "local_ref": "refs/remotes/fork/main",
+    "commit": "27a89f3abdbaa74b30765a8ebbaefe1928242ad9",
+    "archive_ref": "refs/heads/archive/remote-tips/fork/main"
+  },
+  {
+    "local_ref": "refs/remotes/fork/v0.2.0",
+    "commit": "b4b133eb2d4e1eae16b0018826259c628f0fd0e6",
+    "archive_ref": "refs/heads/archive/remote-tips/fork/v0.2.0"
+  },
+  {
+    "local_ref": "refs/remotes/origin/main",
+    "commit": "e8f5503e9b86d5c2710b0c76b1f686703968c9df",
+    "archive_ref": "refs/heads/archive/remote-tips/origin/main"
+  },
+  {
+    "local_ref": "refs/remotes/origin/v0.2.0",
+    "commit": "b4b133eb2d4e1eae16b0018826259c628f0fd0e6",
+    "archive_ref": "refs/heads/archive/remote-tips/origin/v0.2.0"
+  },
+  {
+    "local_ref": "refs/tags/v0.1.0",
+    "commit": "0501f28dad649f8b806783450f0fb7a628891fd7",
+    "archive_ref": "refs/tags/v0.1.0"
+  },
+  {
+    "local_ref": "refs/tags/v0.1.1",
+    "commit": "04c32f51ce1512c546e943de7286302dc37bfb3c",
+    "archive_ref": "refs/tags/v0.1.1"
+  },
+  {
+    "local_ref": "refs/tags/v0.2.0",
+    "commit": "0966969183099ca251b2d2139a168afdf9c80f7f",
+    "archive_ref": "refs/tags/v0.2.0"
+  },
+  {
+    "local_ref": "refs/tags/v0.2.1",
+    "commit": "551fd7f074fab8e1080d4ca30efaa4b6b4cd7517",
+    "archive_ref": "refs/tags/v0.2.1"
+  },
+  {
+    "local_ref": "refs/tags/v0.2.2",
+    "commit": "589b351f2ab55a8a37d846848479cebc810a5a36",
+    "archive_ref": "refs/tags/v0.2.2"
+  },
+  {
+    "local_ref": "refs/tags/v0.2.3",
+    "commit": "4641c03340c70e0e75e74234c998325164c72b36",
+    "archive_ref": "refs/tags/v0.2.3"
+  },
+  {
+    "local_ref": "refs/tags/v0.2.4",
+    "commit": "cba7e676faa52f05573da683bb87815d6bf15814",
+    "archive_ref": "refs/tags/v0.2.4"
+  },
+  {
+    "local_ref": "refs/tags/v0.2.5",
+    "commit": "65537596d48523584083b19fa308a905d3480232",
+    "archive_ref": "refs/tags/v0.2.5"
+  },
+  {
+    "local_ref": "refs/tags/v0.3.0",
+    "commit": "0a19704df3d7d894500697c233faf520a27dec6e",
+    "archive_ref": "refs/tags/v0.3.0"
+  },
+  {
+    "local_ref": "refs/tags/v0.3.1",
+    "commit": "5a3d1b51d339202d03c4b57c1a1012f69376495f",
+    "archive_ref": "refs/tags/v0.3.1"
+  },
+  {
+    "local_ref": "refs/tags/v0.4.0",
+    "commit": "c5e62b8bb88bc308e84ea351044356f99da1213e",
+    "archive_ref": "refs/tags/v0.4.0"
+  },
+  {
+    "local_ref": "refs/tags/v0.5.0",
+    "commit": "6aafdce38e0d1c1f211127f9ff8f969695020478",
+    "archive_ref": "refs/tags/v0.5.0"
+  },
+  {
+    "local_ref": "refs/tags/v0.5.1",
+    "commit": "b95674673d3a20749e07855f1dce2ac82ccacade",
+    "archive_ref": "refs/tags/v0.5.1"
+  },
+  {
+    "local_ref": "refs/tags/v0.5.2",
+    "commit": "4b300982fac416477897da575ee3cc8b8bf560bd",
+    "archive_ref": "refs/tags/v0.5.2"
+  },
+  {
+    "local_ref": "refs/tags/v0.6.0",
+    "commit": "1394a3f72aa4393e1a98f51b382434c4b4c2d972",
+    "archive_ref": "refs/tags/v0.6.0"
+  },
+  {
+    "local_ref": "refs/tags/v0.7.0",
+    "commit": "e8f5503e9b86d5c2710b0c76b1f686703968c9df",
+    "archive_ref": "refs/tags/v0.7.0"
+  }
+]

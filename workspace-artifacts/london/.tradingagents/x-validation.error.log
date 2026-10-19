@@ -1,0 +1,204 @@
+2026-08-23 14:05:01,038 INFO Store: configured local database · news themes: 6 · news cadence: 3600s · X cadence: 86400s
+2026-08-23 14:05:11,832 INFO stocktwits fetch mirrored 30 temporal documents
+2026-08-23 14:05:13,235 ERROR reddit fetch slot f10cbdc5641ec872 failed (ProviderTransientError)
+2026-08-23 14:05:13,333 INFO GET https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts failed (HTTPError)
+2026-08-23 14:05:13,335 ERROR bluesky fetch slot 66ee3213b5264e99 failed (ProviderResponseError)
+2026-08-23 14:05:51,696 INFO news fetch mirrored 116 temporal documents
+2026-08-23 14:05:51,697 INFO AAPL: stocktwits success +14 · reddit failed · bluesky failed · news success +23
+2026-08-23 14:06:01,459 INFO stocktwits fetch mirrored 30 temporal documents
+2026-08-23 14:06:02,879 ERROR reddit fetch slot d24d93371e8db370 failed (ProviderTransientError)
+2026-08-23 14:06:02,965 INFO GET https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts failed (HTTPError)
+2026-08-23 14:06:02,966 ERROR bluesky fetch slot 70bc52b125a69a3d failed (ProviderResponseError)
+2026-08-23 14:06:41,930 INFO news fetch mirrored 118 temporal documents
+2026-08-23 14:06:41,931 INFO AMZN: stocktwits success +23 · reddit failed · bluesky failed · news success +29
+2026-08-23 14:06:53,249 INFO stocktwits fetch mirrored 30 temporal documents
+2026-08-23 14:06:53,403 ERROR reddit fetch slot 1121240bf9a17e22 failed (ProviderTransientError)
+2026-08-23 14:06:53,479 INFO GET https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts failed (HTTPError)
+2026-08-23 14:06:53,480 ERROR bluesky fetch slot 7e3191a5ac998b39 failed (ProviderResponseError)
+2026-08-23 14:07:31,705 INFO news fetch mirrored 116 temporal documents
+2026-08-23 14:07:31,706 INFO AVGO: stocktwits success +11 · reddit failed · bluesky failed · news success +11
+2026-08-23 14:07:41,535 INFO stocktwits fetch mirrored 30 temporal documents
+2026-08-23 14:07:42,861 ERROR reddit fetch slot cceb3c29f8685ea1 failed (ProviderTransientError)
+2026-08-23 14:07:42,953 INFO GET https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts failed (HTTPError)
+2026-08-23 14:07:42,955 ERROR bluesky fetch slot 61ab4d173f8d3fb5 failed (ProviderResponseError)
+2026-08-23 14:08:18,522 INFO news fetch mirrored 100 temporal documents
+2026-08-23 14:08:18,523 INFO BRK.B: stocktwits success +6 · reddit failed · bluesky failed · news success +8
+2026-08-23 14:08:28,684 INFO stocktwits fetch mirrored 30 temporal documents
+2026-08-23 14:08:30,147 ERROR reddit fetch slot f53d0f3d95d39f0e failed (ProviderTransientError)
+2026-08-23 14:08:30,266 INFO GET https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts failed (HTTPError)
+2026-08-23 14:08:30,267 ERROR bluesky fetch slot 711d30ef391fa18c failed (ProviderResponseError)
+2026-08-23 14:09:11,046 INFO news fetch mirrored 117 temporal documents
+2026-08-23 14:09:11,046 INFO COIN: stocktwits success +27 · reddit failed · bluesky failed · news success +39
+2026-08-23 14:09:20,967 INFO stocktwits fetch mirrored 30 temporal documents
+2026-08-23 14:09:22,672 ERROR reddit fetch slot 7b5441b0cdb150a1 failed (ProviderTransientError)
+2026-08-23 14:09:22,773 INFO GET https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts failed (HTTPError)
+2026-08-23 14:09:22,774 ERROR bluesky fetch slot 1e1dee985b4dd8f1 failed (ProviderResponseError)
+2026-08-23 14:10:01,096 INFO news fetch mirrored 109 temporal documents
+2026-08-23 14:10:01,096 INFO COST: stocktwits success +1 · reddit failed · bluesky failed · news success +46
+2026-08-23 14:10:11,930 INFO stocktwits fetch mirrored 30 temporal documents
+2026-08-23 14:10:13,327 ERROR reddit fetch slot dce7897ea8d1b6f1 failed (ProviderTransientError)
+2026-08-23 14:10:13,450 INFO GET https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts failed (HTTPError)
+2026-08-23 14:10:13,452 ERROR bluesky fetch slot bcc01a9db59a3089 failed (ProviderResponseError)
+2026-08-23 14:10:56,066 INFO news fetch mirrored 118 temporal documents
+2026-08-23 14:10:56,067 INFO CRM: stocktwits success +0 · reddit failed · bluesky failed · news success +11
+2026-08-23 14:11:07,828 INFO stocktwits fetch mirrored 30 temporal documents
+2026-08-23 14:11:09,433 ERROR reddit fetch slot 6a2d24345710e7b1 failed (ProviderTransientError)
+2026-08-23 14:11:09,534 INFO GET https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts failed (HTTPError)
+2026-08-23 14:11:09,536 ERROR bluesky fetch slot b7e85213dedd1586 failed (ProviderResponseError)
+2026-08-23 14:11:51,454 INFO news fetch mirrored 111 temporal documents
+2026-08-23 14:11:51,454 INFO GOOGL: stocktwits success +11 · reddit failed · bluesky failed · news success +16
+2026-08-23 14:11:52,737 ERROR stocktwits fetch slot 410c1ab30721ca64 failed (ProviderResponseError)
+2026-08-23 14:11:52,913 ERROR reddit fetch slot c43fbe60d06af8ef failed (ProviderTransientError)
+2026-08-23 14:11:53,002 INFO GET https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts failed (HTTPError)
+2026-08-23 14:11:53,003 ERROR bluesky fetch slot b42c063b5df72dcc failed (ProviderResponseError)
+2026-08-23 14:12:35,415 INFO news fetch mirrored 117 temporal documents
+2026-08-23 14:12:35,416 INFO JPM: stocktwits failed · reddit failed · bluesky failed · news success +11
+2026-08-23 14:12:45,437 INFO stocktwits fetch mirrored 30 temporal documents
+2026-08-23 14:12:46,957 ERROR reddit fetch slot c1cdd0c9bc21123d failed (ProviderTransientError)
+2026-08-23 14:12:47,055 INFO GET https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts failed (HTTPError)
+2026-08-23 14:12:47,057 ERROR bluesky fetch slot a3b834c97f985316 failed (ProviderResponseError)
+2026-08-23 14:13:29,761 INFO news fetch mirrored 120 temporal documents
+2026-08-23 14:13:29,762 INFO LLY: stocktwits success +2 · reddit failed · bluesky failed · news success +7
+2026-08-23 14:13:40,852 INFO stocktwits fetch mirrored 30 temporal documents
+2026-08-23 14:13:42,385 ERROR reddit fetch slot 50c85d4e671b8c5b failed (ProviderTransientError)
+2026-08-23 14:13:42,494 INFO GET https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts failed (HTTPError)
+2026-08-23 14:13:42,496 ERROR bluesky fetch slot d5fa6e0dfa7230fb failed (ProviderResponseError)
+2026-08-23 14:14:25,626 INFO news fetch mirrored 116 temporal documents
+2026-08-23 14:14:25,627 INFO MA: stocktwits success +6 · reddit failed · bluesky failed · news success +20
+2026-08-23 14:14:37,693 INFO stocktwits fetch mirrored 30 temporal documents
+2026-08-23 14:14:39,323 ERROR reddit fetch slot 9c6f7df1d94fc582 failed (ProviderTransientError)
+2026-08-23 14:14:39,428 INFO GET https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts failed (HTTPError)
+2026-08-23 14:14:39,430 ERROR bluesky fetch slot 1e4fa835d6078a8b failed (ProviderResponseError)
+2026-08-23 14:15:25,373 INFO news fetch mirrored 117 temporal documents
+2026-08-23 14:15:25,374 INFO META: stocktwits success +22 · reddit failed · bluesky failed · news success +26
+2026-08-23 14:15:37,649 INFO stocktwits fetch mirrored 30 temporal documents
+2026-08-23 14:15:39,178 ERROR reddit fetch slot 08ca7a0bd3516a91 failed (ProviderTransientError)
+2026-08-23 14:15:39,273 INFO GET https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts failed (HTTPError)
+2026-08-23 14:15:39,275 ERROR bluesky fetch slot 9f5378aec1ba561d failed (ProviderResponseError)
+2026-08-23 14:16:26,822 INFO news fetch mirrored 117 temporal documents
+2026-08-23 14:16:26,822 INFO MSFT: stocktwits success +18 · reddit failed · bluesky failed · news success +9
+2026-08-23 14:16:37,850 INFO stocktwits fetch mirrored 30 temporal documents
+2026-08-23 14:16:39,374 ERROR reddit fetch slot 4d963f228f43ffdb failed (ProviderTransientError)
+2026-08-23 14:16:39,484 INFO GET https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts failed (HTTPError)
+2026-08-23 14:16:39,486 ERROR bluesky fetch slot 6fce05127d37b49e failed (ProviderResponseError)
+2026-08-23 14:17:26,800 INFO news fetch mirrored 117 temporal documents
+2026-08-23 14:17:26,801 INFO NFLX: stocktwits success +8 · reddit failed · bluesky failed · news success +13
+2026-08-23 14:17:40,056 INFO stocktwits fetch mirrored 30 temporal documents
+2026-08-23 14:17:41,535 ERROR reddit fetch slot 55fb8dd2461490a4 failed (ProviderTransientError)
+2026-08-23 14:17:41,639 INFO GET https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts failed (HTTPError)
+2026-08-23 14:17:41,642 ERROR bluesky fetch slot 87c07394cc0ee346 failed (ProviderResponseError)
+2026-08-23 14:18:33,128 INFO news fetch mirrored 120 temporal documents
+2026-08-23 14:18:33,129 INFO NVDA: stocktwits success +29 · reddit failed · bluesky failed · news success +44
+2026-08-23 14:18:46,432 INFO stocktwits fetch mirrored 30 temporal documents
+2026-08-23 14:18:47,895 ERROR reddit fetch slot 24b0547d7e958216 failed (ProviderTransientError)
+2026-08-23 14:18:47,988 INFO GET https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts failed (HTTPError)
+2026-08-23 14:18:47,990 ERROR bluesky fetch slot 89511185ebd5da57 failed (ProviderResponseError)
+2026-08-23 14:19:35,725 INFO news fetch mirrored 119 temporal documents
+2026-08-23 14:19:35,725 INFO ORCL: stocktwits success +10 · reddit failed · bluesky failed · news success +19
+2026-08-23 14:19:47,845 INFO stocktwits fetch mirrored 30 temporal documents
+2026-08-23 14:19:49,297 ERROR reddit fetch slot 533e1e67bbf6c605 failed (ProviderTransientError)
+2026-08-23 14:19:49,396 INFO GET https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts failed (HTTPError)
+2026-08-23 14:19:49,398 ERROR bluesky fetch slot a09855df86e25cd3 failed (ProviderResponseError)
+2026-08-23 14:20:33,906 INFO news fetch mirrored 111 temporal documents
+2026-08-23 14:20:33,907 INFO PLTR: stocktwits success +28 · reddit failed · bluesky failed · news success +10
+2026-08-23 14:20:45,735 INFO stocktwits fetch mirrored 30 temporal documents
+2026-08-23 14:20:47,188 ERROR reddit fetch slot 270dc663c6584133 failed (ProviderTransientError)
+2026-08-23 14:20:47,281 INFO GET https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts failed (HTTPError)
+2026-08-23 14:20:47,282 ERROR bluesky fetch slot d5405522617c5ad8 failed (ProviderResponseError)
+2026-08-23 14:21:40,332 INFO news fetch mirrored 116 temporal documents
+2026-08-23 14:21:40,332 INFO TSLA: stocktwits success +24 · reddit failed · bluesky failed · news success +38
+2026-08-23 14:21:52,970 INFO stocktwits fetch mirrored 30 temporal documents
+2026-08-23 14:21:54,474 ERROR reddit fetch slot 5aecf88c9b35e5af failed (ProviderTransientError)
+2026-08-23 14:21:54,569 INFO GET https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts failed (HTTPError)
+2026-08-23 14:21:54,571 ERROR bluesky fetch slot b1ab660455c0b809 failed (ProviderResponseError)
+2026-08-23 14:22:44,018 INFO news fetch mirrored 118 temporal documents
+2026-08-23 14:22:44,019 INFO UNH: stocktwits success +6 · reddit failed · bluesky failed · news success +14
+2026-08-23 14:22:56,527 INFO stocktwits fetch mirrored 30 temporal documents
+2026-08-23 14:22:58,272 ERROR reddit fetch slot 9b1cc8b6fa24c221 failed (ProviderTransientError)
+2026-08-23 14:22:58,361 INFO GET https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts failed (HTTPError)
+2026-08-23 14:22:58,363 ERROR bluesky fetch slot e0e9038fb68f4a10 failed (ProviderResponseError)
+2026-08-23 14:23:45,854 INFO news fetch mirrored 116 temporal documents
+2026-08-23 14:23:45,856 INFO V: stocktwits success +5 · reddit failed · bluesky failed · news success +14
+2026-08-23 14:23:58,397 INFO stocktwits fetch mirrored 30 temporal documents
+2026-08-23 14:23:59,892 ERROR reddit fetch slot 551e214f9774359f failed (ProviderTransientError)
+2026-08-23 14:23:59,977 INFO GET https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts failed (HTTPError)
+2026-08-23 14:23:59,979 ERROR bluesky fetch slot 3ee6e2292d13af88 failed (ProviderResponseError)
+2026-08-23 14:24:49,478 INFO news fetch mirrored 119 temporal documents
+2026-08-23 14:24:49,479 INFO XOM: stocktwits success +3 · reddit failed · bluesky failed · news success +11
+2026-08-23 14:25:02,492 INFO stocktwits fetch mirrored 30 temporal documents
+2026-08-23 14:25:03,966 ERROR reddit fetch slot 6a81b55de5a01259 failed (ProviderTransientError)
+2026-08-23 14:25:04,065 INFO GET https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts failed (HTTPError)
+2026-08-23 14:25:04,067 ERROR bluesky fetch slot b55937a6864a9b42 failed (ProviderResponseError)
+2026-08-23 14:25:53,984 INFO news fetch mirrored 119 temporal documents
+2026-08-23 14:25:53,985 INFO AMD: stocktwits success +20 · reddit failed · bluesky failed · news success +21
+2026-08-23 14:26:07,847 INFO stocktwits fetch mirrored 30 temporal documents
+2026-08-23 14:26:10,110 ERROR reddit fetch slot 4ecdf4d29fce2713 failed (ProviderTransientError)
+2026-08-23 14:26:10,208 INFO GET https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts failed (HTTPError)
+2026-08-23 14:26:10,210 ERROR bluesky fetch slot 033b3ea514970cdf failed (ProviderResponseError)
+2026-08-23 14:27:03,435 INFO news fetch mirrored 119 temporal documents
+2026-08-23 14:27:03,436 INFO AMAT: stocktwits success +1 · reddit failed · bluesky failed · news success +54
+2026-08-23 14:27:16,104 INFO stocktwits fetch mirrored 30 temporal documents
+2026-08-23 14:27:17,601 ERROR reddit fetch slot 72d8e38be3e45ac2 failed (ProviderTransientError)
+2026-08-23 14:27:17,695 INFO GET https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts failed (HTTPError)
+2026-08-23 14:27:17,697 ERROR bluesky fetch slot 94705830ae4dbb39 failed (ProviderResponseError)
+2026-08-23 14:28:11,682 INFO news fetch mirrored 119 temporal documents
+2026-08-23 14:28:11,683 INFO BAC: stocktwits success +1 · reddit failed · bluesky failed · news success +12
+2026-08-23 14:28:28,239 INFO stocktwits fetch mirrored 30 temporal documents
+2026-08-23 14:28:29,747 ERROR reddit fetch slot 4d1f46c9d98a4a58 failed (ProviderTransientError)
+2026-08-23 14:28:29,834 INFO GET https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts failed (HTTPError)
+2026-08-23 14:28:29,836 ERROR bluesky fetch slot eb1bd4ded68b6648 failed (ProviderResponseError)
+2026-08-23 14:29:23,802 INFO news fetch mirrored 118 temporal documents
+2026-08-23 14:29:23,802 INFO GS: stocktwits success +1 · reddit failed · bluesky failed · news success +4
+2026-08-23 14:29:37,421 INFO stocktwits fetch mirrored 30 temporal documents
+2026-08-23 14:29:38,878 ERROR reddit fetch slot 4e71ca8f1a029888 failed (ProviderTransientError)
+2026-08-23 14:29:38,978 INFO GET https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts failed (HTTPError)
+2026-08-23 14:29:38,980 ERROR bluesky fetch slot 346301128e55aa8f failed (ProviderResponseError)
+2026-08-23 14:30:34,641 INFO news fetch mirrored 118 temporal documents
+2026-08-23 14:30:34,642 INFO INTC: stocktwits success +27 · reddit failed · bluesky failed · news success +18
+2026-08-23 14:30:49,347 INFO stocktwits fetch mirrored 30 temporal documents
+2026-08-23 14:30:50,845 ERROR reddit fetch slot 471cdb7b09bbb6ed failed (ProviderTransientError)
+2026-08-23 14:30:50,938 INFO GET https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts failed (HTTPError)
+2026-08-23 14:30:50,940 ERROR bluesky fetch slot 1ea9124a2b0aff0c failed (ProviderResponseError)
+2026-08-23 14:31:44,761 INFO news fetch mirrored 116 temporal documents
+2026-08-23 14:31:44,762 INFO MCD: stocktwits success +2 · reddit failed · bluesky failed · news success +9
+2026-08-23 14:31:59,915 INFO stocktwits fetch mirrored 30 temporal documents
+2026-08-23 14:32:01,404 ERROR reddit fetch slot 8f17f74968428aef failed (ProviderTransientError)
+2026-08-23 14:32:01,501 INFO GET https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts failed (HTTPError)
+2026-08-23 14:32:01,502 ERROR bluesky fetch slot 0c3c3257c34e1ef0 failed (ProviderResponseError)
+2026-08-23 14:32:56,457 INFO news fetch mirrored 114 temporal documents
+2026-08-23 14:32:56,460 INFO MS: stocktwits success +0 · reddit failed · bluesky failed · news success +7
+2026-08-23 14:33:13,103 INFO stocktwits fetch mirrored 30 temporal documents
+2026-08-23 14:33:14,787 ERROR reddit fetch slot 3d3c2454fb5cf023 failed (ProviderTransientError)
+2026-08-23 14:33:14,885 INFO GET https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts failed (HTTPError)
+2026-08-23 14:33:14,887 ERROR bluesky fetch slot 2b4553ccd4d3f75c failed (ProviderResponseError)
+2026-08-23 14:34:08,607 INFO news fetch mirrored 119 temporal documents
+2026-08-23 14:34:08,607 INFO QQQ: stocktwits success +26 · reddit failed · bluesky failed · news success +19
+2026-08-23 14:34:23,312 INFO stocktwits fetch mirrored 30 temporal documents
+2026-08-23 14:34:24,851 ERROR reddit fetch slot d4e2a94e0c8f4429 failed (ProviderTransientError)
+2026-08-23 14:34:24,942 INFO GET https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts failed (HTTPError)
+2026-08-23 14:34:24,944 ERROR bluesky fetch slot cf6a40fe39cba273 failed (ProviderResponseError)
+2026-08-23 14:35:21,516 INFO news fetch mirrored 120 temporal documents
+2026-08-23 14:35:21,517 INFO SPY: stocktwits success +22 · reddit failed · bluesky failed · news success +26
+2026-08-23 14:35:34,001 INFO globalnews fetch mirrored 25 temporal documents
+2026-08-23 14:35:45,299 INFO globalnews fetch mirrored 25 temporal documents
+2026-08-23 14:35:45,619 ERROR polymarket fetch slot 7c1fd12cc8afa930 failed (ProviderResponseError)
+2026-08-23 14:35:46,004 ERROR polymarket fetch slot 862ae99949dd1977 failed (ProviderResponseError)
+2026-08-23 14:35:46,005 INFO macro[rates]: globalnews +10 · polymarket-odds +0
+2026-08-23 14:35:57,065 INFO globalnews fetch mirrored 25 temporal documents
+2026-08-23 14:36:08,322 INFO globalnews fetch mirrored 25 temporal documents
+2026-08-23 14:36:12,688 INFO macro[trade]: globalnews +11 · polymarket-odds +4
+2026-08-23 14:36:19,089 INFO globalnews fetch mirrored 15 temporal documents
+2026-08-23 14:36:25,391 INFO globalnews fetch mirrored 15 temporal documents
+2026-08-23 14:36:26,231 ERROR polymarket fetch slot 6050f08a0d3ef9fc failed (ProviderResponseError)
+2026-08-23 14:36:26,231 INFO macro[politics]: globalnews +11 · polymarket-odds +10
+2026-08-23 14:36:37,641 INFO globalnews fetch mirrored 25 temporal documents
+2026-08-23 14:36:37,641 INFO macro[companies]: globalnews +5 · polymarket-odds +0
+2026-08-23 14:36:48,933 INFO globalnews fetch mirrored 25 temporal documents
+2026-08-23 14:37:01,283 INFO globalnews fetch mirrored 25 temporal documents
+2026-08-23 14:37:02,048 INFO macro[technology]: globalnews +15 · polymarket-odds +11
+2026-08-23 14:37:12,084 INFO globalnews fetch slot e92df4dd1e5635ce attempt 1/3 failed (ProviderTransientError); retrying
+2026-08-23 14:37:24,375 INFO globalnews fetch mirrored 25 temporal documents
+2026-08-23 14:37:25,147 ERROR polymarket fetch slot b5d04c3fe9c2feee failed (ProviderResponseError)
+2026-08-23 14:37:25,147 INFO macro[energy]: globalnews +2 · polymarket-odds +0
+2026-08-23 14:37:25,169 WARNING collector alert: query_slot_coverage_incomplete · {"expected_query_slot_count": 140, "missing_periodic_requirement_count": 0, "missing_query_slot_count": 65, "missing_source_group_count": 0, "missing_x_daily_requirement": false, "reason_counts": {"failed": 65}, "slots": [{"provider": "reddit", "reason": "failed", "slot_id": "f10cbdc5641ec872"}, {"provider": "bluesky", "reason": "failed", "slot_id": "66ee3213b5264e99"}, {"provider": "reddit", "reason": "failed", "slot_id": "d24d93371e8db370"}, {"provider": "bluesky", "reason": "failed", "slot_id": "70bc52b125a69a3d"}, {"provider": "reddit", "reason": "failed", "slot_id": "1121240bf9a17e22"}, {"provider": "bluesky", "reason": "failed", "slot_id": "7e3191a5ac998b39"}, {"provider": "reddit", "reason": "failed", "slot_id": "cceb3c29f8685ea1"}, {"provider": "bluesky", "reason": "failed", "slot_id": "61ab4d173f8d3fb5"}, {"provider": "reddit", "reason": "failed", "slot_id": "f53d0f3d95d39f0e"}, {"provider": "bluesky", "reason": "failed", "slot_id": "711d30ef391fa18c"}, {"provider": "reddit", "reason": "failed", "slot_id": "7b5441b0cdb150a1"}, {"provider": "bluesky", "reason": "failed", "slot_id": "1e1dee985b4dd8f1"}, {"provider": "reddit", "reason": "failed", "slot_id": "dce7897ea8d1b6f1"}, {"provider": "bluesky", "reason": "failed", "slot_id": "bcc01a9db59a3089"}, {"provider": "reddit", "reason": "failed", "slot_id": "6a2d24345710e7b1"}, {"provider": "bluesky", "reason": "failed", "slot_id": "b7e85213dedd1586"}, {"provider": "stocktwits", "reason": "failed", "slot_id": "410c1ab30721ca64"}, {"provider": "reddit", "reason": "failed", "slot_id": "c43fbe60d06af8ef"}, {"provider": "bluesky", "reason": "failed", "slot_id": "b42c063b5df72dcc"}, {"provider": "reddit", "reason": "failed", "slot_id": "c1cdd0c9bc21123d"}], "slots_truncated": 45, "x_daily_state": "complete"}
+2026-08-23 14:37:25,169 WARNING Operations webhook was not acknowledged (not_configured)

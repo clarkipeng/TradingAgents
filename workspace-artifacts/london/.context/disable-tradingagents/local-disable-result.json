@@ -1,0 +1,9 @@
+[
+  {
+    "label": "io.tradingagents.audit-fleet-wake-20260906",
+    "disable_success": true,
+    "loaded": false,
+    "startup_definition_present": false,
+    "preserved_definition": "/Users/clarkpeng/Library/LaunchAgents.disabled/tradingagents-20260915/io.tradingagents.audit-fleet-wake-20260906.plist"
+  }
+]

@@ -1,0 +1,33 @@
+.F...................................                                    [100%]
+=================================== FAILURES ===================================
+___ test_production_execution_applies_opening_gap_and_replays_its_quote_tape ___
+
+tmp_path = PosixPath('/private/var/folders/bb/q9_4j2pn5w53238kcp71jh8m0000gn/T/pytest-of-clarkpeng/pytest-142/test_production_execution_appl0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10c3b1220>
+
+    def test_production_execution_applies_opening_gap_and_replays_its_quote_tape(tmp_path, monkeypatch):
+        import tradingagents.dataflows.interface as interface
+    
+        def provider(_method, symbol, *_args):
+            opening = "110" if symbol == "AAPL" else "90"
+            return f"Date,Open,Split Coefficient,Dividend Amount\n2026-09-08,{opening},1,0\n"
+    
+        monkeypatch.setattr(interface, "route_to_vendor", provider)
+        with TemporalStore(tmp_path) as store:
+            _publish_pending(store)
+            result = execute_pending_portfolio_day(
+                store, "2026-09-04", **production_execution_inputs(store),
+                execution_clock=lambda: _utc(2026, 9, 8, 14),
+            )
+>           assert result["status"] == "completed"
+E           AssertionError: assert 'failed_unsealed' == 'completed'
+E             
+E             - completed
+E             + failed_unsealed
+
+tests/test_portfolio_next_open_lifecycle.py:76: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    yfinance:history.py:296 $AAPL: possibly delisted; no price data found  (1d 2026-09-08 -> 2026-09-09)
+=========================== short test summary info ============================
+FAILED tests/test_portfolio_next_open_lifecycle.py::test_production_execution_applies_opening_gap_and_replays_its_quote_tape
+1 failed, 36 passed in 2.02s
