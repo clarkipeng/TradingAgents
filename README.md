@@ -10,7 +10,7 @@ cd TradingAgents-archive-2026-10-18
 git switch --track origin/agent-trading-simulation-backtest
 ```
 
-`agent-trading-simulation-backtest` contains London's integrated audit fixes and latest shutdown documentation. The source checkpoint is `fbceb0e`. `archive/canonical-wip-2026-10-18` preserves the older canonical checkout's 8 modified and 18 untracked source files without changing its original `main` branch. `cdt/8224-ta-audit-lead` includes its previously uncommitted final handoff (`63dff52`). All other local branch tips and tags are retained separately; unfinished or rejected experiments have not been merged. Remote-tracking tips are preserved under `archive/remote-tips/`.
+`agent-trading-simulation-backtest` contains London's integrated audit fixes and latest shutdown documentation. The final source checkpoint is `bb7156d` (archival status documentation; code remains paused). `archive/canonical-wip-2026-10-18` preserves the older canonical checkout's 8 modified and 18 untracked source files without changing its original `main` branch. `cdt/8224-ta-audit-lead` includes its previously uncommitted final handoff (`63dff52`). All other local branch tips and tags are retained separately; unfinished or rejected experiments have not been merged. Remote-tracking tips are preserved under `archive/remote-tips/`.
 
 The `git-history.bundle` file additionally preserves original Conductor/Codex checkpoint refs listed in `historical-refs.json`. It predates the new archival commits, which are on the remote branches. To recover every original ref, run `git clone --mirror git-history.bundle recovered.git` from this index branch.
 
@@ -32,4 +32,6 @@ Dependency environments, bytecode, test/lint caches, and generated package metad
 
 ## Workspace retirement
 
-`conductor-workspaces.json` and `sightmesh-workspaces.json` record the initial inventory. Calgary was already archived. London must be archived by the user in Conductor after preservation: current Conductor support does not expose an agent workspace-control API. Sightmesh retirement results and remote-backup verification will be added when completed.
+`conductor-workspaces.json` and `sightmesh-workspaces.json` record the initial inventory. Calgary was already archived. London must be archived by the user in Conductor after preservation: current Conductor support does not expose an agent workspace-control API. Sightmesh has 24 of 26 TradingAgents workspaces archived, including 14 archived during this request. `ta-sol-execution-v2` and `ta-luna-p4-resume` remain blocked by the service's unconfirmed detached-tool cleanup. Both have zero running execution processes and all their work is preserved. See `sightmesh-retirement.json` and `sightmesh-final.json`. No implementation agents were woken, and no original repository or branch was deleted.
+
+The backup was verified by a fresh GitHub clone, exact remote-ref comparison, Git integrity checks, all 281 artifact checksums, five restored SQLite integrity checks, and restoration of the original Git bundle (421 refs plus eight checkout-head commit objects). See `remote-verification.json`. Local credentials and raw evidence remain in the external `local-only/` directory described above. GitHub Actions remain disabled; this private repository will be marked archived after the final status upload.

@@ -1,0 +1,11 @@
+{
+  "remote_refs_verified": 66,
+  "fresh_github_clone": "passed",
+  "git_fsck": "passed",
+  "artifact_digests_verified": 281,
+  "sqlite_databases_restored": 5,
+  "original_git_bundle_restore": "passed",
+  "historical_refs_verified": 421,
+  "historical_checkout_heads_verified": 8,
+  "note": "Per-worktree HEAD aliases are local checkout metadata. Their exact commits are verified present; a clone does not recreate local checkout aliases."
+}

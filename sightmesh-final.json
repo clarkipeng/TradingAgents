@@ -1,0 +1,163 @@
+{
+  "workspaces": [
+    {
+      "id": "0a1162de-d417-4f7b-b03f-3379f88a489b",
+      "name": "ta-sol-execution-v2",
+      "branch": "cdt/0a11-ta-sol-execution",
+      "archived": false
+    },
+    {
+      "id": "bf9a5eae-6447-4333-8ea2-a296f2fb4676",
+      "name": "ta-luna-p4-resume",
+      "branch": "cdt/bf9a-ta-luna-p4-resum",
+      "archived": false
+    },
+    {
+      "id": "c9836aea-6030-4b3b-86e1-75c8af909039",
+      "name": "ta-sol-review",
+      "branch": "cdt/c983-ta-sol-review",
+      "archived": true
+    },
+    {
+      "id": "67b7d7e7-6cc7-4280-8c0b-ea3da8b3d2d4",
+      "name": "ta-luna-store",
+      "branch": "cdt/67b7-ta-luna-store",
+      "archived": true
+    },
+    {
+      "id": "a87f14d2-fc09-4d46-a62c-c82b5afaf885",
+      "name": "ta-luna-ops",
+      "branch": "cdt/a87f-ta-luna-ops",
+      "archived": true
+    },
+    {
+      "id": "822403cb-f787-4151-84e6-ccfc15084873",
+      "name": "ta-audit-lead",
+      "branch": "cdt/8224-ta-audit-lead",
+      "archived": true
+    },
+    {
+      "id": "89d7a15c-b16f-4111-a1e5-95da12a64836",
+      "name": "luna-round3-generation",
+      "branch": "cdt/89d7-luna-round3-gene",
+      "archived": true
+    },
+    {
+      "id": "2c128890-a39b-449c-b308-d1009e172e2c",
+      "name": "luna-round3-portfolio",
+      "branch": "cdt/2c12-luna-round3-port",
+      "archived": true
+    },
+    {
+      "id": "f2bc7497-8e07-40ba-b50f-793db76e996c",
+      "name": "ta-round2-sol",
+      "branch": "cdt/f2bc-ta-round2-sol",
+      "archived": true
+    },
+    {
+      "id": "9944853e-2824-4863-9da1-d5a2c938506f",
+      "name": "luna-day-repair",
+      "branch": "cdt/9944-luna-day-repair",
+      "archived": true
+    },
+    {
+      "id": "e11bea59-380c-496f-b5a5-dc3a7bbf4f55",
+      "name": "luna-honesty",
+      "branch": "cdt/e11b-luna-honesty",
+      "archived": true
+    },
+    {
+      "id": "06de20c2-dc5d-4517-af05-8e22cbd09085",
+      "name": "luna-reindex",
+      "branch": "cdt/06de-luna-reindex",
+      "archived": true
+    },
+    {
+      "id": "4549a773-150f-4a60-b4c0-365e2cfb97e7",
+      "name": "luna-day",
+      "branch": "cdt/4549-luna-day",
+      "archived": true
+    },
+    {
+      "id": "155252c2-52d5-43b9-abd6-623af6cb19b7",
+      "name": "luna-day",
+      "branch": "cdt/1552-luna-day",
+      "archived": true
+    },
+    {
+      "id": "83bb8029-2d69-43ab-ab67-795204c9c064",
+      "name": "luna-day",
+      "branch": "cdt/83bb-luna-day",
+      "archived": true
+    },
+    {
+      "id": "8ba5c13e-b8b2-45fb-b7f9-a4b0d2c576ed",
+      "name": "ta-round2-terra",
+      "branch": "cdt/8ba5-ta-round2-terra",
+      "archived": true
+    },
+    {
+      "id": "0405ada5-bcf3-4e17-818f-5c5dc0a41c79",
+      "name": "luna-ops",
+      "branch": "cdt/0405-luna-ops",
+      "archived": true
+    },
+    {
+      "id": "9dec7b7b-eecb-4839-b8e3-9c1900ffaff3",
+      "name": "luna-docs",
+      "branch": "cdt/9dec-luna-docs",
+      "archived": true
+    },
+    {
+      "id": "be483039-599f-4dbe-9258-b9182ae7a0b6",
+      "name": "luna-harden",
+      "branch": "cdt/be48-luna-harden",
+      "archived": true
+    },
+    {
+      "id": "7504f0d0-e09c-4bce-879a-d1cbff282381",
+      "name": "luna-taste",
+      "branch": "cdt/7504-luna-taste",
+      "archived": true
+    },
+    {
+      "id": "2bffca96-cf42-4cca-9f37-c53d7018a165",
+      "name": "luna-taste",
+      "branch": "cdt/2bff-luna-taste",
+      "archived": true
+    },
+    {
+      "id": "f468b40f-9c82-475c-a5f9-eefd47f0859c",
+      "name": "luna-docs",
+      "branch": "cdt/f468-luna-docs",
+      "archived": true
+    },
+    {
+      "id": "540f4910-b623-4161-9817-6edcbee9842d",
+      "name": "luna-ops",
+      "branch": "cdt/540f-luna-ops",
+      "archived": true
+    },
+    {
+      "id": "5d52db7e-c188-48b4-b7b2-61eece8cc629",
+      "name": "luna-harden",
+      "branch": "cdt/5d52-luna-harden",
+      "archived": true
+    },
+    {
+      "id": "0539f8e5-2959-4773-a983-c40620e1cd55",
+      "name": "ta-fleet-terra",
+      "branch": "cdt/0539-ta-fleet-terra",
+      "archived": true
+    },
+    {
+      "id": "e0352a17-9879-4dc1-836d-7c0674f0836b",
+      "name": "ta-audit-sol",
+      "branch": "cdt/e035-ta-audit-sol",
+      "archived": true
+    }
+  ],
+  "running_execution_processes": [],
+  "archived_count": 24,
+  "remaining_count": 2
+}
