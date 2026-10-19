@@ -1,5 +1,9 @@
 # Repository operating safeguards
 
+Read [taste.md](taste.md) for how we make decisions before starting work.
+This file gives the repository's commands, workflow, and safety rules; linked docs explain the details.
+Apply TASTE within these rules. Fix conflicting instructions where they are written instead of adding another copy.
+
 - Never print, log, paste, or return secret values, database URLs, connection
   strings, bearer tokens, webhook URLs, or raw environment variables. Report
   only secret names, presence booleans, digests, and fixed-vocabulary outcomes.
@@ -17,5 +21,10 @@
 
 # Engineering review
 
-Read [taste.md](taste.md) before substantive implementation or review.
 Keep [doing.md](doing.md) as one current status, distinguishing planned work from verified outcomes.
+
+## Shell commands
+
+Keep descriptions and other text from being run as commands.
+For example, put a pull request description in `description.md`, then use `gh pr create --body-file description.md`.
+That reads the file as text; it does not run code written inside it.

@@ -462,12 +462,16 @@ monitor is still required to notify you if Fly or the whole app is unreachable.
 For an incident or schema change, stop writes immediately:
 
 ```bash
-fly scale count 0 -a tradagent
+fly scale count 0 -a tradagent --process-group app --yes
+fly scale count 0 -a tradagent --process-group trader --yes
 fly status -a tradagent
 ```
 
-The worker uses Fly's `always` restart policy, so killing its process is not a
-pause mechanism. Scaling the process group to zero remains authoritative.
+The workers use Fly's `always` restart policy, so killing a process is not a
+pause mechanism. Scale each deployed process group to zero: an unqualified
+count command can affect only the default `app` group and leave `trader` running.
+Verify zero Machines afterward. Scaling to zero preserves persistent volumes
+and the separate Postgres database.
 
 Back up Postgres before changing schema. Apply migrations with a dedicated schema
 administrator, never `MEDIA_DB_URL`; follow [`migrations/README.md`](../migrations/README.md).

@@ -1,8 +1,26 @@
 # What we are doing
 
-Updated: 2026-09-08 04:38 UTC.
+Updated: 2026-10-18.
 
-The delivered audit fixes are integrated and locally verified in London through `d51e422`. The full [33-finding audit plan](docs/audit-fix-plan-2026-09-06.md), including C1–C4, remains **in progress**. Nothing has been deployed. [What changed, and why](docs/audit-repairs-explained.md) explains the work in plain English.
+The delivered audit fixes are integrated and locally verified in London through `d51e422`. The full [33-finding audit plan](docs/audit-fix-plan-2026-09-06.md), including C1–C4, is **paused at the user’s request**; unfinished work is preserved below. Nothing has been deployed. [What changed, and why](docs/audit-repairs-explained.md) explains the work in plain English.
+
+## Archival request
+
+The user requested archiving all TradingAgents workspaces before deleting local checkouts on 2026-10-18. Implementation remains paused. A private recovery repository, `clarkipeng/TradingAgents-archive-2026-10-18`, has been created with GitHub Actions disabled. Preservation and remote verification are in progress; this is not yet a verified backup.
+
+Local branches, unfinished canonical-checkout changes, London documentation edits, and worker handoffs are being preserved without merging unfinished experiments. Credentials and original local artifacts have been copied outside the repository to `~/Documents/TradingAgents-archive-2026-10-18/local-only/`; plaintext credentials must not be uploaded. The archive's index will record final branch hashes, recovery instructions, verification, and workspace retirement results.
+
+## Disable request
+
+The user requested disabling TradingAgents on 2026-09-15. Local audit wakeup `io.tradingagents.audit-fleet-wake-20260906` is disabled in launchd, unloaded, and removed from the startup folder. Its definition is preserved under `~/Library/LaunchAgents.disabled/tradingagents-20260915/`. The audit continuation state prevents further automatic work.
+
+Terra, Sol, and Luna have no active execution processes. No local TradingAgents trading/collector process, TradingAgents crontab entry, or matching Repowire scheduled message was found. Code, stored evidence, and worker history remain preserved.
+
+**Cloud shutdown is complete and verified (2026-09-16).** After interactive Fly sign-in, both deployed process groups in `tradagent` were explicitly scaled to zero: `app` (collector) and `trader` (research/supervisor). `fly status` and the Machines API now show zero Machines. The original `temporal_store` volume is preserved and detached; Postgres was not changed or deleted. No cloud worker remains to generate new collector alerts, though already queued mail may still arrive.
+
+The first unqualified scale-to-zero command affected only the default `app` group. The `trader` group was then stopped explicitly, and the production-runbook pause commands now name both groups. The shutdown record contains sanitized before/after inventories in `.context/disable-tradingagents/`.
+
+The checks below were completed on 2026-09-08; they were not rerun for this operational pause.
 
 ## Integrated and verified locally
 
@@ -23,7 +41,7 @@ At the final combined source:
 
 The first combined broad run exposed a CLI source-selection fixture reaching its independent shadow collector. That fixture is isolated; the corrected broad run above passes. Earlier focused results are superseded by this combined proof. No production deployment, paid model-quality experiment, or infrastructure cutover was performed.
 
-Code corrections are `6055e8d` (production lifecycle and replay consumers), `5d2fce3` (concurrent cache and offline comparison), `d51e422` (fixture isolation), and `c9c0b6d` (deployment fixture). They follow the selectively integrated worker candidates through `0c157f3`. The user's uncommitted `AGENTS.md` and `taste.md` edits remain preserved.
+Code corrections are `6055e8d` (production lifecycle and replay consumers), `5d2fce3` (concurrent cache and offline comparison), `d51e422` (fixture isolation), and `c9c0b6d` (deployment fixture). They follow the selectively integrated worker candidates through `0c157f3`. The user's `AGENTS.md` and `taste.md` edits are included in the archival checkpoint.
 
 ## Remaining work and ownership
 
@@ -39,6 +57,6 @@ London owns the residual audit scope. The delivered worker assignments are compl
 
 The work reused visible Sightmesh workers with separate file ownership. London corrected gaps at the actual consumers instead of commissioning another general review. No reliable per-category token or dollar totals are available for implementation, management, corrections, audits, or wakeups, so no numerical savings are claimed.
 
-The 15-minute fallback remains loaded but suppresses model prompts while London owns the remaining work and workers have no assignment. Six local guard fixtures verify active-work, approval, review-pending, and root-owned behavior. Native terminal callbacks remain available. Automatic push into this Conductor chat has not been established; this is not a claim of continuous autonomous follow-up here. Sol archival remains held by the workspace service's unconfirmed detached-tool cleanup; repeated archive attempts have stopped and its source is preserved.
+The 15-minute fallback is now disabled and unloaded per the user’s request. Its definition and prior six-fixture validation are preserved. No automatic audit continuation is intended while the project is paused. Sol archival remains held by the workspace service's unconfirmed detached-tool cleanup; repeated archive attempts have stopped and its source is preserved.
 
 Exact session identities, reconciliation notes, wake state, and check logs are retained in the ignored `.context/audit-fleet/`. [taste.md](taste.md) records the recurring engineering and efficiency lessons at their source.
