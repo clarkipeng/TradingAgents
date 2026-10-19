@@ -1,0 +1,42 @@
+# Container for the media poller — a long-running (or scheduled) data collector
+# that accumulates social/news history into a database for backtesting.
+#
+# Build:  docker build -f Dockerfile.poller -t tradingagents-poller .
+# Run  :  docker run --rm -e MEDIA_POLLER_TICKERS=NVDA,AAPL \
+#                     -e MEDIA_DB_URL=postgresql+psycopg://user:pass@host:5432/trading \
+#                     tradingagents-poller
+#
+# The default ENTRYPOINT runs the hourly daemon. Override CMD for one-shot/cron
+# (e.g. `--once`) or inspection (`--stats`).
+
+FROM python:3.12-slim AS builder
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+WORKDIR /build
+COPY . .
+# Install with the [poller] extra so networked stores (Postgres, …) work.
+RUN pip install --no-cache-dir ".[poller]"
+
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+RUN useradd --create-home appuser \
+ && install -d -m 0755 -o appuser -g appuser /home/appuser/.tradingagents
+USER appuser
+WORKDIR /home/appuser/app
+
+COPY --from=builder --chown=appuser:appuser /build .
+
+ENTRYPOINT ["tradingagents-poller"]
+# Tickers come from MEDIA_POLLER_TICKERS; override CMD to add flags like --once.
+CMD []

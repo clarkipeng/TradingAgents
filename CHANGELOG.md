@@ -6,6 +6,52 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Breaking changes within the 0.x line are called out explicitly.
 
+## [Unreleased]
+
+### Added
+
+- **Shared macro brief (macro theme grounding).** A configurable theme registry
+  (`macro_themes`) maps macro themes to news queries, FRED series, and
+  prediction-market topics, and a ticker→theme map (`ticker_themes`) declares
+  each name's sensitivities. When `macro_brief_enabled` is set, a single macro
+  brief is built once per run over the union of a ticker's themes plus
+  `macro_brief_default_themes` and injected into every agent's state as
+  `macro_context`, giving macro-sensitive names (e.g. NVDA/MU) a consistent
+  global backdrop and avoiding per-ticker macro re-fetching. The News Analyst
+  builds on the brief instead of re-deriving the macro view. Fail-open: a
+  macro-data outage degrades the brief rather than aborting the run.
+  See `docs/portfolio-and-macro-design.md` (Part A).
+- **Media poller** (`tradingagents-poller` / `python -m tradingagents.poller`):
+  hourly or scheduled polling of StockTwits, Reddit, Bluesky, X (paid), Truth
+  Social, and news RSS into a deduped store with look-ahead-safe windowing, for
+  accumulating social/news history to backtest on. Fully env-var configurable
+  (`MEDIA_POLLER_*`) for cloud hosting, with a `Dockerfile.poller`,
+  `docker-compose.poller.yml`, a Fly.io `fly.toml`, and
+  `docs/poller-deployment.md`.
+- **Incremental, trading-hours-aware polling.** Each poll now stores only items
+  posted since the previous poll (`last_poll_utc`, persisted in a `poll_state`
+  table so it survives restarts); after an overnight/weekend/holiday gap the
+  window sweeps the whole gap so the pre-open cycle sees everything that
+  accumulated. The daemon gates to the extended US session (04:00–20:00 ET) on
+  NYSE trading days via `dataflows.trading_clock` (full holiday/half-day calendar
+  from `exchange-calendars`, in the `poller` extra; degrades to weekends-only if
+  absent). Disable gating with `--no-trading-hours` / `MEDIA_POLLER_TRADING_HOURS=false`.
+- **Macro snapshotting in the poller.** Each cycle also captures, per macro
+  theme, global/theme news headlines (Google News, stored in `media_posts` under
+  `@<theme>`) and live Polymarket implied probabilities (a `macro_odds`
+  time series, read look-ahead-safe via `store.odds_asof(end)`). These can't be
+  backfilled, so they're recorded as they happen; FRED is omitted (fetched live
+  at backtest, being fully historical). Toggle with `--no-macro`. Adds
+  `polymarket.iter_forward_markets()` for structured odds.
+- **Pluggable media store** (`tradingagents.dataflows.media_store`): local SQLite
+  by default (no extra deps), or any networked database via `MEDIA_DB_URL`
+  (e.g. Postgres) with the `poller` optional extra
+  (`pip install "tradingagents[poller]"`). Structured fetchers live in
+  `tradingagents.dataflows.media_sources`. `scripts/media_poller.py` is kept as
+  a thin shim.
+- **Design + paper drafts** for portfolio-level management and macro grounding:
+  `docs/portfolio-and-macro-design.md` and `docs/paper/trading-agents-portfolio.md`.
+
 ## [0.3.0] — 2026-06-22
 
 Stabilization and extensibility release: a CI gate, a unified verified

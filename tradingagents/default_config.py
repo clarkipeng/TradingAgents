@@ -120,6 +120,55 @@ DEFAULT_CONFIG = _apply_env_overrides({
         "ECB Bank of England BOJ central bank policy",
         "oil commodities supply chain energy",
     ],
+    # Macro/global-news theme grounding (see docs/portfolio-and-macro-design.md, Part A).
+    # When ``macro_brief_enabled`` is True, a single macro brief is built once per
+    # run from the union of the ticker's mapped themes (``ticker_themes``) and
+    # ``macro_brief_default_themes``, then injected into every agent's state as
+    # ``macro_context``. Each theme pulls its FRED series and prediction-market
+    # topics; ``queries`` guide the News Analyst's targeted ticker/theme searches.
+    # This gives macro-sensitive names (e.g. semis like NVDA/MU) a consistent
+    # global/political backdrop and avoids re-deriving macro per ticker.
+    "macro_brief_enabled": True,
+    "macro_brief_default_themes": ["rates", "trade"],  # always included
+    "macro_themes": {
+        "rates": {
+            "queries": ["Federal Reserve interest rate decision", "inflation CPI outlook"],
+            "fred": ["fed_funds_rate", "10y_treasury", "core_pce"],
+            "prediction_topics": ["Fed rate cut", "recession 2026"],
+        },
+        "trade": {
+            "queries": ["tariffs trade war sanctions", "export controls"],
+            "fred": ["vix"],
+            "prediction_topics": ["tariffs", "US China trade"],
+        },
+        "semiconductors": {
+            "queries": ["semiconductor export controls China", "CHIPS Act subsidy",
+                        "TSMC capacity", "AI accelerator demand"],
+            "fred": [],
+            "prediction_topics": ["China Taiwan", "chip export ban"],
+        },
+        "ai_capex": {
+            "queries": ["hyperscaler capex data center buildout",
+                        "AI infrastructure spending"],
+            "fred": [],
+            "prediction_topics": ["AI bubble"],
+        },
+        "energy": {
+            "queries": ["oil prices OPEC supply", "energy commodities"],
+            "fred": [],
+            "prediction_topics": ["oil price", "OPEC"],
+        },
+    },
+    # Per-ticker macro sensitivities. Unknown tickers fall back to the default
+    # themes only. Curate the big macro-driven names here; a future phase can
+    # LLM-classify and cache unknown tickers (see design doc A2).
+    "ticker_themes": {
+        "NVDA": ["semiconductors", "ai_capex", "trade"],
+        "MU":   ["semiconductors", "trade", "rates"],
+        "AMD":  ["semiconductors", "ai_capex"],
+        "TSM":  ["semiconductors", "trade"],
+        "AAPL": ["trade", "semiconductors"],
+    },
     # Data vendor configuration
     # Category-level configuration (default for all tools in category).
     # The configured value is the exact vendor chain — requests are NOT silently

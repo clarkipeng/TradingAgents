@@ -29,6 +29,7 @@ from tradingagents.agents.utils.agent_utils import (
 )
 from tradingagents.agents.utils.memory import TradingMemoryLog
 from tradingagents.dataflows.config import set_config
+from tradingagents.dataflows.macro_brief import build_macro_brief
 from tradingagents.dataflows.utils import safe_ticker_component
 from tradingagents.default_config import DEFAULT_CONFIG
 from tradingagents.llm_clients import create_llm_client
@@ -318,6 +319,16 @@ class TradingAgentsGraph:
         identity = resolve_instrument_identity(ticker)
         return build_instrument_context(ticker, asset_type, identity)
 
+    def resolve_macro_context(self, ticker: str, trade_date: str) -> str:
+        """Build the shared macro brief for this run (see macro_brief module).
+
+        Computed once and injected into every agent's state as ``macro_context``
+        so macro-sensitive names anchor to a single, look-ahead-safe global view
+        instead of each analyst re-deriving the backdrop. Returns "" when
+        ``macro_brief_enabled`` is off, leaving the prior behavior intact.
+        """
+        return build_macro_brief(ticker, str(trade_date), self.config)
+
     def propagate(self, company_name, trade_date, asset_type: str = "stock"):
         """Run the trading agents graph for a company on a specific date.
 
@@ -380,12 +391,14 @@ class TradingAgentsGraph:
         # deterministically resolved instrument identity for all agents.
         past_context = self.memory_log.get_past_context(company_name)
         instrument_context = self.resolve_instrument_context(company_name, asset_type)
+        macro_context = self.resolve_macro_context(company_name, trade_date)
         init_agent_state = self.propagator.create_initial_state(
             company_name,
             trade_date,
             asset_type=asset_type,
             past_context=past_context,
             instrument_context=instrument_context,
+            macro_context=macro_context,
         )
         args = self.propagator.get_graph_args()
 

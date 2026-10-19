@@ -65,6 +65,30 @@ def _is_forward_looking(market: dict, now: datetime) -> bool:
     )
 
 
+def iter_forward_markets(topic: str, limit: int = 20) -> list[dict]:
+    """Structured, volume-sorted forward-looking markets for ``topic``.
+
+    Public structured counterpart to :func:`get_prediction_markets` (which
+    formats a string). Used by the poller to snapshot implied probabilities over
+    time — past odds cannot be re-fetched from Gamma, so they must be captured
+    live. Returns ``[]`` on network error (fail-open, like the formatter).
+    """
+    try:
+        data = _request("public-search", {"q": topic, "limit_per_type": max(limit, 20)})
+    except requests.RequestException as e:
+        logger.warning("Polymarket search failed for %r: %s", topic, e)
+        return []
+    now = datetime.now(timezone.utc)
+    candidates = [
+        m
+        for event in data.get("events", [])
+        for m in event.get("markets", [])
+        if _is_forward_looking(m, now)
+    ]
+    candidates.sort(key=lambda m: m.get("volumeNum") or 0, reverse=True)
+    return candidates[:limit]
+
+
 def get_prediction_markets(topic: str, limit: int | None = None) -> str:
     """Return live prediction-market probabilities for an event topic.
 

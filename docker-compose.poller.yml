@@ -1,0 +1,40 @@
+# Local/self-hosted stack for the media poller + its Postgres store.
+#
+#   docker compose -f docker-compose.poller.yml up -d        # poller + postgres
+#   docker compose -f docker-compose.poller.yml run --rm poller --stats
+#
+# Set MEDIA_POLLER_TICKERS (and any source tokens) in .env. For a managed cloud
+# database, drop the `db` service and point MEDIA_DB_URL at the managed instance.
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: trading
+      POSTGRES_PASSWORD: trading
+      POSTGRES_DB: trading
+    volumes:
+      - poller_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trading"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  poller:
+    build:
+      context: .
+      dockerfile: Dockerfile.poller
+    env_file:
+      - .env
+    environment:
+      # .env supplies MEDIA_POLLER_TICKERS (+ X_BEARER_TOKEN / TRUTHSOCIAL_TOKEN).
+      MEDIA_DB_URL: postgresql+psycopg://trading:trading@db:5432/trading
+      MEDIA_POLLER_INTERVAL: "3600"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  poller_pgdata:
