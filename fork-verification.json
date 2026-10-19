@@ -1,0 +1,11 @@
+{
+  "repository": "clarkipeng/TradingAgents",
+  "visibility": "public",
+  "source_and_tag_refs_verified": 66,
+  "index_ref": "refs/heads/archive/2026-10-18/index",
+  "existing_fork_refs_unchanged": true,
+  "fresh_clone_and_git_integrity": "passed",
+  "artifact_digests_verified": 281,
+  "historical_bundle_matches_previously_restored_backup": true,
+  "github_actions_enabled": false
+}

@@ -6,7 +6,7 @@
   },
   {
     "source_ref": "refs/heads/agent-trading-simulation-backtest",
-    "commit": "bb7156d8c0d33de950841b706754b56c5e41074d",
+    "commit": "af4398ef505ae155a2b0bfe0859a7f7d68d9de05",
     "fork_ref": "refs/heads/archive/2026-10-18/agent-trading-simulation-backtest"
   },
   {
