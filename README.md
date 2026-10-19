@@ -1,20 +1,20 @@
 # TradingAgents recovery archive
 
-Private preservation snapshot requested on 2026-10-18 before removing local TradingAgents checkouts. This repository is an archive, not a deployment candidate. GitHub Actions are disabled. Nothing was deployed during archival.
+Preservation snapshot in the existing `clarkipeng/TradingAgents` fork, selected by the user on 2026-10-18 before removing local TradingAgents checkouts. The fork is public. Saved work lives under `archive/2026-10-18/` branches and `archive-2026-10-18/` tags; its existing default branch is unchanged. GitHub Actions are disabled. Nothing was deployed during archival.
 
 ## Restore code
 
 ```sh
-git clone https://github.com/clarkipeng/TradingAgents-archive-2026-10-18.git
-cd TradingAgents-archive-2026-10-18
-git switch --track origin/agent-trading-simulation-backtest
+git clone https://github.com/clarkipeng/TradingAgents.git
+cd TradingAgents
+git switch --track origin/archive/2026-10-18/agent-trading-simulation-backtest
 ```
 
-`agent-trading-simulation-backtest` contains London's integrated audit fixes and latest shutdown documentation. The final source checkpoint is `bb7156d` (archival status documentation; code remains paused). `archive/canonical-wip-2026-10-18` preserves the older canonical checkout's 8 modified and 18 untracked source files without changing its original `main` branch. `cdt/8224-ta-audit-lead` includes its previously uncommitted final handoff (`63dff52`). All other local branch tips and tags are retained separately; unfinished or rejected experiments have not been merged. Remote-tracking tips are preserved under `archive/remote-tips/`.
+`archive/2026-10-18/agent-trading-simulation-backtest` contains London's integrated audit fixes and latest shutdown documentation. The final source checkpoint is `bb7156d` (archival status documentation; code remains paused). `archive/2026-10-18/archive/canonical-wip-2026-10-18` preserves the older canonical checkout's 8 modified and 18 untracked source files without changing its original `main` branch. `archive/2026-10-18/cdt/8224-ta-audit-lead` includes its previously uncommitted final handoff (`63dff52`). All other local branch tips and tags are retained separately; unfinished or rejected experiments have not been merged. Remote-tracking tips are preserved under `archive/2026-10-18/archive/remote-tips/`.
 
 The `git-history.bundle` file additionally preserves original Conductor/Codex checkpoint refs listed in `historical-refs.json`. It predates the new archival commits, which are on the remote branches. To recover every original ref, run `git clone --mirror git-history.bundle recovered.git` from this index branch.
 
-See [git-refs.json](git-refs.json) for exact hashes, [worktree-inventory.json](worktree-inventory.json) for the original eight checkouts and dirty-file inventory, and [canonical-snapshot.json](canonical-snapshot.json) for the WIP snapshot. Do not treat every worker branch as approved code. In particular, `cdt/bf9a-ta-luna-p4-resum` retains rejected P5 work for recovery only.
+See [fork-refs.json](fork-refs.json) for exact destination refs and hashes (`git-refs.json` describes the earlier private backup), [worktree-inventory.json](worktree-inventory.json) for the original eight checkouts and dirty-file inventory, and [canonical-snapshot.json](canonical-snapshot.json) for the WIP snapshot. Do not treat every worker branch as approved code. In particular, `archive/2026-10-18/cdt/bf9a-ta-luna-p4-resum` retains rejected P5 work for recovery only.
 
 ## What was done and why
 
@@ -34,4 +34,4 @@ Dependency environments, bytecode, test/lint caches, and generated package metad
 
 `conductor-workspaces.json` and `sightmesh-workspaces.json` record the initial inventory. Calgary was already archived. London must be archived by the user in Conductor after preservation: current Conductor support does not expose an agent workspace-control API. Sightmesh has 24 of 26 TradingAgents workspaces archived, including 14 archived during this request. `ta-sol-execution-v2` and `ta-luna-p4-resume` remain blocked by the service's unconfirmed detached-tool cleanup. Both have zero running execution processes and all their work is preserved. See `sightmesh-retirement.json` and `sightmesh-final.json`. No implementation agents were woken, and no original repository or branch was deleted.
 
-The backup was verified by a fresh GitHub clone, exact remote-ref comparison, Git integrity checks, all 281 artifact checksums, five restored SQLite integrity checks, and restoration of the original Git bundle (421 refs plus eight checkout-head commit objects). See `remote-verification.json`. Local credentials and raw evidence remain in the external `local-only/` directory described above. GitHub Actions remain disabled; this private repository will be marked archived after the final status upload.
+The backup was verified by a fresh GitHub clone, exact remote-ref comparison, Git integrity checks, all 281 artifact checksums, five restored SQLite integrity checks, and restoration of the original Git bundle (421 refs plus eight checkout-head commit objects). See `remote-verification.json`. Local credentials and raw evidence remain in the external `local-only/` directory described above. GitHub Actions remain disabled. The earlier private recovery repository remains archived as an additional verified backup. Verification against this fork is recorded in `fork-verification.json`; the earlier `remote-verification.json` refers to the private backup.
