@@ -6,9 +6,13 @@ The delivered audit fixes are integrated and locally verified in London through 
 
 ## Archival request
 
-The user requested archiving all TradingAgents workspaces before deleting local checkouts on 2026-10-18. Implementation remains paused. A private recovery repository, `clarkipeng/TradingAgents-archive-2026-10-18`, has been created with GitHub Actions disabled. Preservation and remote verification are in progress; this is not yet a verified backup.
+The user's 2026-10-18 request to preserve all TradingAgents work before deleting local checkouts has been carried out in the private [recovery archive](https://github.com/clarkipeng/TradingAgents-archive-2026-10-18). GitHub Actions are disabled. All 43 original/current local branches (including the canonical WIP snapshot), 16 tags, and 7 remote-tracking tips were uploaded; the index also preserves 421 historical checkpoint refs and eight checkout-head records in a Git bundle. A fresh GitHub clone passed Git integrity checks, all 281 artifact digests matched, and five local research databases passed restored integrity checks. The original bundle was restored and its refs/commit objects verified. Implementation remains paused.
 
-Local branches, unfinished canonical-checkout changes, London documentation edits, and worker handoffs are being preserved without merging unfinished experiments. Credentials and original local artifacts have been copied outside the repository to `~/Documents/TradingAgents-archive-2026-10-18/local-only/`; plaintext credentials must not be uploaded. The archive's index will record final branch hashes, recovery instructions, verification, and workspace retirement results.
+The archive preserves London's documentation edits, the canonical checkout's unfinished source, worker handoffs, review artifacts, attachments, and local research data without merging unfinished experiments. Credentials and original local artifacts are separately preserved in `~/Documents/TradingAgents-archive-2026-10-18/local-only/`, outside the repository; retain that directory when removing local checkouts. Plaintext credentials were not uploaded. Remote cloud stores remain untouched.
+
+Sightmesh now has 24 of the 26 TradingAgents workspaces archived (14 newly archived). Its service still refuses archival of `ta-sol-execution-v2` and `ta-luna-p4-resume` because detached-tool cleanup is unconfirmed. Their work is already in the verified archive; no execution process was running at inventory. No repeated archive attempts or implementation wakeups were issued. Calgary is already archived in Conductor. London requires the user's Archive action in Conductor because its supported local-workspace controls are user-only. No local repository was deleted.
+
+See the archive's `README.md`, ref manifests, verification record, and workspace retirement report for recovery details and exact identities. The archive index is the final preservation record; the September verification below describes historical engineering checks, not new test runs.
 
 ## Disable request
 
@@ -57,6 +61,6 @@ London owns the residual audit scope. The delivered worker assignments are compl
 
 The work reused visible Sightmesh workers with separate file ownership. London corrected gaps at the actual consumers instead of commissioning another general review. No reliable per-category token or dollar totals are available for implementation, management, corrections, audits, or wakeups, so no numerical savings are claimed.
 
-The 15-minute fallback is now disabled and unloaded per the user’s request. Its definition and prior six-fixture validation are preserved. No automatic audit continuation is intended while the project is paused. Sol archival remains held by the workspace service's unconfirmed detached-tool cleanup; repeated archive attempts have stopped and its source is preserved.
+The 15-minute fallback is now disabled and unloaded per the user’s request. Its definition and prior six-fixture validation are preserved. No automatic audit continuation is intended while the project is paused. Sol execution and Luna P4 archival remain held by the workspace service's unconfirmed detached-tool cleanup; their source and handoffs are preserved in the verified private archive.
 
 Exact session identities, reconciliation notes, wake state, and check logs are retained in the ignored `.context/audit-fleet/`. [taste.md](taste.md) records the recurring engineering and efficiency lessons at their source.
